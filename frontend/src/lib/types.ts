@@ -204,3 +204,97 @@ export interface SkillDetailData {
   target_career_requirement: string;
   recommended_next_action: string;
 }
+
+// ----------------------------------------------------
+// Roadmap System Types
+// ----------------------------------------------------
+
+export interface RoadmapTask {
+  id: string;
+  title: string;
+  skill: string;
+  estimated_minutes: number;
+  why_matters: string;
+  practice_activity: string;
+  completed: boolean;
+  completed_at?: string;
+}
+
+export interface RoadmapProject {
+  id: string;
+  title: string;
+  objective: string;
+  skills_practiced: string[];
+  difficulty: string;
+  expected_outcome: string;
+  resume_relevance: string;
+  completed: boolean;
+}
+
+export interface RoadmapMilestone {
+  id: string;
+  title: string;
+  criteria: string;
+  completed: boolean;
+}
+
+export interface RoadmapSkillItem {
+  name: string;
+  status: string;
+  priority: string;
+  level: string;
+}
+
+export interface RoadmapPhase {
+  phase_id: string;
+  name: string;
+  description: string;
+  estimated_weeks: number;
+  skills: RoadmapSkillItem[];
+  learning_objectives: string[];
+  tasks: RoadmapTask[];
+  projects: RoadmapProject[];
+  milestones: RoadmapMilestone[];
+}
+
+export interface RoadmapData {
+  id: string;
+  user_id: string;
+  target_career_id?: string;
+  target_role: string;
+  user_level: string;
+  overall_progress_percent: number;
+  is_active: boolean;
+  is_outdated: boolean;
+  hours_per_day: number;
+  days_per_week: number;
+  preferred_learning_style: string;
+  total_estimated_weeks: number;
+  phases: RoadmapPhase[];
+  completed_task_ids: string[];
+  completed_milestone_ids: string[];
+  completed_project_ids: string[];
+}
+
+export interface DailyTasksData {
+  roadmap_id: string;
+  target_role: string;
+  current_phase_name: string;
+  hours_budget: number;
+  today_focus_title: string;
+  why_it_matters: string;
+  tasks: RoadmapTask[];
+}
+
+export interface RoadmapProgressData {
+  roadmap_id: string;
+  target_role: string;
+  overall_progress_percent: number;
+  completed_tasks_count: number;
+  total_tasks_count: number;
+  completed_projects_count: number;
+  total_projects_count: number;
+  completed_milestones_count: number;
+  total_milestones_count: number;
+  is_outdated: boolean;
+}

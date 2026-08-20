@@ -10,7 +10,11 @@ import {
   SkillProfileData,
   UserSkill,
   SkillGap,
-  SkillDetailData
+  SkillDetailData,
+  RoadmapData,
+  DailyTasksData,
+  RoadmapProgressData,
+  RoadmapPhase
 } from './types';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api/v1';
@@ -137,4 +141,58 @@ export async function getSkillDetails(skillId: string): Promise<SkillDetailData>
 
 export async function recalculateSkills(): Promise<SkillProfileData> {
   return request<SkillProfileData>('/skills/recalculate', { method: 'POST' });
+}
+
+// Roadmap System APIs
+export async function getCurrentRoadmap(): Promise<RoadmapData | null> {
+  try {
+    return await request<RoadmapData>('/roadmap/current', { cache: 'no-store' });
+  } catch (err) {
+    return null;
+  }
+}
+
+export async function generateRoadmap(params?: {
+  user_level?: string;
+  hours_per_day?: number;
+  days_per_week?: number;
+  preferred_learning_style?: string;
+  target_career_id?: string;
+}): Promise<RoadmapData> {
+  return request<RoadmapData>('/roadmap/generate', {
+    method: 'POST',
+    body: JSON.stringify(params || {}),
+  });
+}
+
+export async function getTodayTasks(): Promise<DailyTasksData> {
+  return request<DailyTasksData>('/roadmap/today', { cache: 'no-store' });
+}
+
+export async function completeRoadmapTask(taskId: string): Promise<RoadmapProgressData> {
+  return request<RoadmapProgressData>(`/roadmap/tasks/${taskId}/complete`, {
+    method: 'POST',
+  });
+}
+
+export async function uncompleteRoadmapTask(taskId: string): Promise<RoadmapProgressData> {
+  return request<RoadmapProgressData>(`/roadmap/tasks/${taskId}/uncomplete`, {
+    method: 'POST',
+  });
+}
+
+export async function recalculateRoadmap(): Promise<RoadmapData> {
+  return request<RoadmapData>('/roadmap/recalculate', { method: 'POST' });
+}
+
+export async function updateRoadmapPreferences(prefs: {
+  hours_per_day: number;
+  days_per_week: number;
+  preferred_learning_style: string;
+  user_level: string;
+}): Promise<RoadmapData> {
+  return request<RoadmapData>('/roadmap/preferences', {
+    method: 'PUT',
+    body: JSON.stringify(prefs),
+  });
 }

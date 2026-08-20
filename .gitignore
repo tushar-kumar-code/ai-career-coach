@@ -23,6 +23,7 @@ backend/.pytest_cache/
 backend/*.db
 backend/*.sqlite3
 backend/uploads/*
+
 !backend/uploads/.gitkeep
 
 # Environment variables & secrets

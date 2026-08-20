@@ -13,25 +13,33 @@ import {
   TrendingUp, 
   CheckCircle2, 
   ArrowRight,
-  Target
+  Target,
+  Clock,
+  Layers
 } from 'lucide-react';
-import { getAssessmentResult, getResumeAnalysis } from '@/lib/api-client';
-import { AssessmentResultData, ResumeAnalysisData } from '@/lib/types';
+import { getAssessmentResult, getResumeAnalysis, getCurrentRoadmap, getTodayTasks } from '@/lib/api-client';
+import { AssessmentResultData, ResumeAnalysisData, RoadmapData, DailyTasksData } from '@/lib/types';
 
 export default function DashboardPage() {
   const [assessmentData, setAssessmentData] = useState<AssessmentResultData | null>(null);
   const [resumeData, setResumeData] = useState<ResumeAnalysisData | null>(null);
+  const [roadmapData, setRoadmapData] = useState<RoadmapData | null>(null);
+  const [todayData, setTodayData] = useState<DailyTasksData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function loadDashboardData() {
       try {
-        const [aRes, rRes] = await Promise.all([
+        const [aRes, rRes, rmRes, tRes] = await Promise.all([
           getAssessmentResult(),
-          getResumeAnalysis()
+          getResumeAnalysis(),
+          getCurrentRoadmap(),
+          getTodayTasks().catch(() => null)
         ]);
         setAssessmentData(aRes);
         setResumeData(rRes);
+        setRoadmapData(rmRes);
+        setTodayData(tRes);
       } catch (err) {
         console.error('Failed to load dashboard data:', err);
       } finally {
@@ -41,7 +49,7 @@ export default function DashboardPage() {
     loadDashboardData();
   }, []);
 
-  const targetCareer = assessmentData?.selected_target_career || resumeData?.target_match?.target_career_name || null;
+  const targetCareer = assessmentData?.selected_target_career || resumeData?.target_match?.target_career_name || roadmapData?.target_role || null;
   const atsScore = resumeData?.ats_score ?? null;
   const topMatch = assessmentData?.analysis?.recommended_careers?.[0];
   const readinessScore = topMatch?.match_percentage || (atsScore ? Math.round((atsScore + (topMatch?.match_percentage || 70)) / 2) : null);
@@ -59,14 +67,21 @@ export default function DashboardPage() {
             Welcome to your AI Career Dashboard
           </h1>
           <p className="text-slate-300 text-sm leading-relaxed mb-6">
-            Your Career Discovery profile and Resume Intelligence metrics are synchronized in real-time.
+            Your Career Discovery profile, Resume Intelligence metrics, and Learning Roadmap are synchronized in real-time.
           </p>
           <div className="flex flex-wrap gap-4">
             <Link
-              href="/assessment"
+              href="/roadmap"
               className="px-5 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm transition-all shadow-lg shadow-indigo-500/25 flex items-center space-x-2"
             >
-              <Compass className="w-4 h-4" />
+              <MapPin className="w-4 h-4" />
+              <span>Career Roadmap</span>
+            </Link>
+            <Link
+              href="/assessment"
+              className="px-5 py-2.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 font-semibold text-sm transition-all flex items-center space-x-2"
+            >
+              <Compass className="w-4 h-4 text-indigo-400" />
               <span>Career Discovery</span>
             </Link>
             <Link
@@ -122,6 +137,24 @@ export default function DashboardPage() {
 
         <div className="p-5 rounded-xl bg-slate-900/60 border border-slate-800">
           <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Roadmap Progress</span>
+            <Layers className="w-4 h-4 text-indigo-400" />
+          </div>
+          {roadmapData ? (
+            <>
+              <div className="text-3xl font-bold text-white mb-1">{roadmapData.overall_progress_percent}%</div>
+              <p className="text-xs text-indigo-400 font-medium">{roadmapData.completed_task_ids.length} Tasks Completed</p>
+            </>
+          ) : (
+            <>
+              <div className="text-xl font-bold text-slate-400 mb-1">No Roadmap</div>
+              <p className="text-xs text-slate-500 font-medium">Create career roadmap</p>
+            </>
+          )}
+        </div>
+
+        <div className="p-5 rounded-xl bg-slate-900/60 border border-slate-800">
+          <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">ATS Resume Score</span>
             <FileText className="w-4 h-4 text-purple-400" />
           </div>
@@ -137,34 +170,46 @@ export default function DashboardPage() {
             </>
           )}
         </div>
-
-        <div className="p-5 rounded-xl bg-slate-900/60 border border-slate-800">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Extracted Skills</span>
-            <Award className="w-4 h-4 text-pink-400" />
-          </div>
-          {resumeData?.extracted_skills ? (
-            <>
-              <div className="text-3xl font-bold text-white mb-1">{resumeData.extracted_skills.length}</div>
-              <p className="text-xs text-pink-400 font-medium">Extracted from Resume</p>
-            </>
-          ) : (
-            <>
-              <div className="text-xl font-bold text-slate-400 mb-1">Not calculated yet</div>
-              <p className="text-xs text-slate-500 font-medium">Upload resume to extract</p>
-            </>
-          )}
-        </div>
       </div>
 
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
+          {/* Today's Focus Card */}
+          {todayData && (
+            <div className="p-6 rounded-2xl bg-gradient-to-r from-indigo-950/60 to-slate-900 border border-indigo-500/30 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-indigo-400 uppercase tracking-wider flex items-center space-x-1.5">
+                  <Sparkles className="w-4 h-4" />
+                  <span>Today's Focus • {todayData.current_phase_name}</span>
+                </span>
+                <Link href="/roadmap" className="text-xs text-indigo-300 hover:text-white font-semibold flex items-center space-x-1">
+                  <span>View Full Roadmap</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+              </div>
+              <h3 className="text-base font-bold text-white">{todayData.today_focus_title}</h3>
+              <p className="text-xs text-slate-300">{todayData.why_it_matters}</p>
+            </div>
+          )}
+
           <div className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-4">
             <h2 className="text-lg font-bold text-white flex items-center space-x-2">
               <Sparkles className="w-5 h-5 text-indigo-400" />
               <span>Recommended Actions</span>
             </h2>
+
+            {!roadmapData && (
+              <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-200">Create My Career Roadmap</h3>
+                  <p className="text-xs text-slate-400 mt-1">Get a personalized, step-by-step curriculum for your target career.</p>
+                </div>
+                <Link href="/roadmap" className="px-4 py-2 rounded-lg bg-indigo-600 text-white font-semibold text-xs">
+                  Create Roadmap
+                </Link>
+              </div>
+            )}
 
             {!assessmentData && (
               <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 flex items-center justify-between">
@@ -190,14 +235,14 @@ export default function DashboardPage() {
               </div>
             )}
 
-            {assessmentData && resumeData && (
+            {assessmentData && resumeData && roadmapData && (
               <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2">
                 <div className="flex items-center space-x-2 text-emerald-400 text-sm font-bold">
                   <CheckCircle2 className="w-5 h-5" />
-                  <span>Career Discovery Profile & Resume Analysis Synchronized</span>
+                  <span>Discovery Profile, Resume Intelligence & Career Roadmap Synchronized</span>
                 </div>
                 <p className="text-xs text-slate-300">
-                  Target Role: <strong className="text-white">{targetCareer}</strong> | ATS Score: <strong className="text-white">{atsScore}%</strong>
+                  Target Role: <strong className="text-white">{targetCareer}</strong> | ATS Score: <strong className="text-white">{atsScore}%</strong> | Progress: <strong className="text-white">{roadmapData.overall_progress_percent}%</strong>
                 </p>
               </div>
             )}
