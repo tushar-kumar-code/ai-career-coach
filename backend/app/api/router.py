@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.v1 import health, assessment, resume, skills, roadmap, jobs
+from app.api.v1 import health, assessment, resume, skills, roadmap, jobs, interview
 
 api_router = APIRouter()
 
@@ -10,3 +10,4 @@ api_router.include_router(resume.router, prefix="/resume", tags=["Resume Intelli
 api_router.include_router(skills.router, prefix="/skills", tags=["Skill Intelligence System"])
 api_router.include_router(roadmap.router, prefix="/roadmap", tags=["Personalized Career Roadmap System"])
 api_router.include_router(jobs.router, prefix="/jobs", tags=["Job Intelligence System"])
+api_router.include_router(interview.router, prefix="/interview", tags=["AI Mock Interview & Adaptive Engine"])

@@ -19,7 +19,11 @@ import {
   JobMatchAnalysis,
   SavedJobData,
   JobApplicationData,
-  ApplicationHistoryItem
+  ApplicationHistoryItem,
+  InterviewSessionData,
+  InterviewEvaluationData,
+  InterviewFinalReportData,
+  InterviewReadinessData
 } from './types';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api/v1';
@@ -284,4 +288,49 @@ export async function deleteJobApplication(applicationId: string): Promise<boole
 
 export async function getApplicationHistory(applicationId: string): Promise<ApplicationHistoryItem[]> {
   return request<ApplicationHistoryItem[]>(`/jobs/applications/${applicationId}/history`, { cache: 'no-store' });
+}
+
+// AI Mock Interview System APIs
+export async function startInterviewSession(params: {
+  mode: string;
+  target_role?: string;
+  difficulty?: string;
+  question_count?: number;
+  job_id?: string;
+}): Promise<InterviewSessionData> {
+  return request<InterviewSessionData>('/interview/start', {
+    method: 'POST',
+    body: JSON.stringify(params),
+  });
+}
+
+export async function getInterviewSession(sessionId: string): Promise<InterviewSessionData> {
+  return request<InterviewSessionData>(`/interview/session/${sessionId}`, { cache: 'no-store' });
+}
+
+export async function submitInterviewAnswer(sessionId: string, answerText: string): Promise<InterviewEvaluationData> {
+  return request<InterviewEvaluationData>(`/interview/session/${sessionId}/answer`, {
+    method: 'POST',
+    body: JSON.stringify({ answer_text: answerText }),
+  });
+}
+
+export async function nextInterviewQuestion(sessionId: string): Promise<InterviewSessionData> {
+  return request<InterviewSessionData>(`/interview/session/${sessionId}/next`, { method: 'POST' });
+}
+
+export async function completeInterviewSession(sessionId: string): Promise<InterviewFinalReportData> {
+  return request<InterviewFinalReportData>(`/interview/session/${sessionId}/complete`, { method: 'POST' });
+}
+
+export async function getInterviewHistory(): Promise<InterviewSessionData[]> {
+  return request<InterviewSessionData[]>('/interview/history', { cache: 'no-store' });
+}
+
+export async function getInterviewResults(sessionId: string): Promise<InterviewFinalReportData> {
+  return request<InterviewFinalReportData>(`/interview/session/${sessionId}/results`, { cache: 'no-store' });
+}
+
+export async function getInterviewReadiness(): Promise<InterviewReadinessData> {
+  return request<InterviewReadinessData>('/interview/readiness', { cache: 'no-store' });
 }

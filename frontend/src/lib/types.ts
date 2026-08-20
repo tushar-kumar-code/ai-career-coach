@@ -391,3 +391,89 @@ export interface ApplicationHistoryItem {
   changed_at: string;
   notes?: string;
 }
+
+// ----------------------------------------------------
+// AI Mock Interview Engine Types
+// ----------------------------------------------------
+
+export interface STARAnalysisData {
+  situation_feedback?: string;
+  task_feedback?: string;
+  action_feedback?: string;
+  result_feedback?: string;
+  star_complete: boolean;
+}
+
+export interface InterviewEvaluationData {
+  score: number;
+  technical_score: number;
+  communication_score: number;
+  problem_solving_score: number;
+  behavioral_score: number;
+  resume_knowledge_score: number;
+  strengths: string[];
+  weaknesses: string[];
+  missing_points: string[];
+  suggested_improvement: string;
+  ideal_answer_outline: string[];
+  star_analysis?: STARAnalysisData;
+  detected_weak_topic?: string;
+}
+
+export interface InterviewQuestionItem {
+  question_index: number;
+  category: string;
+  difficulty: string;
+  question_text: string;
+  context_tip?: string;
+  user_answer?: string;
+  score?: number;
+  evaluation?: InterviewEvaluationData;
+}
+
+export interface InterviewSessionData {
+  id: string;
+  user_id: string;
+  job_id?: string;
+  target_role: string;
+  mode: string; // Technical, HR, Behavioral, Resume-Based, Job-Specific, Mixed
+  difficulty: string; // Beginner, Intermediate, Advanced
+  question_count: number;
+  current_question_index: number;
+  is_completed: boolean;
+  current_question?: InterviewQuestionItem;
+  overall_score: number;
+  category_scores: Record<string, number>;
+  readiness_status: string; // EXCELLENT, READY, NEARLY READY, NEEDS PRACTICE
+  readiness_explanation?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface InterviewFinalReportData {
+  session_id: string;
+  target_role: string;
+  mode: string;
+  difficulty: string;
+  overall_score: number;
+  technical_score: number;
+  communication_score: number;
+  problem_solving_score: number;
+  behavioral_score: number;
+  resume_knowledge_score: number;
+  readiness_status: string;
+  readiness_explanation: string;
+  strong_areas: string[];
+  weak_areas: string[];
+  recommended_roadmap_topics: string[];
+  questions_review: InterviewQuestionItem[];
+}
+
+export interface InterviewReadinessData {
+  overall_readiness_status: string;
+  average_score: number;
+  total_interviews_completed: number;
+  strongest_mode: string;
+  weakest_topic?: string;
+  recommendation: string;
+}

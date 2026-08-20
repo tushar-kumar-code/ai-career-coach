@@ -45,12 +45,8 @@ class GeminiProvider(BaseLLMProvider):
         system_instruction: str = "You are an expert AI Career Coach."
     ) -> T:
         if not self.api_key:
-            logger.warning("Gemini API Key missing for structured generation. Attempting mock fallback.")
-            # For development when API key is not yet set, return dummy instance if possible
-            try:
-                return output_schema.model_construct()
-            except Exception:
-                raise AIProviderException("Gemini API Key not set and default schema construction failed.")
+            logger.warning("Gemini API Key missing for structured generation. Falling back to service default.")
+            raise AIProviderException("Gemini API Key is not set.")
 
         try:
             from google import genai

@@ -37,3 +37,16 @@ Parse raw job descriptions to extract required skills, preferred skills, experie
 Normalize all extracted skill names to standard technical naming conventions.
 Never fabricate compensation or requirements not mentioned in the text.
 """
+
+ADAPTIVE_INTERVIEW_QUESTION_PROMPT = """
+You are a senior technical hiring manager interviewing a candidate.
+Generate a realistic, adaptive interview question tailored strictly to the candidate's target role, resume projects, verified skills, and previous answer performance.
+Never fabricate candidate projects or achievements not present in their context.
+"""
+
+MULTI_CATEGORY_ANSWER_EVALUATION_PROMPT = """
+You are an expert interview coach evaluating a candidate's answer.
+Evaluate sub-scores across technical correctness, communication clarity, problem solving, behavioral ownership (STAR method), and resume authenticity.
+Provide constructive strengths, missing points, and an ideal answer outline.
+Never make psychological diagnoses or judge sensitive personal characteristics.
+"""
