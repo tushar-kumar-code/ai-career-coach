@@ -11,6 +11,7 @@ from app.models.career_catalog import CareerRole
 from app.models.question import Question
 from app.models.skill_catalog import SkillDefinition
 from app.models.skill_evidence import SkillEvidence
+from app.models.job import Job, SavedJob, JobApplication, ApplicationStatusHistory
 
 __all__ = [
     "Base",
@@ -26,4 +27,8 @@ __all__ = [
     "Question",
     "SkillDefinition",
     "SkillEvidence",
+    "Job",
+    "SavedJob",
+    "JobApplication",
+    "ApplicationStatusHistory",
 ]

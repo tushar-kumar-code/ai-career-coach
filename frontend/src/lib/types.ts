@@ -156,12 +156,12 @@ export interface UserSkill {
   normalized_name: string;
   category: string;
   proficiency_percent: number;
-  proficiency_level: string; // Beginner, Intermediate, Advanced
+  proficiency_level: string;
   confidence_score: number;
-  confidence_status: string; // Claimed, Supported, Verified
+  confidence_status: string;
   target_required_level?: string;
-  gap_status: string; // Matched, Partially Matched, Missing, Weak
-  priority: string; // High, Medium, Low
+  gap_status: string;
+  priority: string;
   priority_reason?: string;
   evidence_sources: string[];
   last_evaluated_at?: string;
@@ -297,4 +297,97 @@ export interface RoadmapProgressData {
   completed_milestones_count: number;
   total_milestones_count: number;
   is_outdated: boolean;
+}
+
+// ----------------------------------------------------
+// Job Intelligence System Types
+// ----------------------------------------------------
+
+export interface JobData {
+  id: string;
+  provider_id?: string;
+  provider_name: string;
+  title: string;
+  company: string;
+  location: string;
+  is_remote: boolean;
+  employment_type: string;
+  experience_level: string;
+  description: string;
+  required_skills: string[];
+  preferred_skills: string[];
+  education_requirements: string;
+  salary_min?: number;
+  salary_max?: number;
+  salary_currency: string;
+  source_url?: string;
+  posted_date?: string;
+  is_saved?: boolean;
+  application_status?: string;
+}
+
+export interface JobMatchBreakdown {
+  overall_score: number;
+  skill_score: number;
+  career_alignment_score: number;
+  resume_score: number;
+  experience_score: number;
+  roadmap_score: number;
+  readiness_status: string; // READY, NEARLY READY, NEEDS SKILL DEVELOPMENT, LOW MATCH
+  readiness_explanation: string;
+}
+
+export interface RoadmapGapConnection {
+  skill_name: string;
+  gap_level: string;
+  roadmap_phase: string;
+  estimated_weeks: number;
+  match_boost_percent: number;
+}
+
+export interface JobMatchAnalysis {
+  job: JobData;
+  match_breakdown: JobMatchBreakdown;
+  matching_skills: string[];
+  missing_skills: string[];
+  strong_matches_explanation: string[];
+  missing_gaps_explanation: string[];
+  roadmap_connections: RoadmapGapConnection[];
+  recommendation: string;
+}
+
+export interface SavedJobData {
+  id: string;
+  user_id: string;
+  job_id: string;
+  notes?: string;
+  saved_at: string;
+  job: JobData;
+}
+
+export interface JobApplicationData {
+  id: string;
+  user_id: string;
+  job_id: string;
+  job_title: string;
+  company: string;
+  location: string;
+  status: string; // Saved, Applied, Assessment, Interview, Offer, Rejected, Withdrawn
+  applied_date?: string;
+  interview_date?: string;
+  notes?: string;
+  source_url?: string;
+  match_percentage: number;
+  readiness_status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ApplicationHistoryItem {
+  id: string;
+  application_id: string;
+  from_status?: string;
+  to_status: string;
+  changed_at: string;
+  notes?: string;
 }

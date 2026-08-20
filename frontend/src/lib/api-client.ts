@@ -14,7 +14,12 @@ import {
   RoadmapData,
   DailyTasksData,
   RoadmapProgressData,
-  RoadmapPhase
+  RoadmapPhase,
+  JobData,
+  JobMatchAnalysis,
+  SavedJobData,
+  JobApplicationData,
+  ApplicationHistoryItem
 } from './types';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api/v1';
@@ -195,4 +200,88 @@ export async function updateRoadmapPreferences(prefs: {
     method: 'PUT',
     body: JSON.stringify(prefs),
   });
+}
+
+// Job Intelligence System APIs
+export async function searchJobs(params?: {
+  query?: string;
+  location?: string;
+  remote_only?: boolean;
+  experience_level?: string;
+}): Promise<JobData[]> {
+  const queryParams = new URLSearchParams();
+  if (params?.query) queryParams.append('query', params.query);
+  if (params?.location) queryParams.append('location', params.location);
+  if (params?.remote_only !== undefined) queryParams.append('remote_only', String(params.remote_only));
+  if (params?.experience_level) queryParams.append('experience_level', params.experience_level);
+
+  const url = `/jobs/search${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+  return request<JobData[]>(url, { cache: 'no-store' });
+}
+
+export async function getRecommendedJobs(): Promise<JobMatchAnalysis[]> {
+  return request<JobMatchAnalysis[]>('/jobs/recommended', { cache: 'no-store' });
+}
+
+export async function getSavedJobs(): Promise<SavedJobData[]> {
+  return request<SavedJobData[]>('/jobs/saved', { cache: 'no-store' });
+}
+
+export async function getJobDetails(jobId: string): Promise<JobData> {
+  return request<JobData>(`/jobs/${jobId}`, { cache: 'no-store' });
+}
+
+export async function getJobMatchAnalysis(jobId: string): Promise<JobMatchAnalysis> {
+  return request<JobMatchAnalysis>(`/jobs/${jobId}/match`, { cache: 'no-store' });
+}
+
+export async function saveJob(jobId: string, notes?: string): Promise<SavedJobData> {
+  const query = notes ? `?notes=${encodeURIComponent(notes)}` : '';
+  return request<SavedJobData>(`/jobs/${jobId}/save${query}`, { method: 'POST' });
+}
+
+export async function deleteSavedJob(jobId: string): Promise<boolean> {
+  return request<boolean>(`/jobs/${jobId}/save`, { method: 'DELETE' });
+}
+
+export async function getUserApplications(statusFilter?: string): Promise<JobApplicationData[]> {
+  const query = statusFilter ? `?status=${encodeURIComponent(statusFilter)}` : '';
+  return request<JobApplicationData[]>(`/jobs/applications/all${query}`, { cache: 'no-store' });
+}
+
+export async function createJobApplication(data: {
+  job_id: string;
+  status?: string;
+  applied_date?: string;
+  interview_date?: string;
+  notes?: string;
+  source_url?: string;
+}): Promise<JobApplicationData> {
+  return request<JobApplicationData>('/jobs/applications', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateJobApplication(
+  applicationId: string,
+  data: {
+    status?: string;
+    applied_date?: string;
+    interview_date?: string;
+    notes?: string;
+  }
+): Promise<JobApplicationData> {
+  return request<JobApplicationData>(`/jobs/applications/${applicationId}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteJobApplication(applicationId: string): Promise<boolean> {
+  return request<boolean>(`/jobs/applications/${applicationId}`, { method: 'DELETE' });
+}
+
+export async function getApplicationHistory(applicationId: string): Promise<ApplicationHistoryItem[]> {
+  return request<ApplicationHistoryItem[]>(`/jobs/applications/${applicationId}/history`, { cache: 'no-store' });
 }

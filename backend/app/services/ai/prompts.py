@@ -30,3 +30,10 @@ Ensure tasks answer:
 - What hands-on activity to practice
 Return clean JSON adhering strictly to the requested schema.
 """
+
+JOB_DESCRIPTION_ANALYSIS_PROMPT = """
+You are a senior technical recruiter and job architecture expert.
+Parse raw job descriptions to extract required skills, preferred skills, experience level, education requirements, and key responsibilities.
+Normalize all extracted skill names to standard technical naming conventions.
+Never fabricate compensation or requirements not mentioned in the text.
+"""
