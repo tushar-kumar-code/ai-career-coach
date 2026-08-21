@@ -1,5 +1,5 @@
-from fastapi import APIRouter
-from app.api.v1 import health, assessment, resume, skills, roadmap, jobs, interview
+﻿from fastapi import APIRouter
+from app.api.v1 import health, assessment, resume, skills, roadmap, jobs, interview, digital_twin
 
 api_router = APIRouter()
 
@@ -11,3 +11,4 @@ api_router.include_router(skills.router, prefix="/skills", tags=["Skill Intellig
 api_router.include_router(roadmap.router, prefix="/roadmap", tags=["Personalized Career Roadmap System"])
 api_router.include_router(jobs.router, prefix="/jobs", tags=["Job Intelligence System"])
 api_router.include_router(interview.router, prefix="/interview", tags=["AI Mock Interview & Adaptive Engine"])
+api_router.include_router(digital_twin.router, prefix="/digital-twin", tags=["Career Digital Twin & Progress Engine"])

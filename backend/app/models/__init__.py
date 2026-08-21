@@ -1,4 +1,4 @@
-from app.core.database import Base
+﻿from app.core.database import Base
 from app.models.base import TimestampMixin
 from app.models.user import User
 from app.models.profile import UserProfile
@@ -12,6 +12,8 @@ from app.models.question import Question
 from app.models.skill_catalog import SkillDefinition
 from app.models.skill_evidence import SkillEvidence
 from app.models.job import Job, SavedJob, JobApplication, ApplicationStatusHistory
+from app.models.digital_twin import CareerDigitalTwin, ReadinessSnapshot, UserAchievement
+from app.models.weekly_report import WeeklyCareerReport
 
 __all__ = [
     "Base",
@@ -31,4 +33,8 @@ __all__ = [
     "SavedJob",
     "JobApplication",
     "ApplicationStatusHistory",
+    "CareerDigitalTwin",
+    "ReadinessSnapshot",
+    "UserAchievement",
+    "WeeklyCareerReport",
 ]

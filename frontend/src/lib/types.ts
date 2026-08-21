@@ -477,3 +477,143 @@ export interface InterviewReadinessData {
   weakest_topic?: string;
   recommendation: string;
 }
+
+// ----------------------------------------------------
+// Career Digital Twin + Progress & Readiness Engine Types
+// ----------------------------------------------------
+
+export interface ReadinessSubScores {
+  skill_readiness: number;
+  resume_readiness: number;
+  interview_readiness: number;
+  roadmap_progress: number;
+  job_match_readiness: number;
+  portfolio_readiness: number;
+}
+
+export interface CareerStrength {
+  name: string;
+  category: string;
+  proficiency: number;
+  level: string;
+  verified: boolean;
+}
+
+export interface CareerGap {
+  area: string;
+  name: string;
+  category: string;
+  priority: string; // Critical, High, Medium, Low
+  current_level: string;
+  required_level: string;
+  reason: string;
+  source: string;
+}
+
+export interface NextBestAction {
+  action_type: string;
+  title: string;
+  description: string;
+  why_it_matters: string;
+  expected_impact: string;
+  related_goal: string;
+  action_link: string;
+  impact_level: string; // critical, high, medium, low
+  specific_item?: Record<string, string> | null;
+  current_sub_score?: number;
+}
+
+export interface CareerDigitalTwinData {
+  user_id: string;
+  overall_readiness_score: number;
+  readiness_label: string;
+  sub_scores: ReadinessSubScores;
+  target_career?: string;
+  primary_archetype?: string;
+  experience_level: string;
+  top_strengths: CareerStrength[];
+  priority_gaps: CareerGap[];
+  critical_missing_skills: string[];
+  next_action: NextBestAction;
+  evidence_summary: Record<string, unknown>;
+  last_computed_at?: string;
+  snapshot_date?: string;
+  achievements?: UserAchievementData[];
+  gaps?: GapAnalysisData;
+}
+
+export interface ReadinessScoreData {
+  overall_readiness_score: number;
+  readiness_label: string;
+  skill_readiness: number;
+  resume_readiness: number;
+  interview_readiness: number;
+  roadmap_progress: number;
+  job_match_readiness: number;
+  portfolio_readiness: number;
+  evidence_summary: Record<string, unknown>;
+  weights: Record<string, number>;
+}
+
+export interface ReadinessSnapshotData {
+  date: string;
+  overall: number;
+  skill: number;
+  resume: number;
+  interview: number;
+  roadmap: number;
+  job_match: number;
+  portfolio: number;
+}
+
+export interface GapAnalysisData {
+  top_strengths: CareerStrength[];
+  priority_gaps: CareerGap[];
+  critical_missing_skills: string[];
+  total_gaps_found: number;
+  total_strengths_found: number;
+}
+
+export interface UserAchievementData {
+  achievement_key: string;
+  title: string;
+  description: string;
+  icon: string;
+  category: string;
+  evidence_description?: string;
+  earned_at: string;
+}
+
+export interface WeeklyReportScoreChanges {
+  overall_delta: number;
+  skill_delta: number;
+  resume_delta: number;
+  interview_delta: number;
+  roadmap_delta: number;
+}
+
+export interface WeeklyReportActivity {
+  interviews_completed: number;
+  applications_submitted: number;
+  skills_verified: number;
+}
+
+export interface WeeklyCareerReportData {
+  week_start_date: string;
+  week_end_date: string;
+  score_changes: WeeklyReportScoreChanges;
+  activity: WeeklyReportActivity;
+  improvements: string[];
+  achievements_earned_this_week: UserAchievementData[];
+  biggest_weakness?: string;
+  recommended_focus?: string;
+  current_scores: {
+    overall: number;
+    skill: number;
+    resume: number;
+    interview: number;
+    roadmap: number;
+    job_match: number;
+    portfolio: number;
+  };
+}
