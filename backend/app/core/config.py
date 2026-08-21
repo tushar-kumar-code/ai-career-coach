@@ -1,4 +1,4 @@
-from typing import List, Union
+﻿from typing import List, Union
 from pydantic import AnyHttpUrl, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -26,10 +26,13 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = "sqlite+aiosqlite:///./aicareercoach.db"
 
-    # Security
+    # Security & JWT
     SECRET_KEY: str = "dev_secret_key_change_in_production"
     SUPABASE_URL: str = ""
     SUPABASE_ANON_KEY: str = ""
+    SUPABASE_JWT_SECRET: str = ""
+    JWT_ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
 
     # AI Provider
     AI_PROVIDER: str = "groq"  # groq, gemini, openai, anthropic

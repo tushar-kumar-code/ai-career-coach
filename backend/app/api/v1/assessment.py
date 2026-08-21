@@ -1,4 +1,4 @@
-from typing import List
+﻿from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -46,6 +46,17 @@ async def start_assessment(
     res = await db.execute(stmt)
     session = res.scalars().first()
 
+    # Get total questions count
+    q_count_res = await db.execute(select(Question))
+    total_questions = len(q_count_res.scalars().all())
+
+    if session:
+        answered_ids = list(session.dimension_answers.keys())
+        next_q = await adaptive_engine.get_next_question(db, answered_ids, session.dimension_answers)
+        if not next_q and total_questions > 0:
+            # Session had all questions answered; start a fresh assessment session
+            session = None
+
     if not session:
         session = AssessmentResponse(
             user_id=user_id,
@@ -56,14 +67,8 @@ async def start_assessment(
         db.add(session)
         await db.commit()
         await db.refresh(session)
-
-    # Get total questions count
-    q_count_res = await db.execute(select(Question))
-    total_questions = len(q_count_res.scalars().all())
-
-    # Get current question
-    answered_ids = list(session.dimension_answers.keys())
-    next_q = await adaptive_engine.get_next_question(db, answered_ids, session.dimension_answers)
+        answered_ids = []
+        next_q = await adaptive_engine.get_next_question(db, answered_ids, session.dimension_answers)
 
     q_schema = None
     if next_q:
@@ -440,3 +445,4 @@ async def select_target_career(
         message=f"Target career set to '{role.title}'",
         data={"target_career": role.title, "slug": role.slug}
     )
+
