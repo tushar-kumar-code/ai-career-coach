@@ -61,7 +61,8 @@ async def start_interview_session(
         question_index=0,
         previous_evaluations=[],
         job_id=req.job_id,
-        target_role_override=target_role
+        target_role_override=target_role,
+        topic_focus=req.topic_focus
     )
 
     questions_list = [q0_data]

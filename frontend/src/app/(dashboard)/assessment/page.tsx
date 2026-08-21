@@ -1,5 +1,8 @@
 'use client';
 
+import Link from 'next/link';
+
+
 import { useState, useEffect } from 'react';
 import { 
   Compass, 
@@ -206,6 +209,33 @@ export default function AssessmentPage() {
             <span className="font-semibold">{targetSuccessMsg}</span>
           </div>
         )}
+
+          {/* Transition 1: Assessment -> Resume Action Banner */}
+          <div className="p-6 rounded-2xl bg-gradient-to-r from-emerald-950/70 via-slate-900 to-indigo-950/70 border border-emerald-500/30 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-5">
+            <div className="space-y-1.5">
+              <div className="flex items-center space-x-2">
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                  Career Discovery Complete ??
+                </span>
+                {selectedTarget && (
+                  <span className="text-xs text-slate-300 font-semibold">
+                    Target: <strong className="text-white">{selectedTarget}</strong>
+                  </span>
+                )}
+              </div>
+              <h3 className="text-lg font-bold text-white">Next Step: Upload & Scan Your Resume</h3>
+              <p className="text-xs text-slate-300 max-w-2xl leading-relaxed">
+                Upload your resume to verify your skills against ATS hiring standards for {selectedTarget || 'your target career'} and synchronize verified evidence with your Digital Twin.
+              </p>
+            </div>
+            <Link
+              href="/resume"
+              className="px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm flex items-center justify-center space-x-2 shrink-0 transition-all shadow-lg shadow-emerald-600/30 self-start md:self-auto"
+            >
+              <span>Upload Resume ?</span>
+            </Link>
+          </div>
+
 
         {error && (
           <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-sm">

@@ -1,3 +1,5 @@
+from sqlalchemy.orm.attributes import flag_modified
+import copy, uuid
 from typing import List, Optional
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -15,7 +17,10 @@ from app.schemas.roadmap import (
     RoadmapPreferencesRequest,
     DailyTasksResponse,
     RoadmapProgressResponse,
-    RoadmapPhaseSchema
+    RoadmapPhaseSchema,
+    FocusSkillRequest,
+    FocusSkillResponse,
+    RoadmapTaskSchema
 )
 from app.services.roadmap.roadmap_engine import RoadmapEngine
 from app.services.roadmap.daily_task_engine import DailyTaskEngine
@@ -388,4 +393,115 @@ async def update_learning_preferences(
         success=True,
         message="Learning preferences updated successfully",
         data=_to_detail_response(roadmap)
+    )
+
+
+@router.post(
+    "/focus-skill",
+    response_model=APIResponse[FocusSkillResponse],
+    summary="Map a skill gap to Today's Focus in active roadmap"
+)
+async def focus_skill(
+    req: FocusSkillRequest,
+    db: AsyncSession = Depends(get_db),
+    user_id: str = Depends(get_current_user_id)
+):
+    skill_clean = req.skill_name.strip()
+    if not skill_clean:
+        raise HTTPException(status_code=400, detail="Skill name is required")
+
+    stmt = select(Roadmap).where(Roadmap.user_id == user_id, Roadmap.is_active == True)
+    res = await db.execute(stmt)
+    roadmap = res.scalars().first()
+
+    if not roadmap:
+        roadmap = await roadmap_engine.generate_user_roadmap(db=db, user_id=user_id)
+
+    phases = copy.deepcopy(roadmap.phases or [])
+    completed_ids = set(roadmap.completed_task_ids or [])
+    
+    # 1. Check if an incomplete task already exists matching this skill
+    found_task = None
+    target_phase_idx = 0
+    for p_idx, phase in enumerate(phases):
+        for task in phase.get("tasks", []):
+            if (task.get("skill", "").lower() == skill_clean.lower() or 
+                skill_clean.lower() in task.get("title", "").lower()):
+                found_task = task
+                target_phase_idx = p_idx
+                break
+        if found_task:
+            break
+
+    # Check today's current focus
+    today_data = daily_task_engine.get_today_tasks(roadmap)
+    if today_data.tasks and today_data.tasks[0].skill.lower() == skill_clean.lower():
+        return APIResponse(
+            success=True,
+            message=f"'{skill_clean}' is already in your Today's Focus",
+            data=FocusSkillResponse(
+                status="already_focus",
+                message=f"'{skill_clean}' is already in your Today's Focus",
+                skill_name=skill_clean,
+                roadmap_id=roadmap.id,
+                task=today_data.tasks[0]
+            )
+        )
+
+    if found_task:
+        # Prioritize this task by moving it to the top of its phase's tasks
+        phase_tasks = phases[target_phase_idx].get("tasks", [])
+        phase_tasks = [t for t in phase_tasks if t.get("id") != found_task.get("id")]
+        phase_tasks.insert(0, found_task)
+        phases[target_phase_idx]["tasks"] = phase_tasks
+        status_msg = "prioritized"
+        user_msg = f"Task for '{skill_clean}' prioritized in your active roadmap"
+    else:
+        # Create a new focused task in the first phase without duplication
+        new_task_id = f"task_focus_{uuid.uuid4().hex[:8]}"
+        found_task = {
+            "id": new_task_id,
+            "title": f"Master {skill_clean} Fundamentals & Core Implementation",
+            "skill": skill_clean,
+            "estimated_minutes": 30,
+            "why_matters": f"Essential skill gap for {roadmap.target_role}.",
+            "practice_activity": f"Build practical hands-on exercises and implement core concepts in {skill_clean}.",
+            "completed": False,
+            "completed_at": None
+        }
+        if phases:
+            if "tasks" not in phases[0]:
+                phases[0]["tasks"] = []
+            phases[0]["tasks"].insert(0, found_task)
+        else:
+            phases.append({
+                "phase_id": "phase_1",
+                "name": "Phase 1 ? Core Foundations",
+                "description": "Core foundational skills",
+                "estimated_weeks": 2,
+                "skills": [{"name": skill_clean, "status": "Missing", "priority": "Essential", "level": "Beginner"}],
+                "learning_objectives": [f"Learn {skill_clean}"],
+                "tasks": [found_task],
+                "projects": [],
+                "milestones": []
+            })
+        status_msg = "added"
+        user_msg = f"New focus task for '{skill_clean}' added to Today's Focus"
+
+    roadmap.phases = phases
+    flag_modified(roadmap, "phases")
+    await db.commit()
+    await db.refresh(roadmap)
+
+    task_schema = RoadmapTaskSchema(**found_task)
+    return APIResponse(
+        success=True,
+        message=user_msg,
+        data=FocusSkillResponse(
+            status=status_msg,
+            message=user_msg,
+            skill_name=skill_clean,
+            roadmap_id=roadmap.id,
+            task=task_schema
+        )
     )

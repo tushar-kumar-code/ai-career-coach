@@ -1,5 +1,8 @@
 'use client';
 
+import Link from 'next/link';
+
+
 import { useState, useEffect } from 'react';
 import { 
   Award, 
@@ -17,7 +20,9 @@ import {
   Compass,
   ArrowRight
 } from 'lucide-react';
-import { getSkillProfile, recalculateSkills, getSkillDetails } from '@/lib/api-client';
+import { getSkillProfile, recalculateSkills, getSkillDetails,
+  focusSkillOnRoadmap
+} from '@/lib/api-client';
 import { SkillProfileData, UserSkill, SkillGap, SkillDetailData } from '@/lib/types';
 
 export default function SkillsPage() {
@@ -27,6 +32,28 @@ export default function SkillsPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [selectedSkillModal, setSelectedSkillModal] = useState<SkillDetailData | null>(null);
   const [modalLoading, setModalLoading] = useState(false);
+
+  const [focusingSkill, setFocusingSkill] = useState<string | null>(null);
+  const [focusFeedback, setFocusFeedback] = useState<{ skill: string; msg: string; status: string } | null>(null);
+
+  const handleAddToTodayFocus = async (skillName: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setFocusingSkill(skillName);
+    try {
+      const res = await focusSkillOnRoadmap(skillName);
+      setFocusFeedback({
+        skill: skillName,
+        msg: res.message || `Added ${skillName} to Today's Focus!`,
+        status: res.status
+      });
+      setTimeout(() => setFocusFeedback(null), 5000);
+    } catch (err: any) {
+      console.error('Failed to focus skill:', err);
+    } finally {
+      setFocusingSkill(null);
+    }
+  };
+
 
   useEffect(() => {
     loadProfile();
@@ -99,7 +126,24 @@ export default function SkillsPage() {
 
   return (
     <div className="space-y-8 max-w-6xl mx-auto pb-12">
-      {/* Top Banner */}
+      
+        {/* Focus Feedback Toast Alert */}
+        {focusFeedback && (
+          <div className="p-4 rounded-xl bg-indigo-950/80 border border-indigo-500/40 text-xs text-indigo-200 flex items-center justify-between shadow-lg">
+            <div className="flex items-center space-x-2">
+              <Sparkles className="w-4 h-4 text-indigo-400 shrink-0" />
+              <span><strong>{focusFeedback.skill}:</strong> {focusFeedback.msg}</span>
+            </div>
+            <Link
+              href="/roadmap"
+              className="px-3 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center space-x-1 shrink-0 ml-4 transition-colors"
+            >
+              <span>Open Roadmap Focus ?</span>
+            </Link>
+          </div>
+        )}
+
+        {/* Top Banner */}
       <div className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="inline-flex items-center space-x-2 text-xs font-semibold text-indigo-400 uppercase tracking-wider mb-1">
@@ -344,11 +388,30 @@ export default function SkillsPage() {
               )}
             </div>
 
-            <div className="p-4 rounded-xl bg-indigo-500/10 border border-indigo-500/20 space-y-1">
-              <span className="text-xs font-bold text-indigo-400 uppercase tracking-wider">Recommended Next Action</span>
-              <p className="text-xs text-indigo-200 leading-relaxed">
-                {selectedSkillModal.recommended_next_action}
-              </p>
+            <div className="p-4 rounded-xl bg-indigo-500/10 border border-indigo-500/20 space-y-3">
+              <div className="space-y-1">
+                <span className="text-xs font-bold text-indigo-400 uppercase tracking-wider">Recommended Next Action</span>
+                <p className="text-xs text-indigo-200 leading-relaxed">
+                  {selectedSkillModal.recommended_next_action}
+                </p>
+              </div>
+              <div className="pt-2 border-t border-indigo-500/20 flex items-center justify-between">
+                <button
+                  onClick={() => handleAddToTodayFocus(selectedSkillModal.skill.skill_name)}
+                  disabled={focusingSkill === selectedSkillModal.skill.skill_name}
+                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all shadow-md shadow-indigo-600/30 flex items-center space-x-1.5 disabled:opacity-50"
+                >
+                  <Target className="w-3.5 h-3.5" />
+                  <span>{focusFeedback?.skill === selectedSkillModal.skill.skill_name ? focusFeedback.msg : "Add to Today's Focus ?"}</span>
+                </button>
+                <Link
+                  href="/roadmap"
+                  className="text-xs text-indigo-300 hover:text-white font-semibold flex items-center space-x-1"
+                >
+                  <span>View Roadmap</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+              </div>
             </div>
           </div>
         </div>

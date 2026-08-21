@@ -28,7 +28,8 @@ class InterviewQuestionGenerator:
         question_index: int,
         previous_evaluations: List[Dict[str, Any]],
         job_id: Optional[str] = None,
-        target_role_override: Optional[str] = None
+        target_role_override: Optional[str] = None,
+        topic_focus: Optional[str] = None
     ) -> Dict[str, Any]:
         """Generate a personalized question grounded in user evidence."""
         # 1. Fetch User Profile
@@ -69,7 +70,8 @@ class InterviewQuestionGenerator:
             parsed_skills=parsed_skills,
             parsed_experience=parsed_experience,
             job=job,
-            question_index=question_index
+            question_index=question_index,
+            topic_focus=topic_focus
         )
 
         return question_data
@@ -100,10 +102,11 @@ class InterviewQuestionGenerator:
         parsed_skills: List[Any],
         parsed_experience: List[Any],
         job: Optional[Job],
-        question_index: int
+        question_index: int,
+        topic_focus: Optional[str] = None
     ) -> Dict[str, Any]:
         """Generate structured question with context tip."""
-        top_skill = list(skills_matrix.keys())[0] if skills_matrix else "Python"
+        top_skill = topic_focus if topic_focus else (list(skills_matrix.keys())[0] if skills_matrix else "Python")
         proj_title = parsed_projects[0].get("title", "your portfolio project") if parsed_projects and isinstance(parsed_projects[0], dict) else "your major project"
 
         if category == "Technical":

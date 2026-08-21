@@ -105,3 +105,15 @@ class RoadmapDetailResponse(BaseModel):
     completed_task_ids: List[str] = Field(default_factory=list)
     completed_milestone_ids: List[str] = Field(default_factory=list)
     completed_project_ids: List[str] = Field(default_factory=list)
+
+
+class FocusSkillRequest(BaseModel):
+    skill_name: str
+
+
+class FocusSkillResponse(BaseModel):
+    status: str  # "added", "prioritized", "already_focus"
+    message: str
+    skill_name: str
+    roadmap_id: str
+    task: Optional[RoadmapTaskSchema] = None

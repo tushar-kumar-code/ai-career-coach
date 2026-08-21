@@ -8,6 +8,7 @@ class InterviewStartRequest(BaseModel):
     difficulty: str = "Beginner"  # Beginner, Intermediate, Advanced
     question_count: int = 5
     job_id: Optional[str] = None
+    topic_focus: Optional[str] = None
 
 
 class InterviewAnswerRequest(BaseModel):
@@ -53,6 +54,7 @@ class InterviewSessionResponse(BaseModel):
     id: str
     user_id: str
     job_id: Optional[str] = None
+    topic_focus: Optional[str] = None
     target_role: str
     mode: str
     difficulty: str

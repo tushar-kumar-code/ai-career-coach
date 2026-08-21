@@ -1,5 +1,8 @@
 'use client';
 
+import Link from 'next/link';
+
+
 import { useState, useEffect } from 'react';
 import { 
   Upload, 
@@ -133,6 +136,39 @@ export default function ResumePage() {
       {/* Analysis Output View */}
       {analysis && !uploading && (
         <div className="space-y-8">
+
+          {/* Transition 2: Resume -> Skills & Roadmap Action Banner */}
+          <div className="p-6 rounded-2xl bg-gradient-to-r from-purple-950/70 via-slate-900 to-indigo-950/70 border border-purple-500/30 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-5">
+            <div className="space-y-1.5">
+              <div className="flex items-center space-x-2">
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-purple-500/20 text-purple-400 border border-purple-500/30">
+                  Resume Analysis Complete ??
+                </span>
+                <span className="text-xs text-slate-300 font-semibold">
+                  ATS Score: <strong className="text-emerald-400">{analysis.ats_score}%</strong>
+                </span>
+              </div>
+              <h3 className="text-lg font-bold text-white">Your Skills Have Been Synchronized</h3>
+              <p className="text-xs text-slate-300 max-w-2xl leading-relaxed">
+                Extracted verified skills from your projects and experience are now synced with your Skill Matrix and Career Digital Twin.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-3 shrink-0">
+              <Link
+                href="/skills"
+                className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs sm:text-sm flex items-center justify-center space-x-2 transition-all shadow-lg shadow-indigo-600/30"
+              >
+                <span>View My Skills ?</span>
+              </Link>
+              <Link
+                href="/roadmap"
+                className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 font-semibold text-xs sm:text-sm flex items-center justify-center space-x-2 transition-colors"
+              >
+                <span>Build My Roadmap ?</span>
+              </Link>
+            </div>
+          </div>
+
           {/* File Metadata Header */}
           <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
             <div className="flex items-center space-x-3">

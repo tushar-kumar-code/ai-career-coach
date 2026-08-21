@@ -617,3 +617,12 @@ export interface WeeklyCareerReportData {
     portfolio: number;
   };
 }
+
+
+export interface FocusSkillResultData {
+  status: string; // 'added' | 'prioritized' | 'already_focus'
+  message: string;
+  skill_name: string;
+  roadmap_id: string;
+  task?: RoadmapTask;
+}

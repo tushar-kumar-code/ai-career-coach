@@ -12,6 +12,7 @@ import {
   SkillGap,
   SkillDetailData,
   RoadmapData,
+  FocusSkillResultData,
   DailyTasksData,
   RoadmapProgressData,
   RoadmapPhase,
@@ -297,6 +298,7 @@ export async function startInterviewSession(params: {
   difficulty?: string;
   question_count?: number;
   job_id?: string;
+  topic_focus?: string;
 }): Promise<InterviewSessionData> {
   return request<InterviewSessionData>('/interview/start', {
     method: 'POST',
@@ -333,4 +335,12 @@ export async function getInterviewResults(sessionId: string): Promise<InterviewF
 
 export async function getInterviewReadiness(): Promise<InterviewReadinessData> {
   return request<InterviewReadinessData>('/interview/readiness', { cache: 'no-store' });
+}
+
+
+export async function focusSkillOnRoadmap(skillName: string): Promise<FocusSkillResultData> {
+  return request<FocusSkillResultData>('/roadmap/focus-skill', {
+    method: 'POST',
+    body: JSON.stringify({ skill_name: skillName }),
+  });
 }

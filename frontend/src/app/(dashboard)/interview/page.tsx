@@ -57,6 +57,7 @@ export default function InterviewPage() {
   const [currentSession, setCurrentSession] = useState<InterviewSessionData | null>(null);
   const [userAnswer, setUserAnswer] = useState('');
   const [evaluating, setEvaluating] = useState(false);
+  const [startingSession, setStartingSession] = useState(false);
   const [currentEvaluation, setCurrentEvaluation] = useState<InterviewEvaluationData | null>(null);
 
   // Report & History states
@@ -85,6 +86,28 @@ export default function InterviewPage() {
       console.error('Failed to load setup data:', err);
     }
   }
+
+  
+  const handlePracticeWeakTopic = async (topic: string) => {
+    setStartingSession(true);
+    try {
+      const session = await startInterviewSession({
+        mode: 'Technical',
+        target_role: finalReport?.target_role || 'Software Developer',
+        difficulty: 'Beginner',
+        question_count: 3,
+        topic_focus: topic,
+      });
+      setCurrentSession(session);
+      setUserAnswer('');
+      setCurrentEvaluation(null);
+      setViewState('room');
+    } catch (err) {
+      console.error('Failed to start focused practice:', err);
+    } finally {
+      setStartingSession(false);
+    }
+  };
 
   async function handleStartInterview(e: React.FormEvent) {
     e.preventDefault();
@@ -516,18 +539,40 @@ export default function InterviewPage() {
               </div>
             </div>
 
-            {/* Roadmap Recommendations Box */}
-            {finalReport.recommended_roadmap_topics && finalReport.recommended_roadmap_topics.length > 0 && (
-              <div className="p-5 rounded-xl bg-indigo-950/40 border border-indigo-500/30 space-y-3 text-xs">
-                <h3 className="font-bold text-indigo-300 flex items-center space-x-2 text-sm">
-                  <Layers className="w-4 h-4 text-indigo-400" />
-                  <span>Roadmap Topics Recommended to Revisit</span>
-                </h3>
-                <div className="space-y-1.5">
-                  {finalReport.recommended_roadmap_topics.map((topic, idx) => (
-                    <div key={idx} className="flex items-center space-x-2 text-slate-200 font-medium">
-                      <ArrowRight className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-                      <span>{topic}</span>
+            {/* Targeted Focused Practice for Weak Areas */}
+            {((finalReport.weak_areas && finalReport.weak_areas.length > 0) || (finalReport.recommended_roadmap_topics && finalReport.recommended_roadmap_topics.length > 0)) && (
+              <div className="p-6 rounded-2xl bg-gradient-to-r from-amber-950/40 via-slate-900 to-indigo-950/40 border border-amber-500/30 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-bold text-white flex items-center space-x-2 text-sm">
+                    <Target className="w-4 h-4 text-amber-400" />
+                    <span>Targeted Practice for Detected Weak Areas</span>
+                  </h3>
+                  <span className="text-[11px] text-amber-400 font-semibold">1-Click Launch</span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {Array.from(new Set([...(finalReport.weak_areas || []), ...(finalReport.recommended_roadmap_topics || [])])).slice(0, 4).map((topic, idx) => (
+                    <div key={idx} className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2 flex flex-col justify-between">
+                      <div>
+                        <div className="flex items-center justify-between">
+                          <h4 className="font-bold text-slate-200 text-xs">{topic}</h4>
+                          <span className="text-[10px] px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 font-semibold">
+                            Weak Area
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-400 mt-1">
+                          Technical Accuracy: {finalReport.technical_score}% ? Practice focused questions to raise confidence.
+                        </p>
+                      </div>
+
+                      <button
+                        onClick={() => handlePracticeWeakTopic(topic)}
+                        disabled={startingSession}
+                        className="mt-2 w-full py-2 px-3 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition-all shadow-md shadow-indigo-600/20 flex items-center justify-center space-x-1.5 disabled:opacity-50"
+                      >
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>Practice {topic} ?</span>
+                      </button>
                     </div>
                   ))}
                 </div>
