@@ -217,12 +217,29 @@ function PracticeContent() {
           ) : (
             <>
               <div className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-4">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-base font-bold text-white flex items-center space-x-2">
-                    <Target className="w-4 h-4 text-violet-400" />
-                    <span>Recommended Practice Topics</span>
-                  </h2>
-                  <span className="text-[11px] text-slate-500">Based on your skill profile & interview history</span>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <h2 className="text-base font-bold text-white flex items-center space-x-2">
+                      <Target className="w-4 h-4 text-violet-400" />
+                      <span>Recommended Practice Topics</span>
+                    </h2>
+                    <span className="text-[11px] text-slate-500">Based on your skill profile & interview history</span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      const el = document.getElementById('custom-topic-section');
+                      if (el) {
+                        el.scrollIntoView({ behavior: 'smooth' });
+                        const input = el.querySelector('input');
+                        if (input) input.focus();
+                      }
+                    }}
+                    className="text-xs font-semibold text-violet-300 hover:text-white bg-violet-500/10 hover:bg-violet-500/20 border border-violet-500/20 px-3 py-1.5 rounded-lg flex items-center space-x-1.5 self-start sm:self-auto transition-all"
+                    id="jump-to-custom-topic-btn"
+                  >
+                    <Zap className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Practice a specific topic ↓</span>
+                  </button>
                 </div>
 
                 {suggestions.length === 0 ? (
@@ -274,7 +291,7 @@ function PracticeContent() {
               </div>
 
               {/* Custom topic input */}
-              <div className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-4">
+              <div id="custom-topic-section" className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-4">
                 <h2 className="text-sm font-bold text-white flex items-center space-x-2">
                   <Zap className="w-4 h-4 text-amber-400" />
                   <span>Practice Any Topic</span>

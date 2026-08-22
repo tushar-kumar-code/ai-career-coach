@@ -94,7 +94,26 @@ export default function StudentCareerBriefPage() {
   ];
 
   return (
-    <div className="max-w-4xl mx-auto pb-16 space-y-6">
+    <div className="max-w-4xl mx-auto pb-16 space-y-6 print:pb-0 print:space-y-0">
+      {/* Print-specific style overrides */}
+      <style jsx global>{`
+        @media print {
+          @page {
+            size: A4 portrait;
+            margin: 6mm;
+          }
+          body {
+            background-color: #ffffff !important;
+            color: #000000 !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          header, aside, nav, #print-brief-btn {
+            display: none !important;
+          }
+        }
+      `}</style>
+
       {/* Top Action Bar (Hidden in Print) */}
       <div className="flex items-center justify-between gap-4 print:hidden">
         <Link
@@ -116,17 +135,17 @@ export default function StudentCareerBriefPage() {
       </div>
 
       {/* 1-PAGE DOCUMENT CONTAINER (Print-Optimized) */}
-      <div className="p-8 md:p-10 rounded-3xl bg-slate-900 border border-slate-800 shadow-2xl space-y-6 print:p-0 print:border-none print:shadow-none print:bg-white print:text-black">
+      <div className="p-8 md:p-10 rounded-3xl bg-slate-900 border border-slate-800 shadow-2xl space-y-6 print:p-2 print:border-none print:shadow-none print:bg-white print:text-black print:space-y-3">
         {/* Document Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-800 print:border-slate-300">
-          <div className="space-y-1">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-800 print:border-slate-300 print:pb-3 print:gap-2">
+          <div className="space-y-1 print:space-y-0.5">
             <div className="flex items-center space-x-2">
-              <GraduationCap className="w-5 h-5 text-indigo-400 print:text-indigo-600" />
-              <span className="text-xs font-bold text-indigo-400 uppercase tracking-wider print:text-indigo-600">
+              <GraduationCap className="w-5 h-5 text-indigo-400 print:text-indigo-700 print:w-4 print:h-4" />
+              <span className="text-xs font-bold text-indigo-400 uppercase tracking-wider print:text-indigo-700 print:text-[10px]">
                 Placement Candidate Career Brief
               </span>
             </div>
-            <h1 className="text-2xl font-black text-white print:text-black tracking-tight">
+            <h1 className="text-2xl font-black text-white print:text-black print:text-xl tracking-tight">
               {brief.student_name}
             </h1>
             <div className="flex items-center space-x-3 text-xs text-slate-400 print:text-slate-600 flex-wrap gap-y-1">

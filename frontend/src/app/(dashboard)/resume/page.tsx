@@ -279,13 +279,24 @@ export default function ResumePage() {
                 </div>
 
                 <div>
-                  <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">Missing Target Role Skills:</span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">Missing Target Role Skills:</span>
+                    <Link href="/skills" className="text-[11px] text-amber-400/80 hover:text-amber-300 font-semibold transition-colors">
+                      Skill Intelligence →
+                    </Link>
+                  </div>
                   <div className="flex flex-wrap gap-1.5 pt-1.5">
                     {analysis.target_match.missing_skills.length > 0 ? (
                       analysis.target_match.missing_skills.map((gap, idx) => (
-                        <span key={idx} className="px-2.5 py-1 rounded bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300 font-semibold">
-                          {gap}
-                        </span>
+                        <Link
+                          key={idx}
+                          href="/skills"
+                          className="px-2.5 py-1 rounded bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 hover:border-amber-500/40 text-xs text-amber-300 font-semibold transition-all flex items-center space-x-1 cursor-pointer"
+                          title={`View ${gap} in Skill Intelligence`}
+                        >
+                          <span>{gap}</span>
+                          <span className="text-[10px] text-amber-400/60">→</span>
+                        </Link>
                       ))
                     ) : (
                       <span className="text-xs text-slate-400">All target skills detected!</span>

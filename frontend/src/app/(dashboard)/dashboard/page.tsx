@@ -146,10 +146,10 @@ export default function DashboardPage() {
     }
     return {
       stepNum: 0,
-      title: "🎉 All Core Steps Complete! You're Job-Ready",
-      desc: 'Keep your momentum going: complete daily roadmap tasks, practice adaptive interviews, and apply to top-matched jobs.',
-      href: '/progress',
-      btnText: 'View Readiness Progress →',
+      title: "🎉 You're Job Ready to Move Forward",
+      desc: 'All foundational onboarding steps are complete! Review your 10-point Placement Readiness checklist and export your 1-Page Student Career Brief.',
+      href: '/placement',
+      btnText: 'Check Placement Readiness & Brief →',
     };
   };
 
