@@ -8,7 +8,7 @@ class InterviewStartRequest(BaseModel):
     difficulty: str = "Beginner"  # Beginner, Intermediate, Advanced
     question_count: int = 5
     job_id: Optional[str] = None
-    topic_focus: Optional[str] = None
+    topic_focus: Optional[str] = None  # For Micro Practice: focus on a specific skill/topic
 
 
 class InterviewAnswerRequest(BaseModel):
@@ -16,11 +16,16 @@ class InterviewAnswerRequest(BaseModel):
 
 
 class STARAnalysis(BaseModel):
+    situation_status: Optional[str] = "Good"  # Good, Needs Clarity, Missing, Not Applicable
+    task_status: Optional[str] = "Good"
+    action_status: Optional[str] = "Good"
+    result_status: Optional[str] = "Good"
     situation_feedback: Optional[str] = None
     task_feedback: Optional[str] = None
     action_feedback: Optional[str] = None
     result_feedback: Optional[str] = None
     star_complete: bool = False
+    star_score: int = 0
 
 
 class InterviewEvaluationResponse(BaseModel):
@@ -96,3 +101,19 @@ class InterviewReadinessResponse(BaseModel):
     strongest_mode: str
     weakest_topic: Optional[str] = None
     recommendation: str
+
+
+class PracticeSuggestionItem(BaseModel):
+    """A suggested micro-practice topic for the student."""
+    topic: str
+    reason: str
+    source: str  # "skill_gap" | "interview_weakness" | "roadmap_task"
+    priority: str  # "High" | "Medium" | "Low"
+
+
+class MicroPracticeStartResponse(BaseModel):
+    """Response when kicking off a focused micro-practice session."""
+    session: InterviewSessionResponse
+    topic: str
+    question_count: int
+    message: str

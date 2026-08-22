@@ -55,7 +55,15 @@ class DailyTaskEngine:
                 why_matters=t.get("why_matters", f"Key skill for {roadmap.target_role}."),
                 practice_activity=t.get("practice_activity", "Complete coding exercise."),
                 completed=t["id"] in completed_task_ids,
-                completed_at=t.get("completed_at")
+                completed_at=t.get("completed_at"),
+                concept_explanation=t.get("concept_explanation", f"Understand the core syntax, mental model, and best practices of {t.get('skill', 'this topic')} in {roadmap.target_role}."),
+                check_quiz_question=t.get("check_quiz_question", f"What is the primary benefit of applying {t.get('skill', 'this skill')} in real-world applications?"),
+                check_quiz_answer=t.get("check_quiz_answer", f"{t.get('skill', 'This skill')} ensures code reliability, performance optimization, and clean architecture."),
+                check_quiz_options=t.get("check_quiz_options", [
+                    f"A) Essential for performance & reliability in {roadmap.target_role}",
+                    f"B) Temporary workaround with no production value",
+                    f"C) Only used for non-critical documentation"
+                ])
             )
             for t in selected_tasks
         ]

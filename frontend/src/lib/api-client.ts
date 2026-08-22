@@ -24,7 +24,11 @@ import {
   InterviewSessionData,
   InterviewEvaluationData,
   InterviewFinalReportData,
-  InterviewReadinessData
+  InterviewReadinessData,
+  PracticeSuggestion,
+  RoadmapTaskLearningContent,
+  PlacementChecklistData,
+  StudentCareerBriefData
 } from './types';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api/v1';
@@ -343,4 +347,39 @@ export async function focusSkillOnRoadmap(skillName: string): Promise<FocusSkill
     method: 'POST',
     body: JSON.stringify({ skill_name: skillName }),
   });
+}
+
+// Phase 3 — Micro Practice & Learning Resource APIs
+export async function getPracticeSuggestions(): Promise<PracticeSuggestion[]> {
+  try {
+    return await request<PracticeSuggestion[]>('/roadmap/practice/suggest', { cache: 'no-store' });
+  } catch {
+    return [];
+  }
+}
+
+export async function getTaskLearningContent(taskId: string): Promise<RoadmapTaskLearningContent> {
+  return request<RoadmapTaskLearningContent>(`/roadmap/tasks/${taskId}/learn`, { cache: 'no-store' });
+}
+
+export async function startMicroPractice(topic: string, targetRole?: string): Promise<InterviewSessionData> {
+  return request<InterviewSessionData>('/interview/start', {
+    method: 'POST',
+    body: JSON.stringify({
+      mode: 'Mixed',
+      target_role: targetRole || 'Software Developer',
+      difficulty: 'Beginner',
+      question_count: 3,
+      topic_focus: topic,
+    }),
+  });
+}
+
+// Phase 4 — College Placement Readiness & Student Brief APIs
+export async function getPlacementChecklist(): Promise<PlacementChecklistData> {
+  return request<PlacementChecklistData>('/placement/checklist', { cache: 'no-store' });
+}
+
+export async function getStudentCareerBrief(): Promise<StudentCareerBriefData> {
+  return request<StudentCareerBriefData>('/placement/brief', { cache: 'no-store' });
 }

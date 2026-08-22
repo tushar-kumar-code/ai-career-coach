@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useEffect } from 'react';
 import Link from 'next/link';
@@ -14,6 +14,8 @@ import {
   TrendingUp, 
   MessageSquare,
   Sparkles,
+  Dumbbell,
+  GraduationCap,
   X
 } from 'lucide-react';
 
@@ -25,7 +27,9 @@ const NAV_ITEMS = [
   { label: 'Skill Matrix', href: '/skills', icon: Award },
   { label: 'Job Engine', href: '/jobs', icon: Briefcase },
   { label: 'Roadmap & Tasks', href: '/roadmap', icon: MapPin },
+  { label: 'Micro Practice', href: '/practice', icon: Dumbbell },
   { label: 'Mock Interview', href: '/interview', icon: Mic },
+  { label: 'Placement Readiness', href: '/placement', icon: GraduationCap },
   { label: 'Progress & Readiness', href: '/progress', icon: TrendingUp },
   { label: 'AI Career Coach', href: '/chat', icon: MessageSquare },
 ];

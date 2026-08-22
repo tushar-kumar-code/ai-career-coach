@@ -460,6 +460,70 @@ export default function InterviewPage() {
                 </div>
               </div>
 
+              {/* STAR Coaching Breakdown */}
+              {currentEvaluation.star_analysis &&
+               currentEvaluation.star_analysis.situation_status &&
+               currentEvaluation.star_analysis.situation_status !== 'Not Applicable' && (
+                <div className="p-4 rounded-xl bg-violet-950/30 border border-violet-500/25 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold text-white flex items-center space-x-1.5">
+                      <span className="text-violet-400">★</span>
+                      <span>STAR Method Coaching</span>
+                    </h4>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-[10px] text-slate-500">Score:</span>
+                      <span className="text-xs font-bold text-violet-300">{currentEvaluation.star_analysis.star_score ?? 0}%</span>
+                      {currentEvaluation.star_analysis.star_complete && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 font-bold">Complete ✓</span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    {[
+                      { key: 'S', label: 'Situation', status: currentEvaluation.star_analysis.situation_status, feedback: currentEvaluation.star_analysis.situation_feedback },
+                      { key: 'T', label: 'Task', status: currentEvaluation.star_analysis.task_status, feedback: currentEvaluation.star_analysis.task_feedback },
+                      { key: 'A', label: 'Action', status: currentEvaluation.star_analysis.action_status, feedback: currentEvaluation.star_analysis.action_feedback },
+                      { key: 'R', label: 'Result', status: currentEvaluation.star_analysis.result_status, feedback: currentEvaluation.star_analysis.result_feedback },
+                    ].map(comp => {
+                      const colorClass = comp.status === 'Good'
+                        ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30'
+                        : comp.status === 'Needs Clarity'
+                        ? 'text-amber-400 bg-amber-500/10 border-amber-500/30'
+                        : comp.status === 'Missing'
+                        ? 'text-red-400 bg-red-500/10 border-red-500/30'
+                        : 'text-slate-500 bg-slate-800 border-slate-700';
+                      const icon = comp.status === 'Good' ? '✓' : comp.status === 'Needs Clarity' ? '⚠' : comp.status === 'Missing' ? '✗' : '—';
+                      return (
+                        <div key={comp.key} className="space-y-1">
+                          <div className={`flex items-center justify-between p-2 rounded-lg border text-[10px] font-bold ${colorClass}`}>
+                            <span>{comp.key} — {comp.label}</span>
+                            <span>{icon}</span>
+                          </div>
+                          {comp.feedback && (
+                            <p className="text-[10px] text-slate-400 leading-relaxed">{comp.feedback}</p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {!currentEvaluation.star_analysis.star_complete && (
+                    <div className="flex items-center justify-between p-2.5 rounded-lg bg-amber-950/30 border border-amber-500/20">
+                      <p className="text-[10px] text-amber-300">
+                        <strong>Tip:</strong> Include a clear <strong>Result</strong> — even a brief outcome ("resolved in 2 hours", "improved by 30%") makes a huge difference.
+                      </p>
+                      <a
+                        href={`/practice?topic=${encodeURIComponent('STAR Method')}`}
+                        className="ml-3 shrink-0 text-[10px] font-bold text-amber-400 hover:text-amber-300 flex items-center space-x-0.5 border border-amber-500/30 px-2 py-1 rounded"
+                      >
+                        <span>Practice STAR →</span>
+                      </a>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Strengths & Weaknesses */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1">
@@ -494,6 +558,7 @@ export default function InterviewPage() {
           )}
         </div>
       )}
+
 
       {/* VIEW 3: COMPREHENSIVE FINAL REPORT */}
       {viewState === 'report' && finalReport && (

@@ -1,7 +1,4 @@
-from sqlalchemy.orm.attributes import flag_modified
-import copy, uuid
 from typing import List, Optional
-from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -9,93 +6,77 @@ from sqlalchemy import select
 from app.core.database import get_db
 from app.core.security import get_current_user_id
 from app.models.roadmap import Roadmap
+from app.models.skill import Skill
 from app.models.profile import UserProfile
+from app.models.interview import InterviewSession
 from app.schemas.health import APIResponse
 from app.schemas.roadmap import (
-    RoadmapDetailResponse,
     RoadmapGenerateRequest,
     RoadmapPreferencesRequest,
-    DailyTasksResponse,
-    RoadmapProgressResponse,
+    RoadmapResponse,
     RoadmapPhaseSchema,
-    FocusSkillRequest,
-    FocusSkillResponse,
-    RoadmapTaskSchema
+    TodayFocusResponse,
+    RoadmapProgressResponse,
+    RoadmapTaskSchema,
+    TaskLearningContentResponse,
+    PracticeSuggestion
 )
+from app.schemas.interview import PracticeSuggestionItem
+from app.services.skill.ingestion_engine import SkillIngestionEngine
+from app.services.skill.gap_engine import SkillGapEngine
 from app.services.roadmap.roadmap_engine import RoadmapEngine
-from app.services.roadmap.daily_task_engine import DailyTaskEngine
 
 router = APIRouter()
+ingestion_engine = SkillIngestionEngine()
+gap_engine = SkillGapEngine()
 roadmap_engine = RoadmapEngine()
-daily_task_engine = DailyTaskEngine()
-
-
-def _to_detail_response(r: Roadmap) -> RoadmapDetailResponse:
-    """Helper converting Roadmap SQLAlchemy model to RoadmapDetailResponse Pydantic schema."""
-    phases_raw = r.phases or []
-    phases_schemas = [RoadmapPhaseSchema(**p) for p in phases_raw]
-
-    return RoadmapDetailResponse(
-        id=r.id,
-        user_id=r.user_id,
-        target_career_id=r.target_career_id,
-        target_role=r.target_role,
-        user_level=r.user_level or "Beginner",
-        overall_progress_percent=r.overall_progress_percent or 0,
-        is_active=r.is_active,
-        is_outdated=r.is_outdated,
-        hours_per_day=r.hours_per_day,
-        days_per_week=r.days_per_week,
-        preferred_learning_style=r.preferred_learning_style,
-        total_estimated_weeks=r.total_estimated_weeks,
-        phases=phases_schemas,
-        completed_task_ids=r.completed_task_ids or [],
-        completed_milestone_ids=r.completed_milestone_ids or [],
-        completed_project_ids=r.completed_project_ids or []
-    )
 
 
 @router.post(
     "/generate",
-    response_model=APIResponse[RoadmapDetailResponse],
-    summary="Generate personalized, dependency-ordered career roadmap"
+    response_model=APIResponse[RoadmapResponse],
+    summary="Generate personalized learning roadmap from target career and skill gaps"
 )
 async def generate_roadmap(
-    req: RoadmapGenerateRequest,
+    payload: RoadmapGenerateRequest,
     db: AsyncSession = Depends(get_db),
     user_id: str = Depends(get_current_user_id)
 ):
-    roadmap = await roadmap_engine.generate_user_roadmap(
+    # 1. Ingest/get user skills
+    u_skills = await ingestion_engine.ingest_user_skills(db, user_id)
+    
+    # 2. Calculate skill gaps & target career
+    target_career, _, _, missing_gaps, _ = await gap_engine.calculate_skill_gaps(db, user_id, u_skills)
+
+    # 3. Generate Roadmap
+    roadmap = await roadmap_engine.generate_roadmap(
         db=db,
         user_id=user_id,
-        user_level=req.user_level or "Beginner",
-        hours_per_day=req.hours_per_day or 1,
-        days_per_week=req.days_per_week or 5,
-        preferred_learning_style=req.preferred_learning_style or "Hands-on",
-        target_career_id=req.target_career_id
+        target_career=target_career,
+        user_skills=u_skills,
+        missing_gaps=missing_gaps,
+        hours_per_day=payload.hours_per_day,
+        days_per_week=payload.days_per_week,
+        learning_style=payload.preferred_learning_style,
+        preserve_progress=True
     )
 
     return APIResponse(
         success=True,
-        message="Personalized career roadmap generated successfully",
-        data=_to_detail_response(roadmap)
+        message="Personalized roadmap generated successfully",
+        data=_serialize_roadmap(roadmap)
     )
 
 
 @router.get(
     "/current",
-    response_model=APIResponse[Optional[RoadmapDetailResponse]],
-    summary="Get user's active career roadmap"
+    response_model=APIResponse[Optional[RoadmapResponse]],
+    summary="Get active user roadmap"
 )
 async def get_current_roadmap(
     db: AsyncSession = Depends(get_db),
     user_id: str = Depends(get_current_user_id)
 ):
-    # Check profile target_career vs active roadmap target_role
-    stmt_prof = select(UserProfile).where(UserProfile.user_id == user_id)
-    res_prof = await db.execute(stmt_prof)
-    profile = res_prof.scalar_one_or_none()
-
     stmt = select(Roadmap).where(Roadmap.user_id == user_id, Roadmap.is_active == True)
     res = await db.execute(stmt)
     roadmap = res.scalars().first()
@@ -107,24 +88,27 @@ async def get_current_roadmap(
             data=None
         )
 
-    # Check if target career was changed on profile
-    if profile and profile.target_career and profile.target_career != roadmap.target_role:
-        if not roadmap.is_outdated:
-            roadmap.is_outdated = True
-            await db.commit()
-            await db.refresh(roadmap)
+    # Check if target career changed
+    p_stmt = select(UserProfile).where(UserProfile.user_id == user_id)
+    p_res = await db.execute(p_stmt)
+    user_profile = p_res.scalars().first()
+
+    if user_profile and user_profile.target_career and user_profile.target_career != roadmap.target_role:
+        roadmap.is_outdated = True
+        db.add(roadmap)
+        await db.commit()
 
     return APIResponse(
         success=True,
-        message="Current career roadmap retrieved",
-        data=_to_detail_response(roadmap)
+        message="Current roadmap retrieved",
+        data=_serialize_roadmap(roadmap)
     )
 
 
 @router.get(
     "/phases",
     response_model=APIResponse[List[RoadmapPhaseSchema]],
-    summary="Get phase breakdown for active roadmap"
+    summary="Get list of roadmap phases with progress"
 )
 async def get_roadmap_phases(
     db: AsyncSession = Depends(get_db),
@@ -135,22 +119,25 @@ async def get_roadmap_phases(
     roadmap = res.scalars().first()
 
     if not roadmap:
-        raise HTTPException(status_code=404, detail="No active roadmap found for user")
+        return APIResponse(
+            success=True,
+            message="No active roadmap found",
+            data=[]
+        )
 
-    phases = [RoadmapPhaseSchema(**p) for p in (roadmap.phases or [])]
     return APIResponse(
         success=True,
-        message="Roadmap phases retrieved successfully",
-        data=phases
+        message="Roadmap phases retrieved",
+        data=roadmap.phases or []
     )
 
 
 @router.get(
     "/today",
-    response_model=APIResponse[DailyTasksResponse],
-    summary="Get 'What should I do today?' daily tasks"
+    response_model=APIResponse[TodayFocusResponse],
+    summary="Get 'What should I do today?' focus tasks"
 )
-async def get_today_tasks(
+async def get_today_focus(
     db: AsyncSession = Depends(get_db),
     user_id: str = Depends(get_current_user_id)
 ):
@@ -158,24 +145,188 @@ async def get_today_tasks(
     res = await db.execute(stmt)
     roadmap = res.scalars().first()
 
-    if not roadmap:
-        # Generate default roadmap if none exists
-        roadmap = await roadmap_engine.generate_user_roadmap(db=db, user_id=user_id)
+    focus_dict = roadmap_engine.get_today_focus_tasks(roadmap)
 
-    today_data = daily_task_engine.get_today_tasks(roadmap)
+    # Map today tasks into schemas
+    today_tasks_schemas = [
+        RoadmapTaskSchema(
+            id=t["id"],
+            title=t["title"],
+            description=t["description"],
+            estimated_minutes=t.get("estimated_minutes", 30),
+            task_type=t.get("task_type", "Learn"),
+            why_it_matters=t.get("why_it_matters", "Skill gap requirement"),
+            is_completed=t.get("is_completed", False),
+            completed_at=t.get("completed_at"),
+            concept_explanation=t.get("concept_explanation"),
+            practice_exercise=t.get("practice_exercise"),
+            check_quiz_question=t.get("check_quiz_question"),
+            check_quiz_options=t.get("check_quiz_options"),
+            check_quiz_answer=t.get("check_quiz_answer"),
+            is_priority=t.get("is_priority", False),
+            priority_reason=t.get("priority_reason")
+        )
+        for t in focus_dict["today_tasks"]
+    ]
+
     return APIResponse(
         success=True,
         message="Today's focus tasks retrieved",
-        data=today_data
+        data=TodayFocusResponse(
+            target_career=focus_dict["target_career"],
+            today_focus_title=focus_dict["today_focus_title"],
+            current_phase_id=focus_dict.get("current_phase_id"),
+            current_phase_title=focus_dict.get("current_phase_title"),
+            today_tasks=today_tasks_schemas,
+            recommended_minutes=focus_dict["recommended_minutes"],
+            why_it_matters=focus_dict.get("why_it_matters")
+        )
+    )
+
+
+@router.get(
+    "/tasks/{task_id}/learn",
+    response_model=APIResponse[TaskLearningContentResponse],
+    summary="Get learning resources (concept, exercise, quiz) for a specific roadmap task"
+)
+async def get_task_learning_content(
+    task_id: str,
+    db: AsyncSession = Depends(get_db),
+    user_id: str = Depends(get_current_user_id)
+):
+    """Returns the learning guidance content (Learn / Practice / Check Yourself) for a task."""
+    stmt = select(Roadmap).where(Roadmap.user_id == user_id, Roadmap.is_active == True)
+    res = await db.execute(stmt)
+    roadmap = res.scalars().first()
+
+    if not roadmap:
+        raise HTTPException(status_code=404, detail="No active roadmap found")
+
+    # Search for task across all phases
+    task_data = None
+    for phase in (roadmap.phases or []):
+        for task in phase.get("tasks", []):
+            if task.get("id") == task_id:
+                task_data = task
+                break
+        if task_data:
+            break
+
+    if not task_data:
+        raise HTTPException(status_code=404, detail=f"Task '{task_id}' not found in active roadmap")
+
+    # Build default learning content if not populated by AI
+    skill_topic = task_data.get("title", "this topic")
+    target_role = roadmap.target_role
+
+    return APIResponse(
+        success=True,
+        message="Task learning content retrieved",
+        data=TaskLearningContentResponse(
+            task_id=task_id,
+            title=task_data.get("title", ""),
+            concept_explanation=task_data.get("concept_explanation") or f"{skill_topic} is a key concept for {target_role}. Understanding it helps you build reliable, production-ready systems. Focus on the core principles before moving to advanced patterns.",
+            practice_exercise=task_data.get("practice_exercise") or f"Write a small working implementation of {skill_topic}. Start with the simplest possible version, verify it works, then add one small feature.",
+            check_quiz_question=task_data.get("check_quiz_question") or f"What is the primary benefit of {skill_topic} in a {target_role} project?",
+            check_quiz_options=task_data.get("check_quiz_options") or [
+                f"A) It directly enables core {target_role} functionality",
+                f"B) It is optional and rarely used in real projects",
+                f"C) It is only relevant for senior-level engineers"
+            ],
+            check_quiz_answer=task_data.get("check_quiz_answer") or f"A) {skill_topic} is a foundational skill that most {target_role} job descriptions require.",
+            why_it_matters=task_data.get("why_it_matters", f"Essential for {target_role} readiness."),
+            task_type=task_data.get("task_type", "Learn")
+        )
+    )
+
+
+@router.get(
+    "/practice/suggest",
+    response_model=APIResponse[List[PracticeSuggestionItem]],
+    summary="Get suggested micro-practice topics based on skill gaps and recent interview weaknesses"
+)
+async def get_practice_suggestions(
+    db: AsyncSession = Depends(get_db),
+    user_id: str = Depends(get_current_user_id)
+):
+    """Returns 3-5 focused practice topics derived from skill gaps and recent interview weak areas."""
+    suggestions: List[PracticeSuggestionItem] = []
+    seen_topics = set()
+
+    # 1. Recent interview weak areas (last 3 completed sessions)
+    stmt_iv = (
+        select(InterviewSession)
+        .where(InterviewSession.user_id == user_id, InterviewSession.is_completed == True)
+        .order_by(InterviewSession.created_at.desc())
+        .limit(3)
+    )
+    res_iv = await db.execute(stmt_iv)
+    recent_sessions = res_iv.scalars().all()
+
+    for session in recent_sessions:
+        for wa in (session.weak_areas or [])[:2]:
+            if wa and wa not in seen_topics:
+                seen_topics.add(wa)
+                suggestions.append(PracticeSuggestionItem(
+                    topic=wa,
+                    reason=f"Identified as a weak area in your recent {session.mode} interview (score: {session.overall_score}%).",
+                    source="interview_weakness",
+                    priority="High" if session.overall_score < 60 else "Medium"
+                ))
+
+    # 2. High-priority skill gaps
+    stmt_sk = select(Skill).where(Skill.user_id == user_id, Skill.priority == "High")
+    res_sk = await db.execute(stmt_sk)
+    high_priority_skills = res_sk.scalars().all()
+
+    for sk in high_priority_skills[:3]:
+        topic = sk.skill_name
+        if topic not in seen_topics:
+            seen_topics.add(topic)
+            suggestions.append(PracticeSuggestionItem(
+                topic=topic,
+                reason=f"High-priority skill gap for your target career. Current confidence: {sk.confidence_status}.",
+                source="skill_gap",
+                priority="High"
+            ))
+
+    # 3. First incomplete roadmap task from current phase
+    stmt_rm = select(Roadmap).where(Roadmap.user_id == user_id, Roadmap.is_active == True)
+    res_rm = await db.execute(stmt_rm)
+    roadmap = res_rm.scalars().first()
+
+    if roadmap and roadmap.phases:
+        for phase in roadmap.phases:
+            for task in phase.get("tasks", []):
+                if not task.get("is_completed"):
+                    topic = task.get("title", "")
+                    if topic and topic not in seen_topics:
+                        seen_topics.add(topic)
+                        suggestions.append(PracticeSuggestionItem(
+                            topic=topic,
+                            reason=f"Next task in your active roadmap: {phase.get('title', 'Current Phase')}.",
+                            source="roadmap_task",
+                            priority="Medium"
+                        ))
+                    break
+            break  # Only first phase
+
+    # Sort: High priority first, then Medium
+    suggestions.sort(key=lambda x: 0 if x.priority == "High" else 1)
+
+    return APIResponse(
+        success=True,
+        message="Practice suggestions retrieved",
+        data=suggestions[:6]  # Max 6 suggestions
     )
 
 
 @router.post(
     "/tasks/{task_id}/complete",
-    response_model=APIResponse[RoadmapProgressResponse],
-    summary="Mark roadmap task complete and update progress"
+    response_model=APIResponse[RoadmapResponse],
+    summary="Mark roadmap task as completed and update progress"
 )
-async def complete_roadmap_task(
+async def complete_task(
     task_id: str,
     db: AsyncSession = Depends(get_db),
     user_id: str = Depends(get_current_user_id)
@@ -185,48 +336,25 @@ async def complete_roadmap_task(
     roadmap = res.scalars().first()
 
     if not roadmap:
-        raise HTTPException(status_code=404, detail="No active roadmap found for user")
+        raise HTTPException(status_code=404, detail="Active roadmap not found")
 
-    completed = set(roadmap.completed_task_ids or [])
-    completed.add(task_id)
-    roadmap.completed_task_ids = list(completed)
-
-    # Recalculate deterministic progress
-    roadmap.overall_progress_percent = roadmap_engine.calculate_progress(roadmap)
-
+    roadmap = roadmap_engine.update_task_completion(roadmap, task_id, completed=True)
+    db.add(roadmap)
     await db.commit()
-    await db.refresh(roadmap)
-
-    total_tasks = sum(len(p.get("tasks", [])) for p in (roadmap.phases or []))
-    total_projs = sum(len(p.get("projects", [])) for p in (roadmap.phases or []))
-    total_mils = sum(len(p.get("milestones", [])) for p in (roadmap.phases or []))
-
-    progress_resp = RoadmapProgressResponse(
-        roadmap_id=roadmap.id,
-        target_role=roadmap.target_role,
-        overall_progress_percent=roadmap.overall_progress_percent,
-        completed_tasks_count=len(roadmap.completed_task_ids),
-        total_tasks_count=total_tasks,
-        completed_projects_count=len(roadmap.completed_project_ids or []),
-        total_projects_count=total_projs,
-        completed_milestones_count=len(roadmap.completed_milestone_ids or []),
-        total_milestones_count=total_mils,
-        is_outdated=roadmap.is_outdated
-    )
 
     return APIResponse(
         success=True,
-        message=f"Task '{task_id}' marked completed",
-        data=progress_resp
+        message=f"Task '{task_id}' marked as completed",
+        data=_serialize_roadmap(roadmap)
     )
 
 
 @router.post(
     "/tasks/{task_id}/uncomplete",
-    response_model=APIResponse[RoadmapProgressResponse],
-    summary="Unmark roadmap task completion"
+    response_model=APIResponse[RoadmapResponse],
+    summary="Mark roadmap task as uncompleted"
 )
-async def uncomplete_roadmap_task(
+async def uncomplete_task(
     task_id: str,
     db: AsyncSession = Depends(get_db),
     user_id: str = Depends(get_current_user_id)
@@ -236,45 +364,23 @@ async def uncomplete_roadmap_task(
     roadmap = res.scalars().first()
 
     if not roadmap:
-        raise HTTPException(status_code=404, detail="No active roadmap found for user")
+        raise HTTPException(status_code=404, detail="Active roadmap not found")
 
-    completed = set(roadmap.completed_task_ids or [])
-    completed.discard(task_id)
-    roadmap.completed_task_ids = list(completed)
-
-    roadmap.overall_progress_percent = roadmap_engine.calculate_progress(roadmap)
-
+    roadmap = roadmap_engine.update_task_completion(roadmap, task_id, completed=False)
+    db.add(roadmap)
     await db.commit()
-    await db.refresh(roadmap)
-
-    total_tasks = sum(len(p.get("tasks", [])) for p in (roadmap.phases or []))
-    total_projs = sum(len(p.get("projects", [])) for p in (roadmap.phases or []))
-    total_mils = sum(len(p.get("milestones", [])) for p in (roadmap.phases or []))
-
-    progress_resp = RoadmapProgressResponse(
-        roadmap_id=roadmap.id,
-        target_role=roadmap.target_role,
-        overall_progress_percent=roadmap.overall_progress_percent,
-        completed_tasks_count=len(roadmap.completed_task_ids),
-        total_tasks_count=total_tasks,
-        completed_projects_count=len(roadmap.completed_project_ids or []),
-        total_projects_count=total_projs,
-        completed_milestones_count=len(roadmap.completed_milestone_ids or []),
-        total_milestones_count=total_mils,
-        is_outdated=roadmap.is_outdated
-    )
 
     return APIResponse(
         success=True,
-        message=f"Task '{task_id}' unmarked",
-        data=progress_resp
+        message=f"Task '{task_id}' marked as uncompleted",
+        data=_serialize_roadmap(roadmap)
     )
 
 
 @router.get(
     "/progress",
     response_model=APIResponse[RoadmapProgressResponse],
-    summary="Get roadmap progress statistics"
+    summary="Get overall roadmap progress metrics"
 )
 async def get_roadmap_progress(
     db: AsyncSession = Depends(get_db),
@@ -285,36 +391,44 @@ async def get_roadmap_progress(
     roadmap = res.scalars().first()
 
     if not roadmap:
-        raise HTTPException(status_code=404, detail="No active roadmap found for user")
+        return APIResponse(
+            success=True,
+            message="No active roadmap",
+            data=RoadmapProgressResponse(
+                target_role="None",
+                overall_progress_percent=0,
+                completed_tasks_count=0,
+                total_tasks_count=0,
+                completed_phases_count=0,
+                total_phases_count=0,
+                is_outdated=False
+            )
+        )
 
-    total_tasks = sum(len(p.get("tasks", [])) for p in (roadmap.phases or []))
-    total_projs = sum(len(p.get("projects", [])) for p in (roadmap.phases or []))
-    total_mils = sum(len(p.get("milestones", [])) for p in (roadmap.phases or []))
-
-    progress_resp = RoadmapProgressResponse(
-        roadmap_id=roadmap.id,
-        target_role=roadmap.target_role,
-        overall_progress_percent=roadmap.overall_progress_percent,
-        completed_tasks_count=len(roadmap.completed_task_ids or []),
-        total_tasks_count=total_tasks,
-        completed_projects_count=len(roadmap.completed_project_ids or []),
-        total_projects_count=total_projs,
-        completed_milestones_count=len(roadmap.completed_milestone_ids or []),
-        total_milestones_count=total_mils,
-        is_outdated=roadmap.is_outdated
-    )
+    phases = roadmap.phases or []
+    total_tasks = sum(len(p.get("tasks", [])) for p in phases)
+    completed_tasks = len(roadmap.completed_task_ids or [])
+    completed_phases = sum(1 for p in phases if p.get("progress_percent", 0) == 100)
 
     return APIResponse(
         success=True,
-        message="Roadmap progress metrics retrieved",
-        data=progress_resp
+        message="Roadmap progress retrieved",
+        data=RoadmapProgressResponse(
+            target_role=roadmap.target_role,
+            overall_progress_percent=roadmap.overall_progress_percent,
+            completed_tasks_count=completed_tasks,
+            total_tasks_count=total_tasks,
+            completed_phases_count=completed_phases,
+            total_phases_count=len(phases),
+            is_outdated=roadmap.is_outdated
+        )
     )
 
 
 @router.post(
     "/recalculate",
-    response_model=APIResponse[RoadmapDetailResponse],
-    summary="Recalculate roadmap for current target career preserving historical task completion"
+    response_model=APIResponse[RoadmapResponse],
+    summary="Recalculate roadmap while preserving completed task progress"
 )
 async def recalculate_roadmap(
     db: AsyncSession = Depends(get_db),
@@ -322,45 +436,41 @@ async def recalculate_roadmap(
 ):
     stmt = select(Roadmap).where(Roadmap.user_id == user_id, Roadmap.is_active == True)
     res = await db.execute(stmt)
-    old_roadmap = res.scalars().first()
+    roadmap = res.scalars().first()
 
-    prev_level = old_roadmap.user_level if old_roadmap else "Beginner"
-    prev_hpd = old_roadmap.hours_per_day if old_roadmap else 1
-    prev_dpw = old_roadmap.days_per_week if old_roadmap else 5
-    prev_style = old_roadmap.preferred_learning_style if old_roadmap else "Hands-on"
-    prev_completed_tasks = list(old_roadmap.completed_task_ids) if old_roadmap and old_roadmap.completed_task_ids else []
+    h_day = roadmap.hours_per_day if roadmap else 1
+    d_week = roadmap.days_per_week if roadmap else 5
+    style = roadmap.preferred_learning_style if roadmap else "Hands-on"
 
-    new_roadmap = await roadmap_engine.generate_user_roadmap(
+    u_skills = await ingestion_engine.ingest_user_skills(db, user_id)
+    target_career, _, _, missing_gaps, _ = await gap_engine.calculate_skill_gaps(db, user_id, u_skills)
+
+    updated_roadmap = await roadmap_engine.generate_roadmap(
         db=db,
         user_id=user_id,
-        user_level=prev_level,
-        hours_per_day=prev_hpd,
-        days_per_week=prev_dpw,
-        preferred_learning_style=prev_style
+        target_career=target_career,
+        user_skills=u_skills,
+        missing_gaps=missing_gaps,
+        hours_per_day=h_day,
+        days_per_week=d_week,
+        learning_style=style,
+        preserve_progress=True
     )
-
-    # Preserve matching completed task IDs if applicable
-    new_roadmap.completed_task_ids = prev_completed_tasks
-    new_roadmap.overall_progress_percent = roadmap_engine.calculate_progress(new_roadmap)
-    new_roadmap.is_outdated = False
-
-    await db.commit()
-    await db.refresh(new_roadmap)
 
     return APIResponse(
         success=True,
-        message="Roadmap recalculated and updated successfully",
-        data=_to_detail_response(new_roadmap)
+        message="Roadmap recalculated and progress preserved",
+        data=_serialize_roadmap(updated_roadmap)
     )
 
 
 @router.put(
     "/preferences",
-    response_model=APIResponse[RoadmapDetailResponse],
-    summary="Update learning time & level preferences"
+    response_model=APIResponse[RoadmapResponse],
+    summary="Update learning preferences and study schedule"
 )
-async def update_learning_preferences(
-    req: RoadmapPreferencesRequest,
+async def update_preferences(
+    payload: RoadmapPreferencesRequest,
     db: AsyncSession = Depends(get_db),
     user_id: str = Depends(get_current_user_id)
 ):
@@ -368,140 +478,44 @@ async def update_learning_preferences(
     res = await db.execute(stmt)
     roadmap = res.scalars().first()
 
-    if not roadmap:
-        roadmap = await roadmap_engine.generate_user_roadmap(
-            db=db,
-            user_id=user_id,
-            user_level=req.user_level,
-            hours_per_day=req.hours_per_day,
-            days_per_week=req.days_per_week,
-            preferred_learning_style=req.preferred_learning_style
-        )
-    else:
-        roadmap.hours_per_day = req.hours_per_day
-        roadmap.days_per_week = req.days_per_week
-        roadmap.preferred_learning_style = req.preferred_learning_style
-        roadmap.user_level = req.user_level
+    u_skills = await ingestion_engine.ingest_user_skills(db, user_id)
+    target_career, _, _, missing_gaps, _ = await gap_engine.calculate_skill_gaps(db, user_id, u_skills)
 
-        weekly_hours = req.hours_per_day * req.days_per_week
-        roadmap.total_estimated_weeks = max(2, int(round(24.0 / max(weekly_hours, 1))))
-
-        await db.commit()
-        await db.refresh(roadmap)
+    updated_roadmap = await roadmap_engine.generate_roadmap(
+        db=db,
+        user_id=user_id,
+        target_career=target_career,
+        user_skills=u_skills,
+        missing_gaps=missing_gaps,
+        hours_per_day=payload.hours_per_day,
+        days_per_week=payload.days_per_week,
+        learning_style=payload.preferred_learning_style,
+        preserve_progress=True
+    )
 
     return APIResponse(
         success=True,
         message="Learning preferences updated successfully",
-        data=_to_detail_response(roadmap)
+        data=_serialize_roadmap(updated_roadmap)
     )
 
 
-@router.post(
-    "/focus-skill",
-    response_model=APIResponse[FocusSkillResponse],
-    summary="Map a skill gap to Today's Focus in active roadmap"
-)
-async def focus_skill(
-    req: FocusSkillRequest,
-    db: AsyncSession = Depends(get_db),
-    user_id: str = Depends(get_current_user_id)
-):
-    skill_clean = req.skill_name.strip()
-    if not skill_clean:
-        raise HTTPException(status_code=400, detail="Skill name is required")
-
-    stmt = select(Roadmap).where(Roadmap.user_id == user_id, Roadmap.is_active == True)
-    res = await db.execute(stmt)
-    roadmap = res.scalars().first()
-
-    if not roadmap:
-        roadmap = await roadmap_engine.generate_user_roadmap(db=db, user_id=user_id)
-
-    phases = copy.deepcopy(roadmap.phases or [])
-    completed_ids = set(roadmap.completed_task_ids or [])
-    
-    # 1. Check if an incomplete task already exists matching this skill
-    found_task = None
-    target_phase_idx = 0
-    for p_idx, phase in enumerate(phases):
-        for task in phase.get("tasks", []):
-            if (task.get("skill", "").lower() == skill_clean.lower() or 
-                skill_clean.lower() in task.get("title", "").lower()):
-                found_task = task
-                target_phase_idx = p_idx
-                break
-        if found_task:
-            break
-
-    # Check today's current focus
-    today_data = daily_task_engine.get_today_tasks(roadmap)
-    if today_data.tasks and today_data.tasks[0].skill.lower() == skill_clean.lower():
-        return APIResponse(
-            success=True,
-            message=f"'{skill_clean}' is already in your Today's Focus",
-            data=FocusSkillResponse(
-                status="already_focus",
-                message=f"'{skill_clean}' is already in your Today's Focus",
-                skill_name=skill_clean,
-                roadmap_id=roadmap.id,
-                task=today_data.tasks[0]
-            )
-        )
-
-    if found_task:
-        # Prioritize this task by moving it to the top of its phase's tasks
-        phase_tasks = phases[target_phase_idx].get("tasks", [])
-        phase_tasks = [t for t in phase_tasks if t.get("id") != found_task.get("id")]
-        phase_tasks.insert(0, found_task)
-        phases[target_phase_idx]["tasks"] = phase_tasks
-        status_msg = "prioritized"
-        user_msg = f"Task for '{skill_clean}' prioritized in your active roadmap"
-    else:
-        # Create a new focused task in the first phase without duplication
-        new_task_id = f"task_focus_{uuid.uuid4().hex[:8]}"
-        found_task = {
-            "id": new_task_id,
-            "title": f"Master {skill_clean} Fundamentals & Core Implementation",
-            "skill": skill_clean,
-            "estimated_minutes": 30,
-            "why_matters": f"Essential skill gap for {roadmap.target_role}.",
-            "practice_activity": f"Build practical hands-on exercises and implement core concepts in {skill_clean}.",
-            "completed": False,
-            "completed_at": None
-        }
-        if phases:
-            if "tasks" not in phases[0]:
-                phases[0]["tasks"] = []
-            phases[0]["tasks"].insert(0, found_task)
-        else:
-            phases.append({
-                "phase_id": "phase_1",
-                "name": "Phase 1 ? Core Foundations",
-                "description": "Core foundational skills",
-                "estimated_weeks": 2,
-                "skills": [{"name": skill_clean, "status": "Missing", "priority": "Essential", "level": "Beginner"}],
-                "learning_objectives": [f"Learn {skill_clean}"],
-                "tasks": [found_task],
-                "projects": [],
-                "milestones": []
-            })
-        status_msg = "added"
-        user_msg = f"New focus task for '{skill_clean}' added to Today's Focus"
-
-    roadmap.phases = phases
-    flag_modified(roadmap, "phases")
-    await db.commit()
-    await db.refresh(roadmap)
-
-    task_schema = RoadmapTaskSchema(**found_task)
-    return APIResponse(
-        success=True,
-        message=user_msg,
-        data=FocusSkillResponse(
-            status=status_msg,
-            message=user_msg,
-            skill_name=skill_clean,
-            roadmap_id=roadmap.id,
-            task=task_schema
-        )
+def _serialize_roadmap(r: Roadmap) -> RoadmapResponse:
+    return RoadmapResponse(
+        id=r.id,
+        user_id=r.user_id,
+        target_role=r.target_role,
+        overall_progress_percent=r.overall_progress_percent,
+        is_active=r.is_active,
+        is_outdated=r.is_outdated,
+        hours_per_day=r.hours_per_day,
+        days_per_week=r.days_per_week,
+        preferred_learning_style=r.preferred_learning_style,
+        total_estimated_weeks=r.total_estimated_weeks,
+        phases=r.phases or [],
+        completed_task_ids=r.completed_task_ids or [],
+        completed_milestone_ids=r.completed_milestone_ids or [],
+        completed_project_ids=r.completed_project_ids or [],
+        created_at=r.created_at.isoformat() if r.created_at else None,
+        updated_at=r.updated_at.isoformat() if r.updated_at else None
     )

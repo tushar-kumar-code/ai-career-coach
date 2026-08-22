@@ -1,99 +1,74 @@
-from typing import List, Optional
+from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
+
+
+class RoadmapGenerateRequest(BaseModel):
+    hours_per_day: int = Field(default=1, ge=1, le=8, description="Available study hours per day")
+    days_per_week: int = Field(default=5, ge=1, le=7, description="Available study days per week")
+    preferred_learning_style: str = Field(default="Hands-on", description="Hands-on, Visual, or Reading")
+
+
+class RoadmapPreferencesRequest(BaseModel):
+    hours_per_day: int = Field(..., ge=1, le=8)
+    days_per_week: int = Field(..., ge=1, le=7)
+    preferred_learning_style: str = Field(...)
 
 
 class RoadmapTaskSchema(BaseModel):
     id: str
     title: str
-    skill: str
-    estimated_minutes: int = 30
-    why_matters: str
-    practice_activity: str
-    completed: bool = False
+    description: str
+    estimated_minutes: int
+    task_type: str
+    why_it_matters: str
+    is_completed: bool
     completed_at: Optional[str] = None
+    # Learning resource fields (Phase 3 — optional so existing tasks still serialize)
+    concept_explanation: Optional[str] = None
+    practice_exercise: Optional[str] = None
+    check_quiz_question: Optional[str] = None
+    check_quiz_options: Optional[List[str]] = None
+    check_quiz_answer: Optional[str] = None
+    # Priority flag from Interview feedback loop
+    is_priority: Optional[bool] = False
+    priority_reason: Optional[str] = None
 
 
 class RoadmapProjectSchema(BaseModel):
     id: str
     title: str
     objective: str
-    skills_practiced: List[str] = Field(default_factory=list)
-    difficulty: str = "Intermediate"
+    skills_practiced: List[str]
+    difficulty: str
     expected_outcome: str
     resume_relevance: str
-    completed: bool = False
+    is_completed: bool
 
 
 class RoadmapMilestoneSchema(BaseModel):
     id: str
     title: str
     criteria: str
-    completed: bool = False
-
-
-class RoadmapSkillItem(BaseModel):
-    name: str
-    status: str = "Missing"  # Verified, Supported, Missing
-    priority: str = "Essential"  # Essential, Core, Optional
-    level: str = "Beginner"
+    is_completed: bool
 
 
 class RoadmapPhaseSchema(BaseModel):
-    phase_id: str
-    name: str
-    description: str
-    estimated_weeks: int = 2
-    skills: List[RoadmapSkillItem] = Field(default_factory=list)
-    learning_objectives: List[str] = Field(default_factory=list)
-    tasks: List[RoadmapTaskSchema] = Field(default_factory=list)
-    projects: List[RoadmapProjectSchema] = Field(default_factory=list)
-    milestones: List[RoadmapMilestoneSchema] = Field(default_factory=list)
-
-
-class RoadmapGenerateRequest(BaseModel):
-    user_level: Optional[str] = "Beginner"
-    hours_per_day: Optional[int] = 1
-    days_per_week: Optional[int] = 5
-    preferred_learning_style: Optional[str] = "Hands-on"
-    target_career_id: Optional[str] = None
-
-
-class RoadmapPreferencesRequest(BaseModel):
-    hours_per_day: int = Field(ge=1, le=12)
-    days_per_week: int = Field(ge=1, le=7)
-    preferred_learning_style: str = "Hands-on"
-    user_level: str = "Beginner"
-
-
-class DailyTasksResponse(BaseModel):
-    roadmap_id: str
-    target_role: str
-    current_phase_name: str
-    hours_budget: float
-    today_focus_title: str
-    why_it_matters: str
+    id: str
+    phase_number: int
+    title: str
+    type: str
+    skills: List[str]
+    learning_objectives: List[str]
+    progress_percent: int
     tasks: List[RoadmapTaskSchema]
+    project: Optional[RoadmapProjectSchema] = None
+    milestone: Optional[RoadmapMilestoneSchema] = None
 
 
-class RoadmapProgressResponse(BaseModel):
-    roadmap_id: str
-    target_role: str
-    overall_progress_percent: int
-    completed_tasks_count: int
-    total_tasks_count: int
-    completed_projects_count: int
-    total_projects_count: int
-    completed_milestones_count: int
-    total_milestones_count: int
-    is_outdated: bool
-
-
-class RoadmapDetailResponse(BaseModel):
+class RoadmapResponse(BaseModel):
     id: str
     user_id: str
-    target_career_id: Optional[str] = None
     target_role: str
-    user_level: str
     overall_progress_percent: int
     is_active: bool
     is_outdated: bool
@@ -102,18 +77,49 @@ class RoadmapDetailResponse(BaseModel):
     preferred_learning_style: str
     total_estimated_weeks: int
     phases: List[RoadmapPhaseSchema]
-    completed_task_ids: List[str] = Field(default_factory=list)
-    completed_milestone_ids: List[str] = Field(default_factory=list)
-    completed_project_ids: List[str] = Field(default_factory=list)
+    completed_task_ids: List[str]
+    completed_milestone_ids: List[str]
+    completed_project_ids: List[str]
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
 
 
-class FocusSkillRequest(BaseModel):
-    skill_name: str
+class TodayFocusResponse(BaseModel):
+    target_career: str
+    today_focus_title: str
+    current_phase_id: Optional[str] = None
+    current_phase_title: Optional[str] = None
+    today_tasks: List[RoadmapTaskSchema]
+    recommended_minutes: int
+    why_it_matters: Optional[str] = None
 
 
-class FocusSkillResponse(BaseModel):
-    status: str  # "added", "prioritized", "already_focus"
-    message: str
-    skill_name: str
-    roadmap_id: str
-    task: Optional[RoadmapTaskSchema] = None
+class RoadmapProgressResponse(BaseModel):
+    target_role: str
+    overall_progress_percent: int
+    completed_tasks_count: int
+    total_tasks_count: int
+    completed_phases_count: int
+    total_phases_count: int
+    is_outdated: bool
+
+
+class TaskLearningContentResponse(BaseModel):
+    """Response for GET /roadmap/tasks/{task_id}/learn — learning resources for a single task."""
+    task_id: str
+    title: str
+    concept_explanation: str
+    practice_exercise: str
+    check_quiz_question: str
+    check_quiz_options: List[str]
+    check_quiz_answer: str
+    why_it_matters: str
+    task_type: str
+
+
+class PracticeSuggestion(BaseModel):
+    """A suggested practice topic derived from skill gaps or recent interview weak areas."""
+    topic: str
+    reason: str
+    source: str  # "skill_gap" | "interview_weakness" | "roadmap_task"
+    priority: str  # "High" | "Medium" | "Low"

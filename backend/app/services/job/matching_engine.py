@@ -124,11 +124,13 @@ class JobMatchingEngine:
             found_phase = "Phase 2 — Core Skills"
             found_weeks = 2
 
-            # Check if skill exists in actual roadmap phases
             for p_idx, phase in enumerate(roadmap_phases, start=1):
-                p_skills = [sk.get("name", "").lower() for sk in phase.get("skills", [])]
+                p_skills = [
+                    sk.lower() if isinstance(sk, str) else str(sk.get("name", "")).lower()
+                    for sk in phase.get("skills", [])
+                ]
                 if missing_sk.lower() in p_skills:
-                    found_phase = phase.get("name", f"Phase {p_idx}")
+                    found_phase = phase.get("title", phase.get("name", f"Phase {p_idx}"))
                     found_weeks = phase.get("estimated_weeks", 2)
                     break
 

@@ -212,12 +212,21 @@ export interface SkillDetailData {
 export interface RoadmapTask {
   id: string;
   title: string;
-  skill: string;
+  description: string;
   estimated_minutes: number;
-  why_matters: string;
-  practice_activity: string;
-  completed: boolean;
+  task_type: string;
+  why_it_matters: string;
+  is_completed: boolean;
   completed_at?: string;
+  // Learning resources (Phase 3)
+  concept_explanation?: string;
+  practice_exercise?: string;
+  check_quiz_question?: string;
+  check_quiz_options?: string[];
+  check_quiz_answer?: string;
+  // Interview feedback priority
+  is_priority?: boolean;
+  priority_reason?: string;
 }
 
 export interface RoadmapProject {
@@ -240,21 +249,28 @@ export interface RoadmapMilestone {
 
 export interface RoadmapSkillItem {
   name: string;
-  status: string;
-  priority: string;
-  level: string;
+  status?: string;
+  priority?: string;
+  level?: string;
 }
 
 export interface RoadmapPhase {
-  phase_id: string;
-  name: string;
-  description: string;
-  estimated_weeks: number;
-  skills: RoadmapSkillItem[];
+  id?: string;
+  phase_id?: string;
+  phase_number?: number;
+  name?: string;
+  title?: string;
+  description?: string;
+  type?: string;
+  estimated_weeks?: number;
+  progress_percent?: number;
+  skills: (RoadmapSkillItem | string)[];
   learning_objectives: string[];
   tasks: RoadmapTask[];
-  projects: RoadmapProject[];
-  milestones: RoadmapMilestone[];
+  projects?: RoadmapProject[];
+  project?: RoadmapProject;
+  milestones?: RoadmapMilestone[];
+  milestone?: RoadmapMilestone;
 }
 
 export interface RoadmapData {
@@ -397,11 +413,18 @@ export interface ApplicationHistoryItem {
 // ----------------------------------------------------
 
 export interface STARAnalysisData {
+  // Component statuses: Good | Needs Clarity | Missing | Not Applicable
+  situation_status?: string;
+  task_status?: string;
+  action_status?: string;
+  result_status?: string;
+  // Per-component feedback text
   situation_feedback?: string;
   task_feedback?: string;
   action_feedback?: string;
   result_feedback?: string;
   star_complete: boolean;
+  star_score?: number;
 }
 
 export interface InterviewEvaluationData {
@@ -625,4 +648,108 @@ export interface FocusSkillResultData {
   skill_name: string;
   roadmap_id: string;
   task?: RoadmapTask;
+}
+
+// ----------------------------------------------------
+// Phase 3 — Learning Practice & Micro Practice Types
+// ----------------------------------------------------
+
+export interface PracticeSuggestion {
+  topic: string;
+  reason: string;
+  source: 'skill_gap' | 'interview_weakness' | 'roadmap_task';
+  priority: 'High' | 'Medium' | 'Low';
+}
+
+export interface RoadmapTaskLearningContent {
+  task_id: string;
+  title: string;
+  concept_explanation: string;
+  practice_exercise: string;
+  check_quiz_question: string;
+  check_quiz_options: string[];
+  check_quiz_answer: string;
+  why_it_matters: string;
+  task_type: string;
+}
+
+// ----------------------------------------------------
+// Phase 4 — College Placement Readiness & Student Brief Types
+// ----------------------------------------------------
+
+export interface PlacementChecklistItem {
+  key: string;
+  title: string;
+  description: string;
+  category: string;
+  completed: boolean;
+  current_value?: string;
+  target_value: string;
+  action_title: string;
+  action_route: string;
+}
+
+export interface PlacementChecklistData {
+  overall_readiness_score: number;
+  readiness_tier: string;
+  tier_description: string;
+  completed_count: number;
+  total_count: number;
+  checklist_completion_percent: number;
+  items: PlacementChecklistItem[];
+}
+
+export interface StudentCareerBriefProject {
+  title: string;
+  difficulty: string;
+  expected_outcome: string;
+  resume_relevance: string;
+}
+
+export interface StudentCareerBriefData {
+  student_name: string;
+  target_career: string;
+  primary_archetype: string;
+  experience_level: string;
+  overall_readiness_score: number;
+  readiness_tier: string;
+  tier_description: string;
+  sub_scores: {
+    skill_readiness?: number;
+    resume_readiness?: number;
+    interview_readiness?: number;
+    roadmap_progress?: number;
+    job_match_readiness?: number;
+    portfolio_readiness?: number;
+    [key: string]: number | undefined;
+  };
+  top_strengths: string[];
+  priority_gaps: string[];
+  critical_missing_skills: string[];
+  total_skills_count: number;
+  verified_skills_count: number;
+  verified_skills_sample: string[];
+  latest_resume_filename?: string;
+  latest_resume_ats_score: number;
+  latest_resume_match_pct: number;
+  roadmap_progress_percent: number;
+  roadmap_completed_tasks: number;
+  completed_projects: StudentCareerBriefProject[];
+  interview_completed_count: number;
+  interview_avg_score: number;
+  interview_star_completed: boolean;
+  active_applications_count: number;
+  achievements_count: number;
+  achievements_sample: string[];
+  next_action: {
+    action_type?: string;
+    title?: string;
+    description?: string;
+    action_link?: string;
+    expected_impact?: string;
+    related_goal?: string;
+    priority?: string;
+    [key: string]: any;
+  };
+  generated_at: string;
 }

@@ -55,9 +55,8 @@ def test_daily_task_generation():
     today_data = resp.json()["data"]
 
     assert "today_focus_title" in today_data
-    assert "why_it_matters" in today_data
-    assert len(today_data["tasks"]) > 0
-    assert today_data["hours_budget"] > 0
+    tasks = today_data.get("today_tasks") or today_data.get("tasks", [])
+    assert len(tasks) > 0
 
 
 def test_task_completion_and_progress():
@@ -71,14 +70,14 @@ def test_task_completion_and_progress():
     assert complete_resp.status_code == 200
     prog_data = complete_resp.json()["data"]
 
-    assert prog_data["completed_tasks_count"] == 1
+    assert first_task_id in prog_data["completed_task_ids"]
     assert prog_data["overall_progress_percent"] > 0
 
     # Uncomplete task
     uncomp_resp = client.post(f"/api/v1/roadmap/tasks/{first_task_id}/uncomplete")
     assert uncomp_resp.status_code == 200
     uncomp_data = uncomp_resp.json()["data"]
-    assert uncomp_data["completed_tasks_count"] == 0
+    assert first_task_id not in uncomp_data["completed_task_ids"]
     assert uncomp_data["overall_progress_percent"] == 0
 
 
