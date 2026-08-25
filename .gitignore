@@ -31,8 +31,9 @@ backend/uploads/*
 .env.local
 .env.*.local
 backend/.env
-backend/.env.example
 frontend/.env.local
+!*.env.example
+!**/.env.example
 
 # IDE & OS files
 .vscode/

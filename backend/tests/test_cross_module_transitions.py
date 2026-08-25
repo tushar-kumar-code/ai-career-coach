@@ -1,4 +1,4 @@
-﻿from fastapi.testclient import TestClient
+from fastapi.testclient import TestClient
 from app.main import app
 
 client = TestClient(app)
@@ -16,8 +16,10 @@ def test_roadmap_focus_skill_transition():
     resp_today = client.get("/api/v1/roadmap/today")
     assert resp_today.status_code == 200
     today_data = resp_today.json()["data"]
-    assert len(today_data["tasks"]) > 0
-    assert any("Docker" in t["title"] or "Docker" in t["skill"] for t in today_data["tasks"])
+    tasks = today_data.get("today_tasks") or today_data.get("tasks") or []
+    assert len(tasks) > 0
+    assert any("Docker" in t["title"] or "Docker" in (t.get("skill") or "") for t in tasks)
+
 
     # 3. Requesting the same skill again detects already in focus
     resp_again = client.post("/api/v1/roadmap/focus-skill", json={"skill_name": "Docker & Containers"})

@@ -123,3 +123,16 @@ class PracticeSuggestion(BaseModel):
     reason: str
     source: str  # "skill_gap" | "interview_weakness" | "roadmap_task"
     priority: str  # "High" | "Medium" | "Low"
+
+
+class FocusSkillRequest(BaseModel):
+    skill_name: str
+
+
+class FocusSkillResponse(BaseModel):
+    status: str  # "added" | "prioritized" | "already_focus"
+    message: str
+    skill_name: str
+    roadmap_id: str
+    task: Optional[RoadmapTaskSchema] = None
+

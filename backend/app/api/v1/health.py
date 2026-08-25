@@ -3,9 +3,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 
 from app.core.config import settings
-from app.core.database import get_db, engine, Base
+from app.core.database import get_db
 from app.schemas.health import HealthCheckResponse, APIResponse
-import app.models  # Ensures models are imported for table creation
 
 router = APIRouter()
 
@@ -17,11 +16,9 @@ router = APIRouter()
     description="Check backend status, environment configuration, real database ping, and AI provider configuration."
 )
 async def check_health(db: AsyncSession = Depends(get_db)):
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
     # 1. Real Database Ping Test
     db_status = "disconnected"
+
     try:
         result = await db.execute(text("SELECT 1"))
         if result.scalar() == 1:

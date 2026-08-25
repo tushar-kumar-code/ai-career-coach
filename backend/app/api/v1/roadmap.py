@@ -1,6 +1,9 @@
+import copy
+import uuid
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm.attributes import flag_modified
 from sqlalchemy import select
 
 from app.core.database import get_db
@@ -19,8 +22,11 @@ from app.schemas.roadmap import (
     RoadmapProgressResponse,
     RoadmapTaskSchema,
     TaskLearningContentResponse,
-    PracticeSuggestion
+    PracticeSuggestion,
+    FocusSkillRequest,
+    FocusSkillResponse
 )
+
 from app.schemas.interview import PracticeSuggestionItem
 from app.services.skill.ingestion_engine import SkillIngestionEngine
 from app.services.skill.gap_engine import SkillGapEngine
@@ -500,7 +506,141 @@ async def update_preferences(
     )
 
 
+@router.post(
+    "/focus-skill",
+    response_model=APIResponse[FocusSkillResponse],
+    summary="Map a skill gap to Today's Focus in active roadmap"
+)
+async def focus_skill(
+    req: FocusSkillRequest,
+    db: AsyncSession = Depends(get_db),
+    user_id: str = Depends(get_current_user_id)
+):
+    skill_clean = req.skill_name.strip()
+    if not skill_clean:
+        raise HTTPException(status_code=400, detail="Skill name is required")
+
+    stmt = select(Roadmap).where(Roadmap.user_id == user_id, Roadmap.is_active == True)
+    res = await db.execute(stmt)
+    roadmap = res.scalars().first()
+
+    if not roadmap:
+        u_skills = await ingestion_engine.ingest_user_skills(db, user_id)
+        target_career, _, _, missing_gaps, _ = await gap_engine.calculate_skill_gaps(db, user_id, u_skills)
+        roadmap = await roadmap_engine.generate_roadmap(
+            db=db,
+            user_id=user_id,
+            target_career=target_career,
+            user_skills=u_skills,
+            missing_gaps=missing_gaps
+        )
+
+    phases = copy.deepcopy(roadmap.phases or [])
+    
+    # 1. Check if an incomplete task already exists matching this skill
+    found_task = None
+    target_phase_idx = 0
+    for p_idx, phase in enumerate(phases):
+        for task in phase.get("tasks", []):
+            task_skill = task.get("skill") or task.get("title", "")
+            if (skill_clean.lower() in task_skill.lower() or 
+                skill_clean.lower() in task.get("title", "").lower()):
+                found_task = task
+                target_phase_idx = p_idx
+                break
+        if found_task:
+            break
+
+    # Check today's current focus
+    focus_dict = roadmap_engine.get_today_focus_tasks(roadmap)
+    today_tasks = focus_dict.get("today_tasks", [])
+    if today_tasks:
+        first_t = today_tasks[0]
+        first_t_skill = first_t.get("skill") or first_t.get("title", "")
+        if skill_clean.lower() in first_t_skill.lower() or skill_clean.lower() in first_t.get("title", "").lower():
+            return APIResponse(
+                success=True,
+                message=f"'{skill_clean}' is already in your Today's Focus",
+                data=FocusSkillResponse(
+                    status="already_focus",
+                    message=f"'{skill_clean}' is already in your Today's Focus",
+                    skill_name=skill_clean,
+                    roadmap_id=roadmap.id,
+                    task=RoadmapTaskSchema(**first_t)
+                )
+            )
+
+    if found_task:
+        # Prioritize this task by moving it to the top of its phase's tasks
+        phase_tasks = phases[target_phase_idx].get("tasks", [])
+        phase_tasks = [t for t in phase_tasks if t.get("id") != found_task.get("id")]
+        phase_tasks.insert(0, found_task)
+        phases[target_phase_idx]["tasks"] = phase_tasks
+        status_msg = "prioritized"
+        user_msg = f"Task for '{skill_clean}' prioritized in your active roadmap"
+    else:
+        # Create a new focused task in the first phase
+        new_task_id = f"task_focus_{uuid.uuid4().hex[:8]}"
+        found_task = {
+            "id": new_task_id,
+            "title": f"Master {skill_clean} Fundamentals & Core Implementation",
+            "description": f"Focused practice and mastery of {skill_clean}.",
+            "estimated_minutes": 30,
+            "task_type": "Practice",
+            "why_it_matters": f"Essential skill gap for {roadmap.target_role}.",
+            "is_completed": False,
+            "completed_at": None,
+            "concept_explanation": f"Core principles and application of {skill_clean}.",
+            "practice_exercise": f"Implement a working component demonstrating {skill_clean}.",
+            "check_quiz_question": f"How is {skill_clean} utilized in {roadmap.target_role}?",
+            "check_quiz_options": [
+                f"A) Core technical requirement for {roadmap.target_role}",
+                f"B) Optional hobby knowledge",
+                f"C) Not relevant"
+            ],
+            "check_quiz_answer": f"A) Core technical requirement for {roadmap.target_role}",
+            "is_priority": True,
+            "priority_reason": f"Manually prioritized focus skill: {skill_clean}"
+        }
+        if phases:
+            if "tasks" not in phases[0]:
+                phases[0]["tasks"] = []
+            phases[0]["tasks"].insert(0, found_task)
+        else:
+            phases.append({
+                "id": "phase-1",
+                "phase_number": 1,
+                "title": f"Phase 1: Core {skill_clean} Foundations",
+                "type": "Foundation",
+                "skills": [skill_clean],
+                "learning_objectives": [f"Learn {skill_clean}"],
+                "progress_percent": 0,
+                "tasks": [found_task]
+            })
+        status_msg = "added"
+        user_msg = f"New focus task for '{skill_clean}' added to Today's Focus"
+
+    roadmap.phases = phases
+    flag_modified(roadmap, "phases")
+    await db.commit()
+    await db.refresh(roadmap)
+
+    task_schema = RoadmapTaskSchema(**found_task)
+    return APIResponse(
+        success=True,
+        message=user_msg,
+        data=FocusSkillResponse(
+            status=status_msg,
+            message=user_msg,
+            skill_name=skill_clean,
+            roadmap_id=roadmap.id,
+            task=task_schema
+        )
+    )
+
+
 def _serialize_roadmap(r: Roadmap) -> RoadmapResponse:
+
     return RoadmapResponse(
         id=r.id,
         user_id=r.user_id,
