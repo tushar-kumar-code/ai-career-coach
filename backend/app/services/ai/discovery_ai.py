@@ -3,7 +3,7 @@ from typing import Dict, Any, List
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from app.services.ai.groq_provider import GroqProvider
+from app.services.ai.client import AIService
 from app.services.ai.prompts import CAREER_DISCOVERY_SYSTEM_PROMPT
 from app.schemas.assessment import (
     CareerDiscoveryAIAnalysis,
@@ -17,8 +17,8 @@ logger = logging.getLogger(__name__)
 
 
 class CareerDiscoveryAIService:
-    def __init__(self):
-        self.provider = GroqProvider()
+    def __init__(self, provider=None):
+        self.provider = provider or AIService.get_provider()
 
     async def analyze_assessment(
         self,

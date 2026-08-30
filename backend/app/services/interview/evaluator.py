@@ -1,9 +1,10 @@
 import logging
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
-from app.services.ai.gemini_provider import GeminiProvider
+from app.services.ai.client import AIService
 
 logger = logging.getLogger(__name__)
+
 
 
 class AIAnswerEvaluationSchema(BaseModel):
@@ -35,8 +36,8 @@ class AIAnswerEvaluationSchema(BaseModel):
 class InterviewEvaluator:
     """Service evaluating user interview answers using structured multi-category AI analysis & deterministic fallback."""
 
-    def __init__(self):
-        self.ai = GeminiProvider()
+    def __init__(self, ai=None):
+        self.ai = ai or AIService.get_provider()
 
     async def evaluate_answer(
         self,

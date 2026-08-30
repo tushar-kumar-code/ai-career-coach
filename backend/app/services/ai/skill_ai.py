@@ -1,15 +1,15 @@
 import logging
 from typing import Dict, Any, List
-from app.services.ai.groq_provider import GroqProvider
+from app.services.ai.client import AIService
 
 logger = logging.getLogger(__name__)
 
 
 class SkillAIService:
-    """AI service evaluating ambiguous resume skill claims and soft-skill signals using Groq Llama 3.3 70B."""
+    """AI service evaluating ambiguous resume skill claims and soft-skill signals."""
 
-    def __init__(self):
-        self.provider = GroqProvider()
+    def __init__(self, provider=None):
+        self.provider = provider or AIService.get_provider()
 
     async def analyze_transferable_skills(
         self,

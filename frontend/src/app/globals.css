@@ -18,14 +18,155 @@
     --accent-foreground: 210 40% 98%;
     --border: 217.2 32.6% 17.5%;
     --radius: 0.75rem;
+
+    --theme-bg: #030712;
+    --theme-card: #0f172a;
+    --theme-border: #1e293b;
+    --theme-accent-gradient: linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%);
+  }
+
+  /* 🌌 Theme: Cyber Neon */
+  html.theme-cyberpunk {
+    --theme-bg: #07070d;
+    --theme-card: #0e0d1c;
+    --theme-border: #261e38;
+    --theme-accent-gradient: linear-gradient(135deg, #a855f7 0%, #d946ef 50%, #ec4899 100%);
+  }
+  html.theme-cyberpunk body {
+    background-color: #07070d;
+  }
+  html.theme-cyberpunk aside, 
+  html.theme-cyberpunk header {
+    background-color: rgba(14, 13, 28, 0.85);
+    border-color: #261e38;
+  }
+
+  /* 🌊 Theme: Ocean Deep */
+  html.theme-ocean {
+    --theme-bg: #040e1a;
+    --theme-card: #091a2e;
+    --theme-border: #132e4d;
+    --theme-accent-gradient: linear-gradient(135deg, #06b6d4 0%, #3b82f6 50%, #10b981 100%);
+  }
+  html.theme-ocean body {
+    background-color: #040e1a;
+  }
+  html.theme-ocean aside,
+  html.theme-ocean header {
+    background-color: rgba(9, 26, 46, 0.85);
+    border-color: #132e4d;
+  }
+
+  /* 🌅 Theme: Sunset Amber */
+  html.theme-sunset {
+    --theme-bg: #100b09;
+    --theme-card: #1c130e;
+    --theme-border: #3b2419;
+    --theme-accent-gradient: linear-gradient(135deg, #f59e0b 0%, #f97316 50%, #ef4444 100%);
+  }
+  html.theme-sunset body {
+    background-color: #100b09;
+  }
+  html.theme-sunset aside,
+  html.theme-sunset header {
+    background-color: rgba(28, 19, 14, 0.85);
+    border-color: #3b2419;
+  }
+
+  /* 🌲 Theme: Emerald Forest */
+  html.theme-emerald {
+    --theme-bg: #041209;
+    --theme-card: #082112;
+    --theme-border: #113c23;
+    --theme-accent-gradient: linear-gradient(135deg, #10b981 0%, #059669 50%, #34d399 100%);
+  }
+  html.theme-emerald body {
+    background-color: #041209;
+  }
+  html.theme-emerald aside,
+  html.theme-emerald header {
+    background-color: rgba(8, 33, 18, 0.85);
+    border-color: #113c23;
+  }
+
+  /* ☀️ Theme: Crisp Modern Light */
+  html.light {
+    --background: 210 40% 98%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --border: 214.3 31.8% 91.4%;
+    --theme-bg: #f8fafc;
+    --theme-card: #ffffff;
+    --theme-border: #e2e8f0;
+  }
+  html.light body {
+    background-color: #f8fafc;
+    color: #0f172a;
+  }
+  html.light aside,
+  html.light header {
+    background-color: rgba(255, 255, 255, 0.9);
+    border-color: #e2e8f0;
+    color: #0f172a;
+  }
+  html.light .bg-slate-950,
+  html.light .bg-slate-900,
+  html.light .bg-slate-900\/60,
+  html.light .bg-slate-900\/70,
+  html.light .bg-slate-900\/80,
+  html.light .bg-slate-900\/90 {
+    background-color: #ffffff !important;
+    border-color: #e2e8f0 !important;
+  }
+  html.light .text-white {
+    color: #0f172a !important;
+  }
+  html.light .text-slate-200,
+  html.light .text-slate-300 {
+    color: #1e293b !important;
+  }
+  html.light .text-slate-400 {
+    color: #64748b !important;
+  }
+  html.light .text-slate-500 {
+    color: #94a3b8 !important;
+  }
+  html.light .border-slate-800,
+  html.light .border-slate-800\/60,
+  html.light .border-slate-800\/80,
+  html.light .border-slate-800\/90,
+  html.light .border-slate-700 {
+    border-color: #e2e8f0 !important;
+  }
+  html.light input,
+  html.light textarea,
+  html.light select {
+    background-color: #f8fafc !important;
+    border-color: #cbd5e1 !important;
+    color: #0f172a !important;
+  }
+  html.light .glass-card {
+    background: rgba(255, 255, 255, 0.85);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
   }
 }
 
 body {
-  background-color: hsl(var(--background));
-  color: hsl(var(--foreground));
+  background-color: hsl(222.2, 84%, 4.9%);
+  color: hsl(210, 40%, 98%);
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
   min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* Glassmorphism utilities */
@@ -37,15 +178,106 @@ body {
 }
 
 .gradient-text {
-  background: linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%);
+  background: var(--theme-accent-gradient);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .gradient-border {
   border: 1px solid transparent;
   background-image: linear-gradient(rgba(15, 23, 42, 0.9), rgba(15, 23, 42, 0.9)), 
-                    linear-gradient(135deg, #6366f1, #a855f7);
+                    var(--theme-accent-gradient);
   background-origin: border-box;
   background-clip: padding-box, border-box;
+}
+
+/* Compact Mode */
+html.compact-ui main {
+  padding-top: 0.75rem !important;
+  padding-bottom: 0.75rem !important;
+}
+
+/* No Animations Mode */
+html.no-animations *,
+html.no-animations *::before,
+html.no-animations *::after {
+  animation: none !important;
+  transition: none !important;
+}
+
+/* Glow Effects */
+html.enable-glow .glow-card {
+  box-shadow: 0 0 20px rgba(99, 102, 241, 0.15);
+}
+
+/* Animation utilities used by sidebar drawer */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes slide-in-from-left {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(0); }
+}
+
+@keyframes slide-in-from-right {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+
+@keyframes slide-in-from-top {
+  from { transform: translateY(-100%); }
+  to   { transform: translateY(0); }
+}
+
+@keyframes slide-in-from-bottom {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+
+.animate-in {
+  animation-duration: 250ms;
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  animation-fill-mode: both;
+}
+
+.fade-in {
+  animation-name: fade-in;
+}
+
+.slide-in-from-left {
+  animation-name: slide-in-from-left;
+}
+
+.slide-in-from-right {
+  animation-name: slide-in-from-right;
+}
+
+.slide-in-from-top {
+  animation-name: slide-in-from-top;
+}
+
+.slide-in-from-bottom {
+  animation-name: slide-in-from-bottom;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(99, 102, 241, 0.3);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(99, 102, 241, 0.5);
 }

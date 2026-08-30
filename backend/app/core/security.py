@@ -1,6 +1,7 @@
-﻿import datetime
+import datetime
 import logging
 from typing import Optional, Dict, Any
+import bcrypt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import jwt, JWTError
@@ -9,6 +10,26 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 security_scheme = HTTPBearer(auto_error=False)
+
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Verifies a plain password against a hashed password."""
+    if not hashed_password or not plain_password:
+        return False
+    try:
+        pw_bytes = plain_password.encode('utf-8')[:72]
+        hash_bytes = hashed_password.encode('utf-8')
+        return bcrypt.checkpw(pw_bytes, hash_bytes)
+    except Exception as e:
+        logger.error(f"Password verification error: {e}")
+        return False
+
+
+def get_password_hash(password: str) -> str:
+    """Generates a secure bcrypt hash for a password."""
+    pw_bytes = password.encode('utf-8')[:72]
+    salt = bcrypt.gensalt()
+    return bcrypt.hashpw(pw_bytes, salt).decode('utf-8')
 
 
 def create_access_token(data: Dict[str, Any], expires_delta: Optional[datetime.timedelta] = None) -> str:
@@ -26,15 +47,8 @@ async def get_current_user_id(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_scheme)
 ) -> str:
     """
-    Extracts and validates user ID from Bearer token (Supabase Auth compatible).
-    
-    Production Mode:
-      - Requires a valid Bearer token signed with SUPABASE_JWT_SECRET or SECRET_KEY.
-      - Missing or invalid tokens raise HTTP 401 Unauthorized.
-      
-    Development Mode:
-      - If a valid token is provided, uses the token identity.
-      - If no token is provided, falls back to 'dev-user-12345' for local API testing.
+    Extracts and validates user ID from Bearer token.
+    Falls back to 'demo-user-12345' in development if no token provided.
     """
     is_production = settings.ENVIRONMENT.lower() == "production"
 
@@ -45,8 +59,8 @@ async def get_current_user_id(
                 detail="Authentication required: missing or empty Authorization header",
                 headers={"WWW-Authenticate": "Bearer"}
             )
-        # Development mode fallback
-        return "dev-user-12345"
+        # Development fallback
+        return "demo-user-12345"
 
     token = credentials.credentials
     secret = settings.SUPABASE_JWT_SECRET or settings.SECRET_KEY
@@ -62,7 +76,7 @@ async def get_current_user_id(
         if not user_id:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token payload: missing subject ('sub') claim",
+                detail="Invalid token payload: missing user identity",
                 headers={"WWW-Authenticate": "Bearer"}
             )
         return str(user_id)
@@ -80,5 +94,4 @@ async def get_current_admin_user(
 ) -> str:
     """Validates that the authenticated user possesses admin privileges."""
     user_id = await get_current_user_id(credentials)
-    # If specific admin IDs or role claims are configured, verify here
     return user_id

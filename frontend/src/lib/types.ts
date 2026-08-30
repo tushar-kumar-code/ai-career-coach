@@ -753,3 +753,56 @@ export interface StudentCareerBriefData {
   };
   generated_at: string;
 }
+
+export interface ChatMessagePayload {
+  role: 'user' | 'assistant' | 'ai';
+  content: string;
+}
+
+export interface ChatRequestPayload {
+  message: string;
+  history?: ChatMessagePayload[];
+  target_role?: string;
+}
+
+export interface ChatResponseData {
+  response: string;
+  provider: string;
+  timestamp?: string;
+}
+
+export interface TestKeyRequestPayload {
+  provider: string;
+  api_key: string;
+  model?: string;
+}
+
+export interface TestKeyResponseData {
+  valid: boolean;
+  provider: string;
+  message: string;
+  model?: string;
+}
+
+export interface AIConfigStatusData {
+  configured_provider: string;
+  has_groq_key: boolean;
+  has_gemini_key: boolean;
+  default_groq_model: string;
+  available_providers: string[];
+}
+
+export interface UserAuthData {
+  id: string;
+  email: string;
+  full_name?: string;
+  is_active: boolean;
+  is_superuser?: boolean;
+}
+
+export interface AuthResponseData {
+  access_token: string;
+  token_type: string;
+  user: UserAuthData;
+}
+

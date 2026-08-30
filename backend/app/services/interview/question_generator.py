@@ -8,7 +8,7 @@ from app.models.profile import UserProfile
 from app.models.resume import Resume
 from app.models.job import Job
 from app.models.roadmap import Roadmap
-from app.services.ai.gemini_provider import GeminiProvider
+from app.services.ai.client import AIService
 
 logger = logging.getLogger(__name__)
 
@@ -16,8 +16,8 @@ logger = logging.getLogger(__name__)
 class InterviewQuestionGenerator:
     """Service generating personalized, role-adaptive interview questions grounded in actual user profile & resume data."""
 
-    def __init__(self):
-        self.ai = GeminiProvider()
+    def __init__(self, ai=None):
+        self.ai = ai or AIService.get_provider()
 
     async def generate_question(
         self,

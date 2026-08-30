@@ -28,25 +28,101 @@ import {
   PracticeSuggestion,
   RoadmapTaskLearningContent,
   PlacementChecklistData,
-  StudentCareerBriefData
+  StudentCareerBriefData,
+  ChatResponseData,
+  TestKeyResponseData,
+  AIConfigStatusData,
+  UserAuthData,
+  AuthResponseData
 } from './types';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api/v1';
 
+export function getSavedAuthToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem('auth_token');
+}
+
+export function saveAuthToken(token: string) {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem('auth_token', token);
+}
+
+export function clearAuthToken() {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem('auth_token');
+  localStorage.removeItem('auth_user');
+}
+
+export function getSavedAIConfig() {
+  if (typeof window === 'undefined') return { provider: 'groq', apiKey: '', model: '' };
+  return {
+    provider: localStorage.getItem('ai_provider') || 'groq',
+    apiKey: localStorage.getItem('ai_api_key') || '',
+    model: localStorage.getItem('ai_model') || '',
+  };
+}
+
+export function saveAIConfig(provider: string, apiKey: string, model?: string) {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem('ai_provider', provider);
+  localStorage.setItem('ai_api_key', apiKey);
+  if (model) {
+    localStorage.setItem('ai_model', model);
+  }
+}
+
+export function clearSavedAIConfig() {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem('ai_api_key');
+  localStorage.removeItem('ai_provider');
+  localStorage.removeItem('ai_model');
+}
+
 async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
+  const aiConfig = getSavedAIConfig();
+  const token = getSavedAuthToken();
+
+  const customHeaders: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+
+  if (token) {
+    customHeaders['Authorization'] = `Bearer ${token}`;
+  }
+
+  if (aiConfig.apiKey) {
+    customHeaders['X-AI-API-Key'] = aiConfig.apiKey;
+    customHeaders['X-AI-Provider'] = aiConfig.provider;
+    if (aiConfig.model) {
+      customHeaders['X-AI-Model'] = aiConfig.model;
+    }
+  }
+
   const response = await fetch(`${BASE_URL}${endpoint}`, {
     headers: {
-      'Content-Type': 'application/json',
+      ...customHeaders,
       ...options?.headers,
     },
     ...options,
   });
 
-  const result: APIResponse<T> = await response.json();
-  if (!response.ok || !result.success) {
-    throw new Error(result.message || result.error || `HTTP error ${response.status}`);
+  let result: any = null;
+  try {
+    result = await response.json();
+  } catch (e) {
+    result = null;
   }
-  return result.data as T;
+
+  if (!response.ok || (result && result.success === false)) {
+    const errorMsg =
+      result?.detail ||
+      result?.message ||
+      result?.error ||
+      `Server error (${response.status})`;
+    throw new Error(typeof errorMsg === 'string' ? errorMsg : JSON.stringify(errorMsg));
+  }
+  return (result?.data !== undefined ? result.data : result) as T;
 }
 
 export async function fetchHealthStatus(): Promise<HealthStatus> {
@@ -383,3 +459,125 @@ export async function getPlacementChecklist(): Promise<PlacementChecklistData> {
 export async function getStudentCareerBrief(): Promise<StudentCareerBriefData> {
   return request<StudentCareerBriefData>('/placement/brief', { cache: 'no-store' });
 }
+
+// AI Career Coach Chat API
+export async function sendChatMessage(
+  message: string,
+  history?: Array<{ role: 'user' | 'assistant' | 'ai'; content: string }>,
+  targetRole?: string
+): Promise<ChatResponseData> {
+  return request<ChatResponseData>('/chat', {
+    method: 'POST',
+    body: JSON.stringify({
+      message,
+      history,
+      target_role: targetRole,
+    }),
+  });
+}
+
+// AI Configuration & Key Testing APIs
+export async function testApiKey(
+  provider: string,
+  apiKey: string,
+  model?: string
+): Promise<TestKeyResponseData> {
+  return request<TestKeyResponseData>('/settings/test-key', {
+    method: 'POST',
+    body: JSON.stringify({
+      provider,
+      api_key: apiKey,
+      model,
+    }),
+  });
+}
+
+export async function getAIConfigStatus(): Promise<AIConfigStatusData> {
+  return request<AIConfigStatusData>('/settings/ai-config', { cache: 'no-store' });
+}
+
+// User Authentication APIs
+export async function loginUser(email: string, password: string): Promise<AuthResponseData> {
+  const result = await request<AuthResponseData>('/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ email, password }),
+  });
+  if (result.access_token) {
+    saveAuthToken(result.access_token);
+    if (typeof window !== 'undefined' && result.user) {
+      localStorage.setItem('auth_user', JSON.stringify(result.user));
+    }
+  }
+  return result;
+}
+
+export async function registerUser(email: string, password: string, fullName?: string): Promise<AuthResponseData> {
+  const result = await request<AuthResponseData>('/auth/register', {
+    method: 'POST',
+    body: JSON.stringify({ email, password, full_name: fullName }),
+  });
+  if (result.access_token) {
+    saveAuthToken(result.access_token);
+    if (typeof window !== 'undefined' && result.user) {
+      localStorage.setItem('auth_user', JSON.stringify(result.user));
+    }
+  }
+  return result;
+}
+
+export async function demoLoginUser(): Promise<AuthResponseData> {
+  const result = await request<AuthResponseData>('/auth/demo-login', {
+    method: 'POST',
+  });
+  if (result.access_token) {
+    saveAuthToken(result.access_token);
+    if (typeof window !== 'undefined' && result.user) {
+      localStorage.setItem('auth_user', JSON.stringify(result.user));
+    }
+  }
+  return result;
+}
+
+export async function getMe(): Promise<UserAuthData> {
+  return request<UserAuthData>('/auth/me', { cache: 'no-store' });
+}
+
+export async function resetPassword(email: string, newPassword: string): Promise<{ success: boolean; message: string }> {
+  return request<{ success: boolean; message: string }>('/auth/reset-password', {
+    method: 'POST',
+    body: JSON.stringify({ email, new_password: newPassword }),
+  });
+}
+
+// 2FA / OTP APIs
+export async function sendOtp(email: string, purpose: 'login' | 'reset' = 'login'): Promise<{ email: string; message: string; dev_code?: string }> {
+  return request<{ email: string; message: string; dev_code?: string }>('/auth/send-otp', {
+    method: 'POST',
+    body: JSON.stringify({ email, purpose }),
+  });
+}
+
+export async function verifyOtpLogin(email: string, otp: string): Promise<AuthResponseData> {
+  const result = await request<AuthResponseData>('/auth/verify-otp-login', {
+    method: 'POST',
+    body: JSON.stringify({ email, otp }),
+  });
+  if (result.access_token) {
+    saveAuthToken(result.access_token);
+    if (typeof window !== 'undefined' && result.user) {
+      localStorage.setItem('auth_user', JSON.stringify(result.user));
+    }
+  }
+  return result;
+}
+
+export async function verifyOtpReset(email: string, otp: string, newPassword: string): Promise<{ success: boolean; message: string }> {
+  return request<{ success: boolean; message: string }>('/auth/verify-otp-reset', {
+    method: 'POST',
+    body: JSON.stringify({ email, otp, new_password: newPassword }),
+  });
+}
+
+
+
+

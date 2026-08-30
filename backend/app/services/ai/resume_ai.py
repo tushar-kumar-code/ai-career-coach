@@ -2,7 +2,7 @@ import logging
 from typing import Dict, Any, List
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.services.ai.groq_provider import GroqProvider
+from app.services.ai.client import AIService
 from app.services.ai.prompts import RESUME_ANALYSIS_SYSTEM_PROMPT
 from app.services.resume.extractor import DocumentExtractor
 from app.services.resume.parser import ResumeParser
@@ -22,8 +22,8 @@ logger = logging.getLogger(__name__)
 
 
 class ResumeAIService:
-    def __init__(self):
-        self.provider = GroqProvider()
+    def __init__(self, provider=None):
+        self.provider = provider or AIService.get_provider()
         self.extractor = DocumentExtractor()
         self.parser = ResumeParser()
         self.ats_engine = ATSEngine()

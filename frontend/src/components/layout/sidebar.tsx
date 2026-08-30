@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useAuth } from '@/context/AuthContext';
 import { 
   LayoutDashboard, 
   Compass, 
@@ -16,6 +17,8 @@ import {
   Sparkles,
   Dumbbell,
   GraduationCap,
+  LogOut,
+  Settings,
   X
 } from 'lucide-react';
 
@@ -32,6 +35,7 @@ const NAV_ITEMS = [
   { label: 'Placement Readiness', href: '/placement', icon: GraduationCap },
   { label: 'Progress & Readiness', href: '/progress', icon: TrendingUp },
   { label: 'AI Career Coach', href: '/chat', icon: MessageSquare },
+  { label: 'Settings', href: '/settings', icon: Settings },
 ];
 
 interface SidebarProps {
@@ -41,6 +45,7 @@ interface SidebarProps {
 
 export default function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
   const pathname = usePathname();
+  const { user, logout } = useAuth();
 
   // Close mobile drawer on Escape key press
   useEffect(() => {
@@ -64,6 +69,17 @@ export default function Sidebar({ isMobileOpen = false, onClose }: SidebarProps)
       document.body.style.overflow = '';
     };
   }, [isMobileOpen]);
+
+  const initials = user?.full_name
+    ? user.full_name
+        .split(' ')
+        .map((n) => n[0])
+        .join('')
+        .toUpperCase()
+        .slice(0, 2)
+    : user?.email
+    ? user.email[0].toUpperCase()
+    : 'CC';
 
   const renderNavLinks = () => (
     <nav className="flex-1 overflow-y-auto p-4 space-y-1">
@@ -92,14 +108,36 @@ export default function Sidebar({ isMobileOpen = false, onClose }: SidebarProps)
   );
 
   const renderFooter = () => (
-    <div className="p-4 border-t border-slate-800/60">
-      <div className="flex items-center space-x-3 p-2 rounded-lg bg-slate-900/40 border border-slate-800/40">
-        <div className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-500 to-indigo-500 flex items-center justify-center text-xs font-bold text-white shadow-sm">
-          CC
+    <div className="p-4 border-t border-slate-800/60 space-y-2">
+      <div className="flex items-center justify-between p-2 rounded-xl bg-slate-900/60 border border-slate-800/60">
+        <div className="flex items-center space-x-2.5 overflow-hidden">
+          <div className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-500 to-indigo-500 flex items-center justify-center text-xs font-bold text-white shadow-sm shrink-0">
+            {initials}
+          </div>
+          <div className="overflow-hidden">
+            <p className="text-xs font-semibold text-slate-200 truncate">
+              {user?.full_name || user?.email || 'Candidate'}
+            </p>
+            <p className="text-[10px] text-slate-400 truncate">{user?.email || 'Authenticated'}</p>
+          </div>
         </div>
-        <div className="overflow-hidden">
-          <p className="text-xs font-semibold text-slate-200 truncate">Career Discovery User</p>
-          <p className="text-[10px] text-slate-500 truncate">Pro Account Active</p>
+
+        <div className="flex items-center gap-1 shrink-0 ml-1">
+          <Link
+            href="/settings"
+            onClick={() => { if (onClose) onClose(); }}
+            title="Settings"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-400 hover:bg-indigo-500/10 transition"
+          >
+            <Settings className="w-4 h-4" />
+          </Link>
+          <button
+            onClick={logout}
+            title="Sign Out"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition"
+          >
+            <LogOut className="w-4 h-4" />
+          </button>
         </div>
       </div>
     </div>
@@ -141,22 +179,18 @@ export default function Sidebar({ isMobileOpen = false, onClose }: SidebarProps)
             aria-modal="true"
             aria-label="Navigation Menu"
           >
-            {/* Drawer Header with Close Button */}
-            <div className="p-5 border-b border-slate-800/60 flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center shadow-md shadow-indigo-500/20">
+            {/* Drawer Header */}
+            <div className="p-5 border-b border-slate-800 flex items-center justify-between">
+              <div className="flex items-center space-x-2.5">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center shadow-md">
                   <Sparkles className="w-4 h-4 text-white" />
                 </div>
-                <div>
-                  <h2 className="font-bold text-base text-white leading-tight">AI Career Coach</h2>
-                  <p className="text-[11px] text-slate-400 font-medium">Student Platform</p>
-                </div>
+                <span className="font-bold text-base text-white">AI Career Coach</span>
               </div>
-
               <button
                 onClick={onClose}
                 aria-label="Close navigation menu"
-                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-900 border border-transparent hover:border-slate-800 transition-colors"
+                className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 hover:text-white transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>

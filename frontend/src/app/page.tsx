@@ -12,13 +12,21 @@ export default function Home() {
           </div>
           <span className="font-bold text-xl text-white tracking-tight">AI Career Coach</span>
         </div>
-        <Link
-          href="/dashboard"
-          className="px-5 py-2.5 rounded-lg text-sm font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-lg shadow-indigo-500/25 flex items-center space-x-2"
-        >
-          <span>Launch Platform</span>
-          <ArrowRight className="w-4 h-4" />
-        </Link>
+        <div className="flex items-center space-x-3">
+          <Link
+            href="/login"
+            className="px-4 py-2 rounded-lg text-sm font-semibold text-slate-300 hover:text-white hover:bg-slate-900 transition"
+          >
+            Sign In
+          </Link>
+          <Link
+            href="/login"
+            className="px-5 py-2.5 rounded-lg text-sm font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-lg shadow-indigo-500/25 flex items-center space-x-2"
+          >
+            <span>Launch Platform</span>
+            <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
       </header>
 
       {/* Hero Section */}

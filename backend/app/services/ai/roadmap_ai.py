@@ -1,9 +1,10 @@
 import logging
 from typing import List, Optional
 from pydantic import BaseModel, Field
-from app.services.ai.gemini_provider import GeminiProvider
+from app.services.ai.client import AIService
 
 logger = logging.getLogger(__name__)
+
 
 
 class AIRoadmapTaskContent(BaseModel):
@@ -54,10 +55,10 @@ class AIRoadmapPhaseContent(BaseModel):
 
 
 class RoadmapAIService:
-    """Dedicated AI Service generating personalized learning objectives, task content, and project ideas using Gemini Provider."""
+    """Dedicated AI Service generating personalized learning objectives, task content, and project ideas."""
 
-    def __init__(self):
-        self.provider = GeminiProvider()
+    def __init__(self, provider=None):
+        self.provider = provider or AIService.get_provider()
 
     async def generate_phase_content(
         self,
