@@ -1,4 +1,4 @@
-﻿<div align="center">
+<div align="center">
 
 # 🚀 AI Career Coach
 
@@ -27,6 +27,21 @@
 It addresses the core challenge every CS student faces: **knowing what to learn, how to present themselves, and whether they are actually ready for the job market.**
 
 The platform integrates 13 connected modules — from career discovery and resume analysis to adaptive mock interviews and a real-time Career Digital Twin — into a single, coherent system driven by AI.
+
+---
+
+## 🔗 Quick Access
+
+> Run the project locally first — see [Getting Started](#-getting-started) below.
+
+| Service | URL |
+|---|---|
+| 🌐 **Web App** | [http://localhost:3000](http://localhost:3000) |
+| ⚡ **API Base** | [http://127.0.0.1:8000/api/v1](http://127.0.0.1:8000/api/v1) |
+| 📖 **Swagger API Docs** | [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs) |
+| 📘 **ReDoc API Docs** | [http://127.0.0.1:8000/redoc](http://127.0.0.1:8000/redoc) |
+| ❤️ **Health Check** | [http://127.0.0.1:8000/api/v1/health](http://127.0.0.1:8000/api/v1/health) |
+| 💻 **GitHub Repository** | [github.com/tushar-kumar-code/ai-career-coach](https://github.com/tushar-kumar-code/ai-career-coach) |
 
 ---
 
