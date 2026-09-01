@@ -4,9 +4,19 @@ from sqlalchemy.orm import declarative_base
 
 from app.core.config import settings
 
-# Create async engine for PostgreSQL / Supabase connection
+def get_clean_db_url(url: str) -> str:
+    if not url:
+        return "sqlite+aiosqlite:///./aicareercoach.db"
+    url_str = str(url).strip()
+    if url_str.startswith("postgres://"):
+        url_str = url_str.replace("postgres://", "postgresql+asyncpg://", 1)
+    elif url_str.startswith("postgresql://") and not url_str.startswith("postgresql+asyncpg://"):
+        url_str = url_str.replace("postgresql://", "postgresql+asyncpg://", 1)
+    return url_str
+
+# Create async engine for SQLite / PostgreSQL / Supabase connection
 engine = create_async_engine(
-    settings.DATABASE_URL,
+    get_clean_db_url(settings.DATABASE_URL),
     echo=settings.DEBUG,
     future=True,
     pool_pre_ping=True

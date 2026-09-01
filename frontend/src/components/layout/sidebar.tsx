@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+import { useLanguage } from '@/context/LanguageContext';
 import { 
   LayoutDashboard, 
   Compass, 
@@ -19,23 +20,25 @@ import {
   GraduationCap,
   LogOut,
   Settings,
+  BookOpen,
   X
 } from 'lucide-react';
 
 const NAV_ITEMS = [
-  { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { label: 'Discovery Assessment', href: '/assessment', icon: Compass },
-  { label: 'Digital Twin Profile', href: '/profile', icon: Sparkles },
-  { label: 'Resume & ATS', href: '/resume', icon: FileText },
-  { label: 'Skill Matrix', href: '/skills', icon: Award },
-  { label: 'Job Engine', href: '/jobs', icon: Briefcase },
-  { label: 'Roadmap & Tasks', href: '/roadmap', icon: MapPin },
-  { label: 'Micro Practice', href: '/practice', icon: Dumbbell },
-  { label: 'Mock Interview', href: '/interview', icon: Mic },
-  { label: 'Placement Readiness', href: '/placement', icon: GraduationCap },
-  { label: 'Progress & Readiness', href: '/progress', icon: TrendingUp },
-  { label: 'AI Career Coach', href: '/chat', icon: MessageSquare },
-  { label: 'Settings', href: '/settings', icon: Settings },
+  { key: 'dashboard', label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { key: 'guide', label: 'How to Use', href: '/guide', icon: BookOpen },
+  { key: 'assessment', label: 'Discovery Assessment', href: '/assessment', icon: Compass },
+  { key: 'profile', label: 'Digital Twin Profile', href: '/profile', icon: Sparkles },
+  { key: 'resume', label: 'Resume & ATS', href: '/resume', icon: FileText },
+  { key: 'skills', label: 'Skill Matrix', href: '/skills', icon: Award },
+  { key: 'jobs', label: 'Job Engine', href: '/jobs', icon: Briefcase },
+  { key: 'roadmap', label: 'Roadmap & Tasks', href: '/roadmap', icon: MapPin },
+  { key: 'practice', label: 'Micro Practice', href: '/practice', icon: Dumbbell },
+  { key: 'interview', label: 'Mock Interview', href: '/interview', icon: Mic },
+  { key: 'placement', label: 'Placement Readiness', href: '/placement', icon: GraduationCap },
+  { key: 'progress', label: 'Progress & Readiness', href: '/progress', icon: TrendingUp },
+  { key: 'chat', label: 'AI Career Coach', href: '/chat', icon: MessageSquare },
+  { key: 'settings', label: 'Settings', href: '/settings', icon: Settings },
 ];
 
 interface SidebarProps {
@@ -46,6 +49,7 @@ interface SidebarProps {
 export default function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
   const pathname = usePathname();
   const { user, logout } = useAuth();
+  const { t } = useLanguage();
 
   // Close mobile drawer on Escape key press
   useEffect(() => {
@@ -86,6 +90,7 @@ export default function Sidebar({ isMobileOpen = false, onClose }: SidebarProps)
       {NAV_ITEMS.map((item) => {
         const Icon = item.icon;
         const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
+        const itemLabel = t(`nav.${item.key}`, item.label);
         return (
           <Link
             key={item.href}
@@ -100,7 +105,7 @@ export default function Sidebar({ isMobileOpen = false, onClose }: SidebarProps)
             }`}
           >
             <Icon className={`w-4 h-4 ${isActive ? 'text-indigo-400' : 'text-slate-400'}`} />
-            <span>{item.label}</span>
+            <span>{itemLabel}</span>
           </Link>
         );
       })}
@@ -118,7 +123,7 @@ export default function Sidebar({ isMobileOpen = false, onClose }: SidebarProps)
             <p className="text-xs font-semibold text-slate-200 truncate">
               {user?.full_name || user?.email || 'Candidate'}
             </p>
-            <p className="text-[10px] text-slate-400 truncate">{user?.email || 'Authenticated'}</p>
+            <p className="text-[10px] text-slate-400 truncate">{user?.email || t('nav.authenticatedAs', 'Candidate Account')}</p>
           </div>
         </div>
 
@@ -126,14 +131,14 @@ export default function Sidebar({ isMobileOpen = false, onClose }: SidebarProps)
           <Link
             href="/settings"
             onClick={() => { if (onClose) onClose(); }}
-            title="Settings"
+            title={t('nav.settings', 'Settings')}
             className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-400 hover:bg-indigo-500/10 transition"
           >
             <Settings className="w-4 h-4" />
           </Link>
           <button
             onClick={logout}
-            title="Sign Out"
+            title={t('nav.signOut', 'Sign Out')}
             className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition"
           >
             <LogOut className="w-4 h-4" />
@@ -153,10 +158,11 @@ export default function Sidebar({ isMobileOpen = false, onClose }: SidebarProps)
             <Sparkles className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h1 className="font-bold text-lg text-white leading-tight">AI Career Coach</h1>
-            <p className="text-xs text-slate-400 font-medium">Personal Twin Platform</p>
+            <h1 className="font-bold text-lg text-white leading-tight">{t('app.title', 'AI Career Coach')}</h1>
+            <p className="text-xs text-slate-400 font-medium">{t('nav.brandSubtitle', 'Personal Twin Platform')}</p>
           </div>
         </div>
+
 
         {renderNavLinks()}
         {renderFooter()}

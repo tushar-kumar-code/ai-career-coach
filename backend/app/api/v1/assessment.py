@@ -1,11 +1,13 @@
-﻿from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import List, Optional
+from fastapi import APIRouter, Depends, HTTPException, status, Header
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.core.database import get_db
 from app.core.security import get_current_user_id
 from app.core.init_db import seed_database
+from app.core.ai_deps import get_ai_provider_from_headers
+from app.services.ai.base import BaseLLMProvider
 from app.models.assessment import AssessmentResponse
 from app.models.question import Question
 from app.models.career_catalog import CareerRole
@@ -33,7 +35,9 @@ ai_service = CareerDiscoveryAIService()
 )
 async def start_assessment(
     db: AsyncSession = Depends(get_db),
-    user_id: str = Depends(get_current_user_id)
+    user_id: str = Depends(get_current_user_id),
+    ai_provider: BaseLLMProvider = Depends(get_ai_provider_from_headers),
+    x_language_preference: str = Header(default="en", alias="X-Language-Preference")
 ):
     # Seed DB questions and career roles if empty
     await seed_database(db)
@@ -46,14 +50,18 @@ async def start_assessment(
     res = await db.execute(stmt)
     session = res.scalars().first()
 
-    # Get total questions count
-    q_count_res = await db.execute(select(Question))
-    total_questions = len(q_count_res.scalars().all())
+    total_questions = adaptive_engine.MAX_QUESTIONS_PER_SESSION
 
     if session:
         answered_ids = list(session.dimension_answers.keys())
-        next_q = await adaptive_engine.get_next_question(db, answered_ids, session.dimension_answers)
-        if not next_q and total_questions > 0:
+        next_q = await adaptive_engine.get_next_question(
+            db=db,
+            answered_question_ids=answered_ids,
+            current_answers=session.dimension_answers,
+            language=x_language_preference,
+            ai_provider=ai_provider
+        )
+        if not next_q and len(answered_ids) >= total_questions:
             # Session had all questions answered; start a fresh assessment session
             session = None
 
@@ -68,7 +76,13 @@ async def start_assessment(
         await db.commit()
         await db.refresh(session)
         answered_ids = []
-        next_q = await adaptive_engine.get_next_question(db, answered_ids, session.dimension_answers)
+        next_q = await adaptive_engine.get_next_question(
+            db=db,
+            answered_question_ids=answered_ids,
+            current_answers=session.dimension_answers,
+            language=x_language_preference,
+            ai_provider=ai_provider
+        )
 
     q_schema = None
     if next_q:
@@ -109,7 +123,9 @@ async def start_assessment(
 async def submit_answer(
     payload: AnswerSubmitRequest,
     db: AsyncSession = Depends(get_db),
-    user_id: str = Depends(get_current_user_id)
+    user_id: str = Depends(get_current_user_id),
+    ai_provider: BaseLLMProvider = Depends(get_ai_provider_from_headers),
+    x_language_preference: str = Header(default="en", alias="X-Language-Preference")
 ):
     stmt = select(AssessmentResponse).where(
         AssessmentResponse.id == payload.session_id,
@@ -151,12 +167,16 @@ async def submit_answer(
     await db.commit()
     await db.refresh(session)
 
-    # Get total count and next question
-    q_count_res = await db.execute(select(Question))
-    total_questions = len(q_count_res.scalars().all())
+    total_questions = adaptive_engine.MAX_QUESTIONS_PER_SESSION
 
     answered_ids = list(updated_answers.keys())
-    next_q = await adaptive_engine.get_next_question(db, answered_ids, updated_answers)
+    next_q = await adaptive_engine.get_next_question(
+        db=db,
+        answered_question_ids=answered_ids,
+        current_answers=updated_answers,
+        language=x_language_preference,
+        ai_provider=ai_provider
+    )
 
     q_schema = None
     if next_q:
@@ -197,7 +217,8 @@ async def submit_answer(
 async def complete_assessment(
     session_id: str,
     db: AsyncSession = Depends(get_db),
-    user_id: str = Depends(get_current_user_id)
+    user_id: str = Depends(get_current_user_id),
+    x_language_preference: str = Header(default="en", alias="X-Language-Preference")
 ):
     stmt = select(AssessmentResponse).where(
         AssessmentResponse.id == session_id,
@@ -213,7 +234,7 @@ async def complete_assessment(
         raise HTTPException(status_code=400, detail="Cannot complete assessment without answers")
 
     # Run AI Analysis
-    ai_result = await ai_service.analyze_assessment(db, session.dimension_answers)
+    ai_result = await ai_service.analyze_assessment(db, session.dimension_answers, language=x_language_preference)
     ai_dict = ai_result.model_dump()
 
     # Update session status

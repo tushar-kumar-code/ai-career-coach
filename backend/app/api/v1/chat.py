@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Header
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -23,7 +23,8 @@ async def chat_with_coach(
     req: ChatRequest,
     db: AsyncSession = Depends(get_db),
     user_id: str = Depends(get_current_user_id),
-    ai_provider: BaseLLMProvider = Depends(get_ai_provider_from_headers)
+    ai_provider: BaseLLMProvider = Depends(get_ai_provider_from_headers),
+    x_language_preference: str = Header(default="en", alias="X-Language-Preference")
 ):
     if not req.message.strip():
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Message cannot be empty")
@@ -48,6 +49,10 @@ async def chat_with_coach(
     roadmap = res_rm.scalars().first()
     roadmap_progress = getattr(roadmap, "overall_progress_percent", getattr(roadmap, "progress_percentage", 0)) if roadmap else 0
 
+    lang_rule = ""
+    if x_language_preference == "hi":
+        lang_rule = "\n3. **Language Preference**: The candidate's selected language preference is Hindi. Write your entire response, explanations, action steps, and advice in clear, supportive Hindi (with standard technical terms in English script where appropriate)."
+
     # Build Contextual System Prompt with strict formatting rules for readability
     system_instruction = f"""You are an elite, encouraging, and deeply technical AI Career Coach for university students and early-career developers.
 Candidate Context:
@@ -66,8 +71,8 @@ FORMATTING & RESPONSE GUIDELINES (CRITICAL FOR USER EXPERIENCE):
 2. **Tone & Style**:
    - Be practical, motivating, concise, and solution-oriented.
    - Break down complex technical concepts into intuitive, easy-to-digest explanations.
-   - If the user asks in Hindi or Hinglish, answer in fluent, helpful Hinglish/English as appropriate.
    - End with a friendly, relevant follow-up question or suggestion to keep the conversation engaging.
+{lang_rule}
 """
 
     # Prepare chat message history

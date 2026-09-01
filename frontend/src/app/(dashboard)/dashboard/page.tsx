@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useLanguage } from '@/context/LanguageContext';
 import {
   Sparkles,
   ArrowRight,
@@ -14,7 +15,8 @@ import {
   Mic,
   Zap,
   CheckCircle,
-  Compass
+  Compass,
+  BookOpen
 } from 'lucide-react';
 import {
   getAssessmentResult,
@@ -36,6 +38,7 @@ import {
 } from '@/lib/types';
 
 export default function DashboardPage() {
+  const { t } = useLanguage();
   const [assessmentData, setAssessmentData] = useState<AssessmentResultData | null>(null);
   const [resumeData, setResumeData] = useState<ResumeAnalysisData | null>(null);
   const [roadmapData, setRoadmapData] = useState<RoadmapData | null>(null);
@@ -111,10 +114,10 @@ export default function DashboardPage() {
     if (!isStep1Done) {
       return {
         stepNum: 1,
-        title: 'Discover Your Target Career Role',
+        title: t('dashboard.startAssessment', 'Discover Your Target Career Role'),
         desc: 'Take the 12-dimension discovery assessment to identify your natural strengths and ideal career direction.',
         href: '/assessment',
-        btnText: 'Start Career Discovery →',
+        btnText: `${t('dashboard.startAssessment', 'Start Career Discovery')} →`,
       };
     }
     if (!isStep2Done) {
@@ -123,7 +126,7 @@ export default function DashboardPage() {
         title: 'Upload & Optimize Your Resume',
         desc: 'Scan your resume against ATS benchmarks and automatically extract verified skills into your skill matrix.',
         href: '/resume',
-        btnText: 'Upload Resume →',
+        btnText: `${t('dashboard.analyzeResume', 'Upload Resume')} →`,
       };
     }
     if (!isStep3Done) {
@@ -141,7 +144,7 @@ export default function DashboardPage() {
         title: 'Practice Your First AI Mock Interview',
         desc: 'Test your technical, HR, and STAR behavioral answers with real-time feedback and skill evidence points.',
         href: '/interview',
-        btnText: 'Start Mock Interview →',
+        btnText: `${t('dashboard.practiceInterview', 'Start Mock Interview')} →`,
       };
     }
     return {
@@ -163,43 +166,50 @@ export default function DashboardPage() {
         <div className="relative z-10 max-w-3xl space-y-3 sm:space-y-4">
           <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs font-semibold">
             <Sparkles className="w-3.5 h-3.5" />
-            <span>AI Career Twin & Intelligence Platform</span>
+            <span>{t('app.title', 'AI Career Coach')}</span>
           </div>
           <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-white tracking-tight">
-            Welcome to Your AI Career Cockpit
+            {t('dashboard.welcome', 'Welcome back')}! {t('header.cockpit', 'AI Career Coach Cockpit')}
           </h1>
           <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-            Your single unified Career Digital Twin brings together assessments, resume ATS optimization, verified skill matrix, learning roadmaps, job opportunities, and AI mock interviews.
+            {t('dashboard.subtitle', 'Your single unified Career Digital Twin brings together assessments, resume ATS optimization, verified skill matrix, learning roadmaps, job opportunities, and AI mock interviews.')}
           </p>
 
           <div className="pt-2 flex flex-wrap gap-2.5 sm:gap-3">
             <Link
-              href="/progress"
-              className="px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs sm:text-sm transition-all shadow-lg shadow-indigo-600/30 flex items-center space-x-2"
+              href="/guide"
+              className="px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs sm:text-sm transition-all shadow-lg shadow-purple-600/30 flex items-center space-x-2"
             >
-              <TrendingUp className="w-4 h-4" />
-              <span>Readiness Progress</span>
+              <BookOpen className="w-4 h-4" />
+              <span>{t('nav.guide', 'How to Use / Guide')}</span>
+            </Link>
+            <Link
+              href="/progress"
+              className="px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 font-semibold text-xs sm:text-sm transition-all flex items-center space-x-2"
+            >
+              <TrendingUp className="w-4 h-4 text-indigo-400" />
+              <span>{t('nav.progress', 'Progress & Readiness')}</span>
             </Link>
             <Link
               href="/jobs"
               className="px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 font-semibold text-xs sm:text-sm transition-all flex items-center space-x-2"
             >
               <Briefcase className="w-4 h-4 text-emerald-400" />
-              <span>Job Tracker</span>
+              <span>{t('nav.jobs', 'Job Engine')}</span>
             </Link>
             <Link
               href="/interview"
               className="px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 font-semibold text-xs sm:text-sm transition-all flex items-center space-x-2"
             >
               <Mic className="w-4 h-4 text-pink-400" />
-              <span>Mock Interview</span>
+              <span>{t('nav.interview', 'Mock Interview')}</span>
             </Link>
             <Link
               href="/roadmap"
               className="px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 font-semibold text-xs sm:text-sm transition-all flex items-center space-x-2"
             >
               <MapPin className="w-4 h-4 text-indigo-400" />
-              <span>Career Roadmap</span>
+              <span>{t('nav.roadmap', 'Roadmap & Tasks')}</span>
             </Link>
           </div>
         </div>

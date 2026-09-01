@@ -36,7 +36,10 @@ import {
   AuthResponseData
 } from './types';
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api/v1';
+const RAW_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api/v1';
+const BASE_URL = RAW_URL.endsWith('/api/v1') 
+  ? RAW_URL.replace(/\/+$/, '') 
+  : `${RAW_URL.replace(/\/+$/, '')}/api/v1`;
 
 export function getSavedAuthToken(): string | null {
   if (typeof window === 'undefined') return null;
@@ -86,6 +89,10 @@ async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
   const customHeaders: Record<string, string> = {
     'Content-Type': 'application/json',
   };
+
+  const lang = typeof window !== 'undefined' ? (localStorage.getItem('ai_career_language') || 'en') : 'en';
+  customHeaders['X-Language-Preference'] = lang;
+  customHeaders['Accept-Language'] = lang;
 
   if (token) {
     customHeaders['Authorization'] = `Bearer ${token}`;

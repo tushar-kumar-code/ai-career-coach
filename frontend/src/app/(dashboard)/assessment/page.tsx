@@ -1,9 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-
-
 import { useState, useEffect } from 'react';
+import { useLanguage } from '@/context/LanguageContext';
+import { getLocalizedQuestion } from '@/lib/assessment-translations';
 import { 
   Compass, 
   CheckCircle2, 
@@ -35,6 +35,7 @@ import {
 } from '@/lib/types';
 
 export default function AssessmentPage() {
+  const { language, t } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
@@ -509,9 +510,9 @@ export default function AssessmentPage() {
   // ----------------------------------------------------
   // PHASE 1: INTERACTIVE QUESTION ASSESSMENT FLOW
   // ----------------------------------------------------
-  const currentQ = session?.current_question;
+  const currentQ = getLocalizedQuestion(session?.current_question, language);
   const currentStep = session?.current_step || 1;
-  const totalQ = session?.total_questions || 16;
+  const totalQ = session?.total_questions || 12;
   const progressPct = Math.min(100, Math.round(((currentStep - 1) / totalQ) * 100));
 
   return (
@@ -527,14 +528,14 @@ export default function AssessmentPage() {
         <div>
           <div className="inline-flex items-center space-x-2 text-xs font-semibold text-indigo-400 uppercase tracking-wider mb-1">
             <Compass className="w-4 h-4" />
-            <span>Interactive Career Discovery Assessment</span>
+            <span>{t('assessment.title', 'Interactive Career Discovery Assessment')}</span>
           </div>
           <h1 className="text-2xl font-extrabold text-white">
-            Question {currentStep} of {totalQ}: {currentQ?.dimension || 'General Discovery'}
+            {t('assessment.questionStep', 'Question')} {currentStep} {t('assessment.of', 'of')} {totalQ}: {currentQ?.dimension || 'General Discovery'}
           </h1>
         </div>
         <div className="sm:text-right shrink-0">
-          <span className="text-xs text-slate-400 font-semibold">{progressPct}% Complete</span>
+          <span className="text-xs text-slate-400 font-semibold">{progressPct}% {t('common.active', 'Complete')}</span>
           <div className="w-44 bg-slate-800 h-2.5 rounded-full mt-2 overflow-hidden">
             <div
               className="bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 h-full transition-all duration-300"
@@ -556,7 +557,7 @@ export default function AssessmentPage() {
                 {currentQ.question_text}
               </h2>
               <p className="text-xs text-slate-400 mt-2">
-                Select the option that best matches your natural intuition and technical instincts.
+                {t('assessment.instruction', 'Please select the option that best describes your instinctual approach:')}
               </p>
             </div>
           </div>
@@ -611,11 +612,15 @@ export default function AssessmentPage() {
               {submitting ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Submitting...</span>
+                  <span>{t('assessment.submitting', 'Recording Answer...')}</span>
                 </>
               ) : (
                 <>
-                  <span>Next Question</span>
+                  <span>
+                    {currentStep === totalQ
+                      ? t('assessment.submitBtn', 'Complete Assessment & Generate AI Analysis ✨')
+                      : t('assessment.nextBtn', 'Next Question →')}
+                  </span>
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}

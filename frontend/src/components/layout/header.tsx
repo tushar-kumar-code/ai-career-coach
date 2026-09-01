@@ -3,10 +3,11 @@
 import { useEffect, useState } from 'react';
 import { fetchHealthStatus, getSavedAIConfig } from '@/lib/api-client';
 import { HealthStatus } from '@/lib/types';
-import { Activity, ShieldCheck, Menu, Sparkles, Key, Palette } from 'lucide-react';
+import { Activity, ShieldCheck, Menu, Sparkles, Key, Palette, Globe } from 'lucide-react';
 import ApiKeyModal from '@/components/common/ApiKeyModal';
 import ThemeModal from '@/components/common/ThemeModal';
 import { useTheme } from '@/context/ThemeContext';
+import { useLanguage } from '@/context/LanguageContext';
 
 interface HeaderProps {
   onOpenMobileMenu?: () => void;
@@ -17,6 +18,7 @@ export default function Header({ onOpenMobileMenu }: HeaderProps) {
   const [isKeyModalOpen, setIsKeyModalOpen] = useState(false);
   const [isThemeModalOpen, setIsThemeModalOpen] = useState(false);
   const { theme } = useTheme();
+  const { language, setLanguage, t } = useLanguage();
   const [activeKeyProvider, setActiveKeyProvider] = useState<{ provider: string; hasKey: boolean }>({
     provider: 'groq',
     hasKey: false,
@@ -58,13 +60,23 @@ export default function Header({ onOpenMobileMenu }: HeaderProps) {
               <Sparkles className="w-4 h-4" />
             </div>
             <h2 className="text-xs sm:text-sm font-semibold text-slate-200 truncate max-w-[200px] sm:max-w-none">
-              AI Career Coach Cockpit
+              {t('header.cockpit', 'AI Career Coach Cockpit')}
             </h2>
           </div>
         </div>
 
-        {/* Right: Theme Switcher, API Key Trigger & Diagnostics */}
+        {/* Right: Language Switcher, Theme Switcher, API Key Trigger & Diagnostics */}
         <div className="flex items-center space-x-2 sm:space-x-2.5">
+          {/* Quick Language Toggle Button */}
+          <button
+            onClick={() => setLanguage(language === 'en' ? 'hi' : 'en')}
+            className="flex items-center space-x-1.5 text-xs px-2.5 sm:px-3 py-1.5 rounded-full border border-indigo-500/30 bg-indigo-950/40 hover:bg-indigo-900/50 text-indigo-300 hover:text-white transition font-semibold shadow-sm"
+            title="Switch Language (English / Hindi)"
+          >
+            <Globe className="w-3.5 h-3.5 text-indigo-400" />
+            <span>{language === 'en' ? 'EN' : 'हिंदी'}</span>
+          </button>
+
           {/* Quick Theme Switcher Button */}
           <button
             onClick={() => setIsThemeModalOpen(true)}
@@ -88,9 +100,9 @@ export default function Header({ onOpenMobileMenu }: HeaderProps) {
             <Key className="w-3.5 h-3.5" />
             <span className="hidden xs:inline">
               {activeKeyProvider.hasKey ? (
-                <>AI: <span className="uppercase font-bold text-white">{activeKeyProvider.provider}</span> (Active)</>
+                <>AI: <span className="uppercase font-bold text-white">{activeKeyProvider.provider}</span> ({t('header.activeKey', 'Active')})</>
               ) : (
-                <>Set AI Key</>
+                <>{t('header.setAiKey', 'Set AI Key')}</>
               )}
             </span>
           </button>
@@ -99,7 +111,7 @@ export default function Header({ onOpenMobileMenu }: HeaderProps) {
           <div className="hidden md:flex items-center space-x-2 sm:space-x-3 text-xs bg-slate-900/80 px-2.5 sm:px-3 py-1.5 rounded-full border border-slate-800">
             <span className="flex items-center text-slate-400">
               <Activity className="w-3.5 h-3.5 mr-1 text-emerald-400" />
-              <strong className="text-emerald-400">{health?.status === 'ok' ? 'Online' : 'Connected'}</strong>
+              <strong className="text-emerald-400">{health?.status === 'ok' ? t('header.online', 'Online') : t('header.connected', 'Connected')}</strong>
             </span>
             <span className="text-slate-700">|</span>
             <span className="flex items-center text-slate-400">

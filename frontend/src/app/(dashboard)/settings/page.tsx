@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
+import { useLanguage } from '@/context/LanguageContext';
 import {
   getSavedAIConfig,
   saveAIConfig,
@@ -36,10 +37,11 @@ import {
   testApiKey,
 } from '@/lib/api-client';
 
-type SettingsTab = 'ai' | 'account' | 'notifications' | 'appearance' | 'about';
+type SettingsTab = 'ai' | 'language' | 'account' | 'notifications' | 'appearance' | 'about';
 
 export default function SettingsPage() {
   const { user, logout } = useAuth();
+  const { language, setLanguage, t } = useLanguage();
   const {
     theme,
     accent,
@@ -114,7 +116,7 @@ export default function SettingsPage() {
     }
     setTimeout(() => {
       setIsSaving(false);
-      setKeyResult({ success: true, message: 'API Key saved and activated for all AI features!' });
+      setKeyResult({ success: true, message: t('settings.keySavedSuccess', 'API Key saved and activated for all AI features!') });
     }, 400);
   };
 
@@ -140,11 +142,12 @@ export default function SettingsPage() {
   };
 
   const TABS: { id: SettingsTab; label: string; icon: React.ElementType }[] = [
-    { id: 'ai', label: 'AI & API Key', icon: Key },
-    { id: 'account', label: 'Account', icon: User },
-    { id: 'notifications', label: 'Notifications', icon: Bell },
-    { id: 'appearance', label: 'Appearance', icon: Palette },
-    { id: 'about', label: 'About', icon: Info },
+    { id: 'ai', label: t('settings.tabAi', 'AI & API Key'), icon: Key },
+    { id: 'language', label: t('settings.tabLanguage', 'Language / भाषा'), icon: Globe },
+    { id: 'account', label: t('settings.tabAccount', 'Account'), icon: User },
+    { id: 'notifications', label: t('settings.tabNotifications', 'Notifications'), icon: Bell },
+    { id: 'appearance', label: t('settings.tabAppearance', 'Appearance'), icon: Palette },
+    { id: 'about', label: t('settings.tabAbout', 'About'), icon: Info },
   ];
 
   return (
@@ -155,8 +158,8 @@ export default function SettingsPage() {
           <Settings className="w-5 h-5" />
         </div>
         <div>
-          <h1 className="text-xl font-extrabold text-white">Settings</h1>
-          <p className="text-xs text-slate-400">Manage your AI configuration, account, and preferences</p>
+          <h1 className="text-xl font-extrabold text-white">{t('settings.title', 'Settings')}</h1>
+          <p className="text-xs text-slate-400">{t('settings.subtitle', 'Manage your AI configuration, account, and preferences')}</p>
         </div>
       </div>
 
@@ -336,6 +339,96 @@ export default function SettingsPage() {
                     </button>
                   </div>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* ─── LANGUAGE CHOICE TAB ─── */}
+          {activeTab === 'language' && (
+            <div className="p-5 sm:p-6 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-6">
+              <div>
+                <h2 className="text-base font-bold text-white mb-0.5">
+                  {t('settings.langTitle', 'Language Preference / भाषा प्राथमिकता')}
+                </h2>
+                <p className="text-xs text-slate-400">
+                  {t('settings.langDesc', 'Select your preferred language. The chosen language will be applied across the entire web application.')}
+                </p>
+              </div>
+
+              {/* Language Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {[
+                  {
+                    id: 'en' as const,
+                    title: 'English (अंग्रेज़ी)',
+                    subtitle: t('settings.langSelectEnSub', 'Default language for all interfaces, navigation, and tools.'),
+                    badge: 'EN',
+                    preview: 'Welcome to AI Career Coach Cockpit!'
+                  },
+                  {
+                    id: 'hi' as const,
+                    title: 'Hindi (हिंदी)',
+                    subtitle: t('settings.langSelectHiSub', 'संपूर्ण वेब ऐप में हिंदी भाषा का उपयोग करें।'),
+                    badge: 'HI',
+                    preview: 'एआई करियर कोच कॉकपिट में आपका स्वागत है!'
+                  }
+                ].map((langItem) => {
+                  const isSelected = language === langItem.id;
+                  return (
+                    <button
+                      key={langItem.id}
+                      type="button"
+                      onClick={() => setLanguage(langItem.id)}
+                      className={`p-5 rounded-2xl border text-left transition-all relative flex flex-col justify-between group ${
+                        isSelected
+                          ? 'bg-indigo-600/15 border-indigo-500 ring-2 ring-indigo-500/80 shadow-lg shadow-indigo-500/10'
+                          : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
+                      }`}
+                    >
+                      <div>
+                        <div className="flex items-center justify-between mb-3 w-full">
+                          <div className="flex items-center space-x-3">
+                            <div className={`w-9 h-9 rounded-xl border flex items-center justify-center font-bold text-sm shadow-inner ${
+                              isSelected ? 'bg-indigo-600 text-white border-indigo-400' : 'bg-slate-900 text-slate-400 border-slate-800'
+                            }`}>
+                              {langItem.badge}
+                            </div>
+                            <div>
+                              <span className="font-bold text-sm text-white block">{langItem.title}</span>
+                              {isSelected && (
+                                <span className="text-[10px] text-emerald-400 font-semibold flex items-center gap-1 mt-0.5">
+                                  <CheckCircle2 className="w-3 h-3" /> {t('common.active', 'Active')}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        <p className="text-xs text-slate-400 leading-relaxed mb-4">{langItem.subtitle}</p>
+                      </div>
+
+                      <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 text-[11px] text-slate-300">
+                        <span className="text-[10px] text-indigo-400 block mb-0.5 uppercase font-semibold tracking-wider">
+                          {t('settings.langPreviewTitle', 'Live Interface Preview / पूर्वावलोकन')}
+                        </span>
+                        <p className="italic text-slate-200">{langItem.preview}</p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Status banner */}
+              <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 flex items-center justify-between text-xs">
+                <div className="flex items-center space-x-2.5 text-slate-300">
+                  <Globe className="w-4 h-4 text-indigo-400 shrink-0" />
+                  <span>
+                    {t('settings.langCurrentActive', 'Currently Active Language')}: <strong className="text-white uppercase font-bold">{language === 'en' ? 'English (अंग्रेज़ी)' : 'Hindi (हिंदी)'}</strong>
+                  </span>
+                </div>
+                <span className="text-[11px] text-emerald-400 font-semibold bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20 flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3" /> {t('common.saved', 'Saved!')}
+                </span>
               </div>
             </div>
           )}

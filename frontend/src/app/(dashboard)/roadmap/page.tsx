@@ -378,7 +378,7 @@ export default function RoadmapPage() {
       )}
 
       {/* Today's Focus Widget */}
-      {todayData && (
+      {todayData && (todayData.tasks || []).length > 0 && (
         <div className="p-6 rounded-2xl bg-gradient-to-br from-indigo-950/60 to-slate-900 border border-indigo-500/30 space-y-4 relative overflow-hidden">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2 text-indigo-400 text-xs font-bold uppercase tracking-wider">
@@ -397,7 +397,7 @@ export default function RoadmapPage() {
           </div>
 
           <div className="space-y-2 pt-2">
-            {todayData.tasks.map((task) => (
+            {(todayData.tasks || []).map((task) => (
               <div
                 key={task.id}
                 className={`p-3.5 rounded-xl border flex items-start justify-between space-x-3 transition-all ${
