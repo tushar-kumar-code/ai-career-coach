@@ -32,16 +32,11 @@ The platform integrates 13 connected modules — from career discovery and resum
 
 ## 🔗 Quick Access
 
-> Run the project locally first — see [Getting Started](#-getting-started) below.
-
-| Service | URL |
+| Service | Access Link |
 |---|---|
-| 🌐 **Web App** | [http://localhost:3000](http://localhost:3000) |
-| ⚡ **API Base** | [http://127.0.0.1:8000/api/v1](http://127.0.0.1:8000/api/v1) |
-| 📖 **Swagger API Docs** | [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs) |
-| 📘 **ReDoc API Docs** | [http://127.0.0.1:8000/redoc](http://127.0.0.1:8000/redoc) |
-| ❤️ **Health Check** | [http://127.0.0.1:8000/api/v1/health](http://127.0.0.1:8000/api/v1/health) |
-| 💻 **GitHub Repository** | [github.com/tushar-kumar-code/ai-career-coach](https://github.com/tushar-kumar-code/ai-career-coach) |
+| 🚀 **Live Project Access (Render)** | [https://ai-career-coach-frontend.onrender.com](https://ai-career-coach-frontend.onrender.com) |
+| ⚡ **Live API & Backend (Render)** | [https://ai-career-coach-backend.onrender.com](https://ai-career-coach-backend.onrender.com) |
+| 📖 **Direct API Docs** | [https://ai-career-coach-backend.onrender.com/docs](https://ai-career-coach-backend.onrender.com/docs) |
 
 ---
 
