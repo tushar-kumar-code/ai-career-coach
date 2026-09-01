@@ -34,7 +34,8 @@ The platform integrates 13 connected modules — from career discovery and resum
 
 | Service | Access Link |
 |---|---|
-| 🚀 **Live Project Access (Render)** | [https://ai-career-coach-frontend.onrender.com](https://ai-career-coach-frontend.onrender.com) |
+| 🌐 **Live Demo of Project** | [https://ai-career-coach-frontend.onrender.com](https://ai-career-coach-frontend.onrender.com) |
+| 🚀 **Direct Project Access** | [https://ai-career-coach-frontend.onrender.com](https://ai-career-coach-frontend.onrender.com) |
 | ⚡ **Live API & Backend (Render)** | [https://ai-career-coach-backend.onrender.com](https://ai-career-coach-backend.onrender.com) |
 | 📖 **Direct API Docs** | [https://ai-career-coach-backend.onrender.com/docs](https://ai-career-coach-backend.onrender.com/docs) |
 
