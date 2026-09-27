@@ -13,6 +13,7 @@ class AssessmentResponse(Base, TimestampMixin):
 
     status = Column(String, default="IN_PROGRESS", nullable=False)  # IN_PROGRESS, COMPLETED
     current_step = Column(Integer, default=1, nullable=False)
+    user_level = Column(String, nullable=True, default="beginner")  # beginner, intermediate, advanced
     
     # Map of question_id -> { option_id, option_text, dimension, weights }
     dimension_answers = Column(JSON, nullable=False, default=dict)

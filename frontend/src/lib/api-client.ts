@@ -55,6 +55,7 @@ export function clearAuthToken() {
   if (typeof window === 'undefined') return;
   localStorage.removeItem('auth_token');
   localStorage.removeItem('auth_user');
+  localStorage.removeItem('cached_resume_analysis');
 }
 
 export function getSavedAIConfig() {
@@ -148,14 +149,36 @@ export async function fetchHealthStatus(): Promise<HealthStatus> {
 }
 
 // Assessment APIs
-export async function startAssessment(): Promise<AssessmentSession> {
-  return request<AssessmentSession>('/assessment/start', { method: 'POST', cache: 'no-store' });
+export async function startAssessment(userLevel?: string): Promise<AssessmentSession> {
+  return request<AssessmentSession>('/assessment/start', {
+    method: 'POST',
+    body: JSON.stringify({ user_level: userLevel || 'beginner', retake: false }),
+    cache: 'no-store',
+  });
 }
 
-export async function submitAnswer(sessionId: string, questionId: string, selectedOptionId: string): Promise<AssessmentSession> {
+export async function startAssessmentRetake(userLevel?: string): Promise<AssessmentSession> {
+  return request<AssessmentSession>('/assessment/start', {
+    method: 'POST',
+    body: JSON.stringify({ user_level: userLevel || 'beginner', retake: true }),
+    cache: 'no-store',
+  });
+}
+
+export async function submitAnswer(
+  sessionId: string,
+  questionId: string,
+  selectedOptionId: string,
+  customAnswer?: string
+): Promise<AssessmentSession> {
   return request<AssessmentSession>('/assessment/answer', {
     method: 'POST',
-    body: JSON.stringify({ session_id: sessionId, question_id: questionId, selected_option_id: selectedOptionId }),
+    body: JSON.stringify({
+      session_id: sessionId,
+      question_id: questionId,
+      selected_option_id: selectedOptionId,
+      custom_answer: customAnswer || null,
+    }),
   });
 }
 
@@ -191,8 +214,30 @@ export async function uploadResumeFile(file: File): Promise<ResumeAnalysisData> 
   const formData = new FormData();
   formData.append('file', file);
 
+  const token = getSavedAuthToken();
+  const aiConfig = getSavedAIConfig();
+  const lang = typeof window !== 'undefined' ? (localStorage.getItem('ai_career_language') || 'en') : 'en';
+
+  const customHeaders: Record<string, string> = {
+    'X-Language-Preference': lang,
+    'Accept-Language': lang,
+  };
+
+  if (token) {
+    customHeaders['Authorization'] = `Bearer ${token}`;
+  }
+
+  if (aiConfig.apiKey) {
+    customHeaders['X-AI-API-Key'] = aiConfig.apiKey;
+    customHeaders['X-AI-Provider'] = aiConfig.provider;
+    if (aiConfig.model) {
+      customHeaders['X-AI-Model'] = aiConfig.model;
+    }
+  }
+
   const response = await fetch(`${BASE_URL}/resume/upload`, {
     method: 'POST',
+    headers: customHeaders,
     body: formData,
   });
 
@@ -200,13 +245,40 @@ export async function uploadResumeFile(file: File): Promise<ResumeAnalysisData> 
   if (!response.ok || !result.success) {
     throw new Error(result.message || result.error || 'Failed to upload and analyze resume');
   }
+
+  if (typeof window !== 'undefined' && result.data) {
+    try {
+      localStorage.setItem('cached_resume_analysis', JSON.stringify(result.data));
+    } catch (e) {
+      // ignore
+    }
+  }
+
   return result.data as ResumeAnalysisData;
 }
 
 export async function getResumeAnalysis(): Promise<ResumeAnalysisData | null> {
   try {
-    return await request<ResumeAnalysisData>('/resume/analysis', { cache: 'no-store' });
+    const data = await request<ResumeAnalysisData>('/resume/analysis', { cache: 'no-store' });
+    if (data && typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('cached_resume_analysis', JSON.stringify(data));
+      } catch (e) {
+        // ignore
+      }
+    }
+    return data;
   } catch (err) {
+    if (typeof window !== 'undefined') {
+      const cached = localStorage.getItem('cached_resume_analysis');
+      if (cached) {
+        try {
+          return JSON.parse(cached) as ResumeAnalysisData;
+        } catch (e) {
+          // ignore
+        }
+      }
+    }
     return null;
   }
 }

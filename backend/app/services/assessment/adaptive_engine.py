@@ -14,21 +14,39 @@ logger = logging.getLogger(__name__)
 
 class GeneratedOption(BaseModel):
     id: str = Field(description="Option ID: A, B, C, or D")
-    text: str = Field(description="Clear, easy-to-understand option text")
+    text: str = Field(description="Clear, easy-to-understand option text in plain simple language")
     archetype: str = Field(description="Archetype: Systems Builder, Data Investigator, Creative Visualizer, Cloud Architect, User Strategist, AI Pioneer")
     target_role: str = Field(description="Target role associated with option, e.g. Frontend Developer, Backend Developer, Data Scientist, Product Manager")
 
 
 class GeneratedQuestion(BaseModel):
     dimension: str = Field(description="Dimension or topic area for this question")
-    question_text: str = Field(description="Easy, clear, practical question text adaptively built upon the user's previous answer")
+    question_text: str = Field(description="Very easy, clear, relatable question written in everyday language. No jargon. Any student can read and answer this.")
     options: List[GeneratedOption] = Field(description="Array of 4 options A, B, C, D")
+
+
+LEVEL_CONTEXT = {
+    "beginner": (
+        "The candidate is a BEGINNER — they may be a student or someone just starting to explore technology careers. "
+        "Use extremely simple, everyday language. No technical jargon. Relate questions to everyday life, hobbies, or curiosity. "
+        "Example: Instead of 'REST API design', ask 'Do you enjoy figuring out how apps talk to each other, like how Instagram shows you photos?'"
+    ),
+    "intermediate": (
+        "The candidate has INTERMEDIATE experience — they have some coding knowledge or work in tech. "
+        "Use clear but slightly technical language. Ask about preferences in tools, approaches, or project types they may have used."
+    ),
+    "advanced": (
+        "The candidate is ADVANCED — a working professional or experienced developer. "
+        "You may use industry terminology. Ask deeper questions about architecture choices, tradeoffs, leadership, or specialization."
+    )
+}
 
 
 class AdaptiveAssessmentEngine:
     """
     Intelligent Adaptive Assessment Engine.
-    Dynamically generates or adaptively selects the NEXT question based on the user's previous answer.
+    Dynamically generates or adaptively selects the NEXT question based on
+    the user's previous answer and experience level.
     Ensures questions are easy, clear, non-repetitive, and persona-tailored.
     """
 
@@ -40,7 +58,8 @@ class AdaptiveAssessmentEngine:
         answered_question_ids: List[str],
         current_answers: Dict[str, Any],
         language: str = "en",
-        ai_provider: Optional[BaseLLMProvider] = None
+        ai_provider: Optional[BaseLLMProvider] = None,
+        user_level: str = "beginner"
     ) -> Optional[Question]:
         step_num = len(answered_question_ids) + 1
 
@@ -57,7 +76,8 @@ class AdaptiveAssessmentEngine:
                     answered_question_ids=answered_question_ids,
                     current_answers=current_answers,
                     language=language,
-                    ai_provider=ai_provider
+                    ai_provider=ai_provider,
+                    user_level=user_level
                 )
                 if ai_q:
                     return ai_q
@@ -79,7 +99,8 @@ class AdaptiveAssessmentEngine:
         answered_question_ids: List[str],
         current_answers: Dict[str, Any],
         language: str,
-        ai_provider: BaseLLMProvider
+        ai_provider: BaseLLMProvider,
+        user_level: str = "beginner"
     ) -> Optional[Question]:
         # Format user's previous answers history for context
         answers_history = []
@@ -89,12 +110,16 @@ class AdaptiveAssessmentEngine:
             dim = ans.get("dimension", "")
             selected_text = ans.get("option_text", "")
             arch = ans.get("archetype", "")
-            answers_history.append(f"- Step {len(answers_history)+1} [{dim}]: Selected '{selected_text}' (Archetype: {arch})")
+            is_custom = ans.get("option_id") == "custom"
+            label = "(own answer)" if is_custom else f"(Archetype: {arch})"
+            answers_history.append(f"- Step {len(answers_history)+1} [{dim}]: Selected '{selected_text}' {label}")
 
         if answers_history:
             last_answer_summary = answers_history[-1]
 
         history_str = "\n".join(answers_history) if answers_history else "No previous answers yet (Starting new session)."
+
+        level_instruction = LEVEL_CONTEXT.get(user_level, LEVEL_CONTEXT["beginner"])
 
         is_hi = language == "hi"
         lang_rule = ""
@@ -104,6 +129,9 @@ class AdaptiveAssessmentEngine:
         prompt = f"""
 You are creating Question #{step_num} of {self.MAX_QUESTIONS_PER_SESSION} for an adaptive career discovery assessment.
 
+CANDIDATE LEVEL CONTEXT:
+{level_instruction}
+
 Candidate Previous Answers History:
 {history_str}
 
@@ -111,17 +139,22 @@ Last Selected Answer Context:
 {last_answer_summary}
 
 TASK & GUIDELINES:
-1. **Easy & Clear Language**: Create a simple, engaging, practical multiple-choice question that any student or beginner developer can easily answer. Avoid complex jargon.
+1. **Easy & Clear Language**: Write a simple, engaging, practical multiple-choice question based on the candidate's level above.
+   - For BEGINNER: Use relatable everyday analogies. No jargon at all.
+   - For INTERMEDIATE: Use simple tech language they would recognize.
+   - For ADVANCED: You may use technical terms and ask about tradeoffs.
 2. **Adaptive Context**: The question MUST adaptively build upon the user's previous answer:
    - If the user previously chose Backend/Systems/Logs, ask a clear follow-up exploring databases, APIs, or system reliability.
    - If the user previously chose Frontend/UI/Design, ask a clear follow-up exploring visual layouts, user interactions, or web components.
    - If the user previously chose Data/Analytics, ask a clear follow-up exploring data charts, trends, or insights.
-   - If this is Question #1, create a welcoming, easy question exploring what kind of tech project energizes them most.
-3. Provide 4 distinct options (A, B, C, D) mapping to different career archetypes.
+   - If the user gave a CUSTOM answer, interpret what they wrote and build a follow-up question from that context.
+   - If this is Question #1, create a welcoming, easy question exploring what kind of project or activity excites them most in technology.
+3. Provide 4 distinct options (A, B, C, D) each mapping to a different career archetype.
+4. Make options short, concrete, and easy to pick between — not vague or overlapping.
 {lang_rule}
 """
 
-        system_instruction = "You are an expert AI Career Coach generating adaptive, easy, and engaging career discovery assessment questions."
+        system_instruction = "You are an expert AI Career Coach generating adaptive, easy, and engaging career discovery assessment questions tailored to the user's experience level."
 
         generated: GeneratedQuestion = await ai_provider.generate_structured(
             prompt=prompt,

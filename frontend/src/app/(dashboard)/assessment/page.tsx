@@ -17,10 +17,15 @@ import {
   Briefcase, 
   X, 
   ShieldCheck, 
-  RotateCcw
+  RotateCcw,
+  Pencil,
+  GraduationCap,
+  Zap,
+  Star
 } from 'lucide-react';
 import { 
-  startAssessment, 
+  startAssessment,
+  startAssessmentRetake,
   submitAnswer, 
   completeAssessment, 
   getAssessmentResult, 
@@ -41,9 +46,17 @@ export default function AssessmentPage() {
   const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Level Selection Screen State
+  const [showLevelSelect, setShowLevelSelect] = useState(false);
+  const [userLevel, setUserLevel] = useState<string>('beginner');
+
   // Active Session State
   const [session, setSession] = useState<AssessmentSession | null>(null);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
+
+  // Custom Answer State
+  const [showCustomInput, setShowCustomInput] = useState(false);
+  const [customAnswerText, setCustomAnswerText] = useState('');
 
   // Result & Profile State
   const [result, setResult] = useState<AssessmentResultData | null>(null);
@@ -70,12 +83,8 @@ export default function AssessmentPage() {
           setResult(existingResult);
           setSelectedTarget(existingResult.selected_target_career || null);
         } else {
-          // Start or resume session
-          const activeSession = await startAssessment();
-          setSession(activeSession);
-          if (activeSession.is_completed) {
-            handleCompleteAssessment(activeSession.session_id);
-          }
+          // Show level selection BEFORE starting the assessment
+          setShowLevelSelect(true);
         }
       } catch (err: any) {
         console.error('Initialization error:', err);
@@ -87,9 +96,31 @@ export default function AssessmentPage() {
     init();
   }, []);
 
+  // Called after user picks their level
+  const handleLevelConfirm = async (level: string) => {
+    setUserLevel(level);
+    setShowLevelSelect(false);
+    setLoading(true);
+    try {
+      const activeSession = await startAssessment(level);
+      setSession(activeSession);
+      if (activeSession.is_completed) {
+        handleCompleteAssessment(activeSession.session_id);
+      }
+    } catch (err: any) {
+      console.error('Start error:', err);
+      setError(err.message || 'Failed to start assessment');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Handle single question answer submission
   const handleAnswerSubmit = async () => {
-    if (!session || !session.current_question || !selectedOption || submitting) return;
+    const isCustom = selectedOption === 'custom';
+    if (!session || !session.current_question || submitting) return;
+    if (!selectedOption) return;
+    if (isCustom && !customAnswerText.trim()) return;
 
     setSubmitting(true);
     setError(null);
@@ -97,10 +128,13 @@ export default function AssessmentPage() {
       const updatedSession = await submitAnswer(
         session.session_id,
         session.current_question.id,
-        selectedOption
+        selectedOption,
+        isCustom ? customAnswerText.trim() : undefined
       );
 
       setSelectedOption(null);
+      setCustomAnswerText('');
+      setShowCustomInput(false);
       setSession(updatedSession);
 
       // If assessment reached completion, trigger AI analysis
@@ -134,14 +168,24 @@ export default function AssessmentPage() {
     }
   };
 
-  // Restart Assessment Flow
+  // Restart Assessment Flow — show level picker again
   const handleRestart = async () => {
-    setLoading(true);
     setResult(null);
     setCompareMatch(null);
     setSelectedOption(null);
+    setCustomAnswerText('');
+    setShowCustomInput(false);
+    setSession(null);
+    setShowLevelSelect(true);
+  };
+
+  // Called when retake starts after level pick
+  const handleRetakeWithLevel = async (level: string) => {
+    setUserLevel(level);
+    setShowLevelSelect(false);
+    setLoading(true);
     try {
-      const newSession = await startAssessment();
+      const newSession = await startAssessmentRetake(level);
       setSession(newSession);
     } catch (err: any) {
       setError(err.message || 'Failed to restart assessment session.');
@@ -169,6 +213,106 @@ export default function AssessmentPage() {
       <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
         <Loader2 className="w-10 h-10 text-indigo-500 animate-spin" />
         <p className="text-sm font-semibold text-slate-300">Loading Career Discovery Session...</p>
+      </div>
+    );
+  }
+
+  // ────────────────────────────────────────────────────
+  // LEVEL SELECTION SCREEN
+  // ────────────────────────────────────────────────────
+  if (showLevelSelect) {
+    const levels = [
+      {
+        id: 'beginner',
+        icon: <GraduationCap className="w-7 h-7" />,
+        color: 'from-emerald-500/20 to-teal-500/10 border-emerald-500/40',
+        activeColor: 'from-emerald-600/30 to-teal-600/20 border-emerald-400 shadow-lg shadow-emerald-500/20',
+        iconColor: 'text-emerald-400',
+        badge: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/30',
+        label: '🌱 Beginner',
+        sublabel: 'Student ya Fresher',
+        desc: 'Maine abhi technology ke baare mein padhna shuru kiya hai ya explore kar raha/rahi hoon. Mujhe zyada technical cheezein nahi pata abhi.',
+      },
+      {
+        id: 'intermediate',
+        icon: <Zap className="w-7 h-7" />,
+        color: 'from-indigo-500/20 to-purple-500/10 border-indigo-500/40',
+        activeColor: 'from-indigo-600/30 to-purple-600/20 border-indigo-400 shadow-lg shadow-indigo-500/20',
+        iconColor: 'text-indigo-400',
+        badge: 'text-indigo-300 bg-indigo-500/10 border-indigo-500/30',
+        label: '⚡ Intermediate',
+        sublabel: '1–3 saal ka experience',
+        desc: 'Mujhe thodi coding/tech aati hai. Maine kuch projects ya internship kar liye hain. Basic cheezein samajhta/samajhti hoon.',
+      },
+      {
+        id: 'advanced',
+        icon: <Star className="w-7 h-7" />,
+        color: 'from-amber-500/20 to-orange-500/10 border-amber-500/40',
+        activeColor: 'from-amber-600/30 to-orange-600/20 border-amber-400 shadow-lg shadow-amber-500/20',
+        iconColor: 'text-amber-400',
+        badge: 'text-amber-300 bg-amber-500/10 border-amber-500/30',
+        label: '🌟 Advanced',
+        sublabel: '3+ saal ka experience',
+        desc: 'Main professionally kaam kar raha/rahi hoon ya mujhe tech mein deep knowledge hai. Main technical questions comfortable feel karta/karti hoon.',
+      },
+    ];
+
+    return (
+      <div className="max-w-2xl mx-auto space-y-8 pb-12 pt-4">
+        {/* Header */}
+        <div className="text-center space-y-3">
+          <div className="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 text-xs font-bold uppercase tracking-widest">
+            <Compass className="w-3.5 h-3.5" />
+            <span>Career Discovery Assessment</span>
+          </div>
+          <h1 className="text-3xl font-extrabold text-white leading-tight">
+            Aap abhi kahan hain?
+          </h1>
+          <p className="text-slate-400 text-sm leading-relaxed max-w-md mx-auto">
+            Apna current experience level batao taaki hum aapke liye <strong className="text-slate-200">bilkul sahi sawal</strong> taiyaar kar sakein — easy aur relatable.
+          </p>
+        </div>
+
+        {/* Level Cards */}
+        <div className="space-y-4">
+          {levels.map((lvl) => {
+            const isActive = userLevel === lvl.id;
+            return (
+              <button
+                key={lvl.id}
+                onClick={() => setUserLevel(lvl.id)}
+                className={`w-full text-left p-5 rounded-2xl border bg-gradient-to-r transition-all duration-200 flex items-start space-x-5 ${
+                  isActive ? lvl.activeColor : lvl.color + ' hover:opacity-90'
+                }`}
+              >
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${isActive ? 'bg-white/10' : 'bg-slate-900/50'} ${lvl.iconColor}`}>
+                  {lvl.icon}
+                </div>
+                <div className="flex-1 space-y-1">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-base font-bold text-white">{lvl.label}</span>
+                    <span className={`px-2 py-0.5 rounded text-[11px] font-semibold border ${lvl.badge}`}>{lvl.sublabel}</span>
+                    {isActive && <CheckCircle2 className="w-4 h-4 text-white ml-auto" />}
+                  </div>
+                  <p className="text-xs text-slate-400 leading-relaxed">{lvl.desc}</p>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Confirm Button */}
+        <button
+          onClick={() => handleLevelConfirm(userLevel)}
+          className="w-full py-4 rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-base flex items-center justify-center space-x-3 shadow-xl shadow-indigo-500/25 transition-all"
+        >
+          <span>Assessment Shuru Karein</span>
+          <ArrowRight className="w-5 h-5" />
+        </button>
+
+        <p className="text-center text-xs text-slate-600">
+          Level baad mein bhi change kiya ja sakta hai — Retake Assessment se.
+        </p>
       </div>
     );
   }
@@ -280,7 +424,7 @@ export default function AssessmentPage() {
             <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Motivation & Driver</span>
             <p className="text-sm font-semibold text-slate-200">{analysis.motivation_profile}</p>
             <div className="flex flex-wrap gap-1.5 pt-2">
-              {analysis.interest_profile.map((interest, idx) => (
+              {(analysis.interest_profile ?? []).map((interest, idx) => (
                 <span key={idx} className="px-2.5 py-0.5 rounded bg-slate-950 border border-slate-800 text-[11px] text-slate-300">
                   {interest}
                 </span>
@@ -307,7 +451,7 @@ export default function AssessmentPage() {
             <span>Top Supporting Strengths</span>
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {analysis.top_strengths.map((str, idx) => (
+            {(analysis.top_strengths ?? []).length > 0 ? (analysis.top_strengths ?? []).map((str, idx) => (
               <div key={idx} className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
                 <h4 className="text-sm font-bold text-slate-200 flex items-center space-x-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-400" />
@@ -315,7 +459,9 @@ export default function AssessmentPage() {
                 </h4>
                 <p className="text-xs text-slate-400 leading-relaxed pl-6">{str.evidence_reason}</p>
               </div>
-            ))}
+            )) : (
+              <p className="text-xs text-slate-500 italic">Strengths will be available after full assessment completion.</p>
+            )}
           </div>
         </div>
 
@@ -369,7 +515,7 @@ export default function AssessmentPage() {
                     <div className="space-y-1.5 pt-2">
                       <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Why Recommended:</span>
                       <ul className="space-y-1">
-                        {match.why_recommended.map((reason, rIdx) => (
+                        {(match.why_recommended ?? []).map((reason: string, rIdx: number) => (
                           <li key={rIdx} className="text-xs text-slate-300 flex items-start space-x-2">
                             <span className="text-indigo-400 font-bold">•</span>
                             <span>{reason}</span>
@@ -569,7 +715,11 @@ export default function AssessmentPage() {
               return (
                 <button
                   key={option.id}
-                  onClick={() => setSelectedOption(option.id)}
+                  onClick={() => {
+                    setSelectedOption(option.id);
+                    setShowCustomInput(false);
+                    setCustomAnswerText('');
+                  }}
                   disabled={submitting}
                   className={`w-full text-left p-4 rounded-xl border transition-all duration-200 flex items-center justify-between ${
                     isSelected
@@ -593,6 +743,50 @@ export default function AssessmentPage() {
                 </button>
               );
             })}
+
+            {/* Custom Answer Option */}
+            <div className="mt-1">
+              <button
+                onClick={() => {
+                  const next = !showCustomInput;
+                  setShowCustomInput(next);
+                  if (next) {
+                    setSelectedOption('custom');
+                  } else {
+                    setSelectedOption(null);
+                    setCustomAnswerText('');
+                  }
+                }}
+                disabled={submitting}
+                className={`w-full text-left p-4 rounded-xl border transition-all duration-200 flex items-center space-x-4 ${
+                  selectedOption === 'custom'
+                    ? 'bg-purple-600/20 border-purple-500 text-white shadow-md shadow-purple-500/10'
+                    : 'bg-slate-950/60 border-slate-700 border-dashed text-slate-400 hover:border-slate-500 hover:text-slate-300'
+                }`}
+              >
+                <span className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                  selectedOption === 'custom' ? 'bg-purple-500 text-white' : 'bg-slate-800 text-slate-400'
+                }`}>
+                  <Pencil className="w-4 h-4" />
+                </span>
+                <span className="text-sm font-medium">Koi option suit nahi karta? Apna khud ka jawab likhein</span>
+                {selectedOption === 'custom' && <CheckCircle2 className="w-5 h-5 text-purple-400 shrink-0 ml-auto" />}
+              </button>
+
+              {showCustomInput && (
+                <div className="mt-3 space-y-2">
+                  <textarea
+                    value={customAnswerText}
+                    onChange={(e) => setCustomAnswerText(e.target.value)}
+                    placeholder="Yahan apna jawab likhein... (jaise: 'Mujhe graphic design mein zyada interest hai' ya 'Main gaming apps banana chahta hoon')"
+                    rows={3}
+                    disabled={submitting}
+                    className="w-full p-4 rounded-xl bg-slate-950 border border-purple-500/40 text-slate-200 text-sm placeholder:text-slate-600 focus:outline-none focus:border-purple-400 resize-none transition-all"
+                  />
+                  <p className="text-[11px] text-slate-600 pl-1">Aapka jawab AI ko aapke career ko better samajhne mein madad karega.</p>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Action Footer */}
@@ -601,7 +795,7 @@ export default function AssessmentPage() {
               Your response will calibrate your Career Digital Twin profile.
             </p>
             <button
-              disabled={!selectedOption || submitting}
+              disabled={!selectedOption || (selectedOption === 'custom' && !customAnswerText.trim()) || submitting}
               onClick={handleAnswerSubmit}
               className={`px-6 py-3 rounded-xl font-semibold text-sm flex items-center space-x-2 transition-all ${
                 selectedOption && !submitting

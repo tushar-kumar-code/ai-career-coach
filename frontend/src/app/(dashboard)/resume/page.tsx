@@ -30,7 +30,18 @@ export default function ResumePage() {
   // Load existing analysis if available
   useEffect(() => {
     async function loadAnalysis() {
-      setLoading(true);
+      if (typeof window !== 'undefined') {
+        const cached = localStorage.getItem('cached_resume_analysis');
+        if (cached) {
+          try {
+            setAnalysis(JSON.parse(cached));
+            setLoading(false);
+          } catch (e) {
+            // ignore
+          }
+        }
+      }
+
       setError(null);
       try {
         const data = await getResumeAnalysis();

@@ -30,6 +30,7 @@ export interface Question {
   question_text: string;
   options: QuestionOption[];
   order_index: number;
+  allow_custom?: boolean;
 }
 
 export interface AssessmentSession {
@@ -39,6 +40,7 @@ export interface AssessmentSession {
   is_completed: boolean;
   current_question?: Question;
   answers_count: number;
+  user_level?: string;
 }
 
 export interface SupportedStrength {

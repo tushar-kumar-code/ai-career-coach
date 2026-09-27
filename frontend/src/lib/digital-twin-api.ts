@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Digital Twin API Client
  * =======================
  * All TypeScript API functions for the Career Digital Twin + Progress Engine.
@@ -7,9 +7,22 @@
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
+import { getSavedAuthToken } from './api-client';
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
+  const token = getSavedAuthToken();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
   const res = await fetch(`${API_BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      ...headers,
+      ...options?.headers,
+    },
     ...options,
   });
   const result = await res.json();

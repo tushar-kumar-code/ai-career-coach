@@ -6,6 +6,11 @@ from pydantic import BaseModel, Field
 # API Request / Response Schemas
 # ----------------------------------------------------
 
+class AssessmentStartRequest(BaseModel):
+    user_level: Optional[str] = Field(default="beginner", description="User skill level: beginner, intermediate, advanced")
+    retake: bool = Field(default=False)
+
+
 class QuestionOptionSchema(BaseModel):
     id: str
     text: str
@@ -19,6 +24,7 @@ class QuestionSchema(BaseModel):
     question_text: str
     options: List[QuestionOptionSchema]
     order_index: int
+    allow_custom: bool = True  # Always allow custom text answer
 
 
 class AssessmentSessionResponse(BaseModel):
@@ -28,12 +34,14 @@ class AssessmentSessionResponse(BaseModel):
     is_completed: bool
     current_question: Optional[QuestionSchema] = None
     answers_count: int
+    user_level: Optional[str] = "beginner"
 
 
 class AnswerSubmitRequest(BaseModel):
     session_id: str
     question_id: str
-    selected_option_id: str
+    selected_option_id: str        # Option ID (A/B/C/D) or "custom"
+    custom_answer: Optional[str] = Field(default=None, description="User's own typed answer when no option fits")
 
 
 class TargetCareerSelectRequest(BaseModel):

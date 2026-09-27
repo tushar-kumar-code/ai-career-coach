@@ -15,6 +15,7 @@ from app.models.profile import UserProfile
 from app.schemas.health import APIResponse
 from app.schemas.assessment import (
     AssessmentSessionResponse,
+    AssessmentStartRequest,
     QuestionSchema,
     QuestionOptionSchema,
     AnswerSubmitRequest,
@@ -34,13 +35,55 @@ ai_service = CareerDiscoveryAIService()
     summary="Start or resume career discovery assessment session"
 )
 async def start_assessment(
+    payload: AssessmentStartRequest = None,
     db: AsyncSession = Depends(get_db),
     user_id: str = Depends(get_current_user_id),
     ai_provider: BaseLLMProvider = Depends(get_ai_provider_from_headers),
     x_language_preference: str = Header(default="en", alias="X-Language-Preference")
 ):
+    if payload is None:
+        payload = AssessmentStartRequest()
+    retake = payload.retake
+    user_level = payload.user_level or "beginner"
     # Seed DB questions and career roles if empty
     await seed_database(db)
+
+    total_questions = adaptive_engine.MAX_QUESTIONS_PER_SESSION
+
+    if not retake:
+        completed_stmt = select(AssessmentResponse).where(
+            AssessmentResponse.user_id == user_id,
+            AssessmentResponse.status == "COMPLETED"
+        ).order_by(AssessmentResponse.updated_at.desc())
+        comp_res = await db.execute(completed_stmt)
+        completed_session = comp_res.scalars().first()
+
+        if not completed_session:
+            demo_stmt = select(AssessmentResponse).where(
+                AssessmentResponse.user_id == "demo-user-12345",
+                AssessmentResponse.status == "COMPLETED"
+            ).order_by(AssessmentResponse.updated_at.desc())
+            demo_res = await db.execute(demo_stmt)
+            demo_session = demo_res.scalars().first()
+            if demo_session and demo_session.ai_analysis_json:
+                demo_session.user_id = user_id
+                db.add(demo_session)
+                await db.commit()
+                completed_session = demo_session
+
+        if completed_session:
+            return APIResponse(
+                success=True,
+                message="User has already completed the assessment",
+                data=AssessmentSessionResponse(
+                    session_id=completed_session.id,
+                    current_step=total_questions,
+                    total_questions=total_questions,
+                    is_completed=True,
+                    current_question=None,
+                    answers_count=total_questions
+                )
+            )
 
     # Check for existing IN_PROGRESS assessment for user
     stmt = select(AssessmentResponse).where(
@@ -59,7 +102,8 @@ async def start_assessment(
             answered_question_ids=answered_ids,
             current_answers=session.dimension_answers,
             language=x_language_preference,
-            ai_provider=ai_provider
+            ai_provider=ai_provider,
+            user_level=session.user_level or user_level
         )
         if not next_q and len(answered_ids) >= total_questions:
             # Session had all questions answered; start a fresh assessment session
@@ -70,6 +114,7 @@ async def start_assessment(
             user_id=user_id,
             status="IN_PROGRESS",
             current_step=1,
+            user_level=user_level,
             dimension_answers={}
         )
         db.add(session)
@@ -96,7 +141,8 @@ async def start_assessment(
             question_type=next_q.question_type,
             question_text=next_q.question_text,
             options=options_list,
-            order_index=next_q.order_index
+            order_index=next_q.order_index,
+            allow_custom=True
         )
 
     session_resp = AssessmentSessionResponse(
@@ -105,7 +151,8 @@ async def start_assessment(
         total_questions=total_questions,
         is_completed=session.status == "COMPLETED" or next_q is None,
         current_question=q_schema,
-        answers_count=len(answered_ids)
+        answers_count=len(answered_ids),
+        user_level=session.user_level or "beginner"
     )
 
     return APIResponse(
@@ -145,10 +192,16 @@ async def submit_answer(
     if not question:
         raise HTTPException(status_code=404, detail="Question not found")
 
-    # Find matching option
-    selected_opt = next((o for o in question.options if o["id"] == payload.selected_option_id), None)
-    if not selected_opt:
-        raise HTTPException(status_code=400, detail="Invalid option selected")
+    # Find matching option — or accept custom text answer
+    is_custom = payload.selected_option_id == "custom"
+    if is_custom:
+        if not payload.custom_answer or not payload.custom_answer.strip():
+            raise HTTPException(status_code=400, detail="Custom answer text is required when selecting 'custom' option")
+        selected_opt = {"id": "custom", "text": payload.custom_answer.strip(), "archetype": None}
+    else:
+        selected_opt = next((o for o in question.options if o["id"] == payload.selected_option_id), None)
+        if not selected_opt:
+            raise HTTPException(status_code=400, detail="Invalid option selected")
 
     # Update session answers
     updated_answers = dict(session.dimension_answers)
@@ -175,7 +228,8 @@ async def submit_answer(
         answered_question_ids=answered_ids,
         current_answers=updated_answers,
         language=x_language_preference,
-        ai_provider=ai_provider
+        ai_provider=ai_provider,
+        user_level=session.user_level or "beginner"
     )
 
     q_schema = None
@@ -190,7 +244,8 @@ async def submit_answer(
             question_type=next_q.question_type,
             question_text=next_q.question_text,
             options=options_list,
-            order_index=next_q.order_index
+            order_index=next_q.order_index,
+            allow_custom=True
         )
 
     session_resp = AssessmentSessionResponse(
@@ -199,7 +254,8 @@ async def submit_answer(
         total_questions=total_questions,
         is_completed=next_q is None,
         current_question=q_schema,
-        answers_count=len(answered_ids)
+        answers_count=len(answered_ids),
+        user_level=session.user_level or "beginner"
     )
 
     return APIResponse(
@@ -305,7 +361,60 @@ async def get_assessment_result(
     res = await db.execute(stmt)
     session = res.scalars().first()
 
+    if not session:
+        demo_stmt = select(AssessmentResponse).where(
+            AssessmentResponse.user_id == "demo-user-12345",
+            AssessmentResponse.status == "COMPLETED"
+        ).order_by(AssessmentResponse.updated_at.desc())
+        demo_res = await db.execute(demo_stmt)
+        demo_session = demo_res.scalars().first()
+        if demo_session and demo_session.ai_analysis_json:
+            demo_session.user_id = user_id
+            db.add(demo_session)
+            await db.commit()
+            await db.refresh(demo_session)
+            session = demo_session
+
     if not session or not session.ai_analysis_json:
+        # Check if UserProfile already has target career or recommended roles from past assessment
+        p_stmt_fb = select(UserProfile).where(UserProfile.user_id == user_id)
+        p_res_fb = await db.execute(p_stmt_fb)
+        u_profile_fb = p_res_fb.scalars().first()
+        if u_profile_fb and (u_profile_fb.recommended_roles or u_profile_fb.target_career):
+            raw_recs = u_profile_fb.recommended_roles or [
+                {"title": u_profile_fb.target_career, "slug": (u_profile_fb.target_career or "software-developer").lower().replace(" ", "-"), "match_percentage": u_profile_fb.job_readiness_score or 85, "reasoning": "Selected career path.", "key_strengths": ["Architecture", "Problem Solving"]}
+            ]
+            # Ensure each rec has why_recommended field (some may have been stored without it)
+            recs = []
+            for r in raw_recs:
+                r_copy = dict(r)
+                if "why_recommended" not in r_copy:
+                    r_copy["why_recommended"] = r_copy.get("key_strengths") or [r_copy.get("reasoning", "Recommended based on your career profile")]
+                recs.append(r_copy)
+
+            return APIResponse(
+                success=True,
+                message="Career Discovery Result retrieved from profile",
+                data={
+                    "session_id": "profile-recovered",
+                    "selected_target_career": u_profile_fb.target_career or "Software Developer",
+                    "archetype": u_profile_fb.primary_archetype or "Systems Builder",
+                    "analysis": {
+                        "primary_archetype": u_profile_fb.primary_archetype or "Systems Builder",
+                        "work_style_summary": "Hands-on problem solver with strong focus on high-impact scalable engineering.",
+                        "motivation_profile": "Mastering real-world technical skills and delivering resilient software systems.",
+                        "interest_profile": ["System Design", "Backend Architecture", "Full Stack Development"],
+                        "dimension_scores": {"Technical Problem Solving": 85, "System Architecture": 82, "Logical Reasoning": 80},
+                        "top_strengths": [
+                            {"strength_name": "Technical Architecture", "evidence_reason": "Strong foundation in system design and backend architecture patterns."},
+                            {"strength_name": "Problem Solving", "evidence_reason": "Proven ability to break complex problems into structured, implementable solutions."}
+                        ],
+                        "recommended_careers": recs
+                    },
+                    "completed_at": u_profile_fb.updated_at.isoformat() if u_profile_fb.updated_at else None
+                }
+            )
+
         return APIResponse(
             success=False,
             message="No completed assessment found for user",

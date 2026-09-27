@@ -22,7 +22,14 @@ import {
   Layers,
   Briefcase,
   DollarSign,
-  HelpCircle
+  Maximize2,
+  Minimize2,
+  ChevronDown,
+  ChevronUp,
+  Type,
+  Eye,
+  EyeOff,
+  X
 } from 'lucide-react';
 import { sendChatMessage, getSavedAIConfig } from '@/lib/api-client';
 import ApiKeyModal from '@/components/common/ApiKeyModal';
@@ -131,6 +138,10 @@ export default function ChatPage() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [speakingId, setSpeakingId] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState<string>('All');
+  const [isWide, setIsWide] = useState<boolean>(true); // Default to expansive wide screen
+  const [fontSize, setFontSize] = useState<'normal' | 'large'>('normal');
+  const [showPrompts, setShowPrompts] = useState<boolean>(true);
+  const [isHeaderVisible, setIsHeaderVisible] = useState<boolean>(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -283,71 +294,165 @@ export default function ChatPage() {
       : CATEGORY_PROMPTS.find((c) => c.category === activeCategory)?.items || [];
 
   return (
-    <div className="space-y-3.5 max-w-4xl mx-auto h-[calc(100vh-7.5rem)] flex flex-col">
-      {/* Header Bar */}
-      <div className="p-3.5 sm:p-4 rounded-2xl bg-slate-900/80 border border-slate-800/90 flex items-center justify-between shrink-0 shadow-sm backdrop-blur-md">
-        <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center text-white shadow-md shadow-indigo-500/20">
-            <Bot className="w-5 h-5" />
+    <div
+      className={`mx-auto h-[calc(100vh-6.5rem)] flex flex-col space-y-3 transition-all duration-300 ${
+        isWide ? 'w-full max-w-full px-1 sm:px-2' : 'w-full max-w-5xl lg:max-w-6xl xl:max-w-7xl px-2 sm:px-4'
+      }`}
+    >
+      {/* Header Bar (Full or Compact Micro-Bar) */}
+      {isHeaderVisible ? (
+        <div className="p-3 sm:p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800/90 flex items-center justify-between shrink-0 shadow-sm backdrop-blur-md animate-in fade-in duration-200">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center text-white shadow-md shadow-indigo-500/20">
+              <Bot className="w-5 h-5" />
+            </div>
+            <div>
+              <h1 className="text-base sm:text-lg font-extrabold text-white flex items-center gap-2">
+                Contextual AI Career Coach
+                <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 rounded-full">
+                  <Zap className="w-3 h-3 text-amber-400" />
+                  Live LLM Engine
+                </span>
+              </h1>
+              <p className="text-xs text-slate-400 hidden sm:block">
+                Full-screen contextual guidance synced with your profile & roadmap
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-base sm:text-lg font-extrabold text-white flex items-center gap-2">
-              Contextual AI Career Coach
-              <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 rounded-full">
-                <Zap className="w-3 h-3 text-amber-400" />
-                Live LLM Engine
-              </span>
-            </h1>
-            <p className="text-xs text-slate-400 hidden sm:block">
-              Structured, easy-to-read career guidance synced with your profile & roadmap
-            </p>
-          </div>
-        </div>
 
-        {/* Right Actions */}
-        <div className="flex items-center space-x-2">
-          {messages.length > 1 && (
+          {/* Right Actions */}
+          <div className="flex items-center space-x-2">
+            {/* Font Size Toggle Button */}
             <button
-              onClick={handleClearChat}
-              title="Start New Chat"
-              className="px-2.5 py-1.5 rounded-xl text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 border border-slate-800 hover:border-rose-500/30 transition text-xs flex items-center gap-1.5 font-medium"
+              onClick={() => setFontSize(fontSize === 'normal' ? 'large' : 'normal')}
+              title={`Switch to ${fontSize === 'normal' ? 'Large' : 'Normal'} text`}
+              className="px-2.5 py-1.5 rounded-xl text-slate-300 hover:text-white bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 transition text-xs flex items-center gap-1.5 font-medium"
             >
-              <Trash2 className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">New Chat</span>
+              <Type className="w-3.5 h-3.5 text-indigo-400" />
+              <span className="hidden sm:inline">{fontSize === 'normal' ? 'Text A+' : 'Text A'}</span>
             </button>
-          )}
 
-          <button
-            onClick={() => setIsKeyModalOpen(true)}
-            className={`flex items-center space-x-1.5 text-xs px-3 py-1.5 rounded-xl border transition font-medium ${
-              hasApiKey
-                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20'
-                : 'bg-indigo-500/10 border-indigo-500/30 text-indigo-300 hover:bg-indigo-500/20'
-            }`}
-          >
-            <Key className="w-3.5 h-3.5 text-amber-400" />
-            <span>
-              {hasApiKey ? `${activeProvider.toUpperCase()} Active` : 'Set AI Key'}
-            </span>
-          </button>
+            {/* Wide Screen Toggle Button */}
+            <button
+              onClick={() => setIsWide(!isWide)}
+              title={isWide ? 'Standard view' : 'Ultra-Wide view'}
+              className="px-2.5 py-1.5 rounded-xl text-slate-300 hover:text-white bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 transition text-xs flex items-center gap-1.5 font-medium"
+            >
+              {isWide ? (
+                <>
+                  <Minimize2 className="w-3.5 h-3.5 text-indigo-400" />
+                  <span className="hidden md:inline">Standard</span>
+                </>
+              ) : (
+                <>
+                  <Maximize2 className="w-3.5 h-3.5 text-indigo-400" />
+                  <span className="hidden md:inline">Wide Mode</span>
+                </>
+              )}
+            </button>
+
+            {messages.length > 1 && (
+              <button
+                onClick={handleClearChat}
+                title="Start New Chat"
+                className="px-2.5 py-1.5 rounded-xl text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 border border-slate-800 hover:border-rose-500/30 transition text-xs flex items-center gap-1.5 font-medium"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">New Chat</span>
+              </button>
+            )}
+
+            <button
+              onClick={() => setIsKeyModalOpen(true)}
+              className={`flex items-center space-x-1.5 text-xs px-3 py-1.5 rounded-xl border transition font-medium ${
+                hasApiKey
+                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20'
+                  : 'bg-indigo-500/10 border-indigo-500/30 text-indigo-300 hover:bg-indigo-500/20'
+              }`}
+            >
+              <Key className="w-3.5 h-3.5 text-amber-400" />
+              <span>
+                {hasApiKey ? `${activeProvider.toUpperCase()} Active` : 'Set AI Key'}
+              </span>
+            </button>
+
+            {/* Hide Header Button to maximize reading space */}
+            <button
+              onClick={() => setIsHeaderVisible(false)}
+              title="Hide header to maximize full screen chat space"
+              className="px-2.5 py-1.5 rounded-xl text-slate-400 hover:text-indigo-300 hover:bg-slate-800 bg-slate-800/40 border border-slate-700/60 transition text-xs flex items-center gap-1.5 font-medium"
+            >
+              <EyeOff className="w-3.5 h-3.5 text-slate-400" />
+              <span className="hidden lg:inline">Hide Header</span>
+            </button>
+          </div>
         </div>
-      </div>
+      ) : (
+        /* Compact Micro-Bar when Header is Hidden (Saves ~70px vertical space) */
+        <div className="px-3 py-1.5 rounded-xl bg-slate-900/80 border border-slate-800/80 flex items-center justify-between shrink-0 shadow-sm backdrop-blur-md text-xs animate-in fade-in duration-200">
+          <div className="flex items-center space-x-2 text-slate-400">
+            <Bot className="w-3.5 h-3.5 text-indigo-400" />
+            <span className="font-semibold text-slate-200 text-xs">AI Career Coach</span>
+            <span className="text-[10px] text-emerald-400 font-mono hidden sm:inline">● Live</span>
+          </div>
 
-      {/* Message Feed */}
-      <div className="flex-1 overflow-y-auto p-4 sm:p-6 rounded-2xl bg-slate-900/40 border border-slate-800/80 space-y-5 scrollbar-thin scrollbar-thumb-slate-800">
+          <div className="flex items-center space-x-1.5">
+            <button
+              onClick={() => setFontSize(fontSize === 'normal' ? 'large' : 'normal')}
+              title={`Text Size: ${fontSize === 'normal' ? 'Normal' : 'Large'}`}
+              className="px-2 py-0.5 rounded-lg text-slate-400 hover:text-white bg-slate-800/60 hover:bg-slate-800 border border-slate-700/50 transition text-[11px] flex items-center gap-1"
+            >
+              <Type className="w-3 h-3 text-indigo-400" />
+              <span>{fontSize === 'normal' ? 'A+' : 'A'}</span>
+            </button>
+
+            <button
+              onClick={() => setIsWide(!isWide)}
+              title={isWide ? 'Standard view' : 'Wide view'}
+              className="px-2 py-0.5 rounded-lg text-slate-400 hover:text-white bg-slate-800/60 hover:bg-slate-800 border border-slate-700/50 transition text-[11px] flex items-center gap-1"
+            >
+              {isWide ? <Minimize2 className="w-3 h-3 text-indigo-400" /> : <Maximize2 className="w-3 h-3 text-indigo-400" />}
+              <span className="hidden sm:inline">{isWide ? 'Standard' : 'Wide'}</span>
+            </button>
+
+            {messages.length > 1 && (
+              <button
+                onClick={handleClearChat}
+                title="Start New Chat"
+                className="p-1 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/30 transition"
+              >
+                <Trash2 className="w-3 h-3" />
+              </button>
+            )}
+
+            {/* Unhide Button */}
+            <button
+              onClick={() => setIsHeaderVisible(true)}
+              title="Show full header"
+              className="flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/40 text-indigo-300 transition text-[11px] font-medium ml-1"
+            >
+              <Eye className="w-3 h-3 text-indigo-400" />
+              <span>Show Header</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Message Feed - Maximized Reading Space */}
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-7 rounded-2xl bg-slate-900/40 border border-slate-800/80 space-y-6 scrollbar-thin scrollbar-thumb-slate-800">
         {messages.map((msg, index) => {
           const isLastAiMessage = msg.sender === 'ai' && !msg.isError && index === messages.length - 1;
 
           return (
             <div
               key={msg.id}
-              className={`flex items-start space-x-3 ${
+              className={`flex items-start space-x-3.5 ${
                 msg.sender === 'user' ? 'justify-end' : 'justify-start'
               }`}
             >
               {msg.sender === 'ai' && (
                 <div
-                  className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-1 shadow-sm ${
+                  className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-1 shadow-sm ${
                     msg.isError
                       ? 'bg-rose-500/20 border border-rose-500/30 text-rose-400'
                       : 'bg-indigo-500/20 border border-indigo-500/30 text-indigo-400'
@@ -358,34 +463,34 @@ export default function ChatPage() {
               )}
 
               <div
-                className={`max-w-2xl p-4 sm:p-5 rounded-2xl text-sm leading-relaxed relative group transition-all ${
+                className={`p-4 sm:p-6 rounded-2xl relative group transition-all ${
                   msg.sender === 'user'
-                    ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-tr-none shadow-md shadow-indigo-600/20 font-medium'
+                    ? 'max-w-xl sm:max-w-2xl bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-tr-none shadow-md shadow-indigo-600/20 font-medium'
                     : msg.isError
-                    ? 'bg-rose-950/40 border border-rose-800/60 text-rose-200 rounded-tl-none'
-                    : 'bg-slate-950/95 border border-slate-800/90 text-slate-200 rounded-tl-none shadow-md shadow-black/20'
+                    ? 'w-full max-w-3xl lg:max-w-4xl xl:max-w-5xl bg-rose-950/40 border border-rose-800/60 text-rose-200 rounded-tl-none'
+                    : 'w-full max-w-3xl lg:max-w-4xl xl:max-w-5xl bg-slate-950/95 border border-slate-800/90 text-slate-200 rounded-tl-none shadow-lg shadow-black/25'
                 }`}
               >
                 {/* Content Renderer */}
                 {msg.sender === 'ai' && !msg.isError ? (
-                  <ChatMarkdown content={msg.text} />
+                  <ChatMarkdown content={msg.text} fontSize={fontSize} />
                 ) : (
-                  <div className="whitespace-pre-wrap leading-relaxed">{msg.text}</div>
+                  <div className={`whitespace-pre-wrap leading-relaxed ${fontSize === 'large' ? 'text-base sm:text-[17px]' : 'text-sm sm:text-base'}`}>{msg.text}</div>
                 )}
 
                 {/* Follow-up Quick Action Chips (shown on latest AI response) */}
                 {isLastAiMessage && !isLoading && (
-                  <div className="mt-4 pt-3 border-t border-slate-800/80">
+                  <div className="mt-5 pt-3.5 border-t border-slate-800/80">
                     <div className="text-[11px] font-semibold text-slate-400 mb-2 flex items-center gap-1.5">
                       <Lightbulb className="w-3.5 h-3.5 text-amber-400" />
                       Suggested Follow-Ups:
                     </div>
-                    <div className="flex flex-wrap gap-1.5">
+                    <div className="flex flex-wrap gap-2">
                       {FOLLOW_UP_SUGGESTIONS.map((item, sIdx) => (
                         <button
                           key={sIdx}
                           onClick={() => handleSend(item.prompt)}
-                          className="text-[11px] px-2.5 py-1 rounded-lg bg-slate-900/90 hover:bg-indigo-950/60 border border-slate-800 hover:border-indigo-500/40 text-slate-300 hover:text-indigo-200 transition font-medium flex items-center gap-1"
+                          className="text-xs px-3 py-1.5 rounded-lg bg-slate-900/90 hover:bg-indigo-950/60 border border-slate-800 hover:border-indigo-500/40 text-slate-300 hover:text-indigo-200 transition font-medium flex items-center gap-1.5 shadow-sm"
                         >
                           {item.label}
                         </button>
@@ -396,17 +501,17 @@ export default function ChatPage() {
 
                 {/* Error actions */}
                 {msg.isError && (
-                  <div className="mt-3 pt-2.5 border-t border-rose-800/40 flex items-center gap-2">
+                  <div className="mt-3.5 pt-3 border-t border-rose-800/40 flex items-center gap-2">
                     <button
                       onClick={handleRetryLast}
-                      className="text-xs px-3 py-1 bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-300 rounded-lg transition flex items-center gap-1.5 font-medium"
+                      className="text-xs px-3 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-300 rounded-lg transition flex items-center gap-1.5 font-medium"
                     >
                       <RefreshCw className="w-3.5 h-3.5" />
                       Retry
                     </button>
                     <button
                       onClick={() => setIsKeyModalOpen(true)}
-                      className="text-xs px-3 py-1 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 rounded-lg transition flex items-center gap-1.5"
+                      className="text-xs px-3 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 rounded-lg transition flex items-center gap-1.5"
                     >
                       <Key className="w-3.5 h-3.5 text-amber-400" />
                       Check AI Key
@@ -415,17 +520,17 @@ export default function ChatPage() {
                 )}
 
                 {/* Meta row */}
-                <div className="flex items-center justify-between mt-3 pt-2 border-t border-slate-800/60 text-[10px] text-slate-400">
+                <div className="flex items-center justify-between mt-3.5 pt-2.5 border-t border-slate-800/60 text-xs text-slate-400">
                   <div className="flex items-center space-x-2">
                     {msg.provider && (
                       <span className="font-mono text-indigo-400/90 flex items-center gap-1 font-medium">
-                        <Zap className="w-2.5 h-2.5 text-amber-400" />
+                        <Zap className="w-3 h-3 text-amber-400" />
                         {msg.provider}
                       </span>
                     )}
                   </div>
 
-                  <div className="flex items-center space-x-2.5">
+                  <div className="flex items-center space-x-3">
                     <span>{msg.timestamp}</span>
 
                     {msg.sender === 'ai' && !msg.isError && (
@@ -434,16 +539,16 @@ export default function ChatPage() {
                         <button
                           onClick={() => handleSpeak(msg.id, msg.text)}
                           title={speakingId === msg.id ? 'Stop listening' : 'Listen to answer'}
-                          className={`p-1 rounded transition ${
+                          className={`p-1.5 rounded-lg transition ${
                             speakingId === msg.id
                               ? 'text-indigo-400 bg-indigo-500/20'
-                              : 'text-slate-400 hover:text-indigo-300'
+                              : 'text-slate-400 hover:text-indigo-300 hover:bg-slate-800/60'
                           }`}
                         >
                           {speakingId === msg.id ? (
-                            <VolumeX className="w-3.5 h-3.5" />
+                            <VolumeX className="w-4 h-4" />
                           ) : (
-                            <Volume2 className="w-3.5 h-3.5" />
+                            <Volume2 className="w-4 h-4" />
                           )}
                         </button>
 
@@ -451,12 +556,12 @@ export default function ChatPage() {
                         <button
                           onClick={() => handleCopy(msg.id, msg.text)}
                           title="Copy response"
-                          className="p-1 rounded text-slate-400 hover:text-indigo-300 transition"
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-300 hover:bg-slate-800/60 transition"
                         >
                           {copiedId === msg.id ? (
-                            <Check className="w-3.5 h-3.5 text-emerald-400" />
+                            <Check className="w-4 h-4 text-emerald-400" />
                           ) : (
-                            <Copy className="w-3.5 h-3.5" />
+                            <Copy className="w-4 h-4" />
                           )}
                         </button>
                       </>
@@ -466,7 +571,7 @@ export default function ChatPage() {
               </div>
 
               {msg.sender === 'user' && (
-                <div className="w-8 h-8 rounded-xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-purple-400 shrink-0 mt-1 shadow-sm">
+                <div className="w-9 h-9 rounded-xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-purple-400 shrink-0 mt-1 shadow-sm">
                   <User className="w-4 h-4" />
                 </div>
               )}
@@ -476,13 +581,13 @@ export default function ChatPage() {
 
         {/* Typing / Loading indicator */}
         {isLoading && (
-          <div className="flex items-start space-x-3 justify-start">
-            <div className="w-8 h-8 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0 mt-1 animate-pulse">
+          <div className="flex items-start space-x-3.5 justify-start">
+            <div className="w-9 h-9 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0 mt-1 animate-pulse">
               <Sparkles className="w-4 h-4" />
             </div>
-            <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 text-slate-300 rounded-tl-none flex items-center space-x-2.5 text-xs shadow-sm">
+            <div className="p-4 sm:p-5 rounded-2xl bg-slate-950 border border-slate-800 text-slate-300 rounded-tl-none flex items-center space-x-3 text-sm shadow-sm">
               <Loader2 className="w-4 h-4 animate-spin text-indigo-400" />
-              <span>AI Coach is structuring your personalized career answer...</span>
+              <span>AI Coach is structuring your comprehensive career response...</span>
             </div>
           </div>
         )}
@@ -490,34 +595,53 @@ export default function ChatPage() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Category Pills & Suggested Prompts (if conversation is starting) */}
-      {messages.length <= 3 && (
-        <div className="space-y-2 shrink-0">
-          <div className="flex items-center space-x-1.5 overflow-x-auto pb-1 scrollbar-none text-xs">
-            {['All', 'Resume & ATS', 'Coding & DSA', 'System Design', 'Behavioral & STAR', 'Salary & Career'].map(
-              (cat) => (
-                <button
-                  key={cat}
-                  onClick={() => setActiveCategory(cat)}
-                  className={`px-3 py-1 rounded-lg font-medium whitespace-nowrap transition ${
-                    activeCategory === cat
-                      ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/30'
-                      : 'bg-slate-900/80 text-slate-400 hover:text-slate-200 border border-slate-800'
-                  }`}
-                >
-                  {cat}
-                </button>
-              )
-            )}
+      {/* Suggested Prompts Section - Fully Collapsible & Hideable */}
+      {showPrompts ? (
+        <div className="space-y-2.5 shrink-0 bg-slate-900/60 p-3 rounded-2xl border border-slate-800/80 animate-in fade-in duration-200">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2 overflow-x-auto scrollbar-none py-0.5">
+              <span className="text-xs font-semibold text-slate-300 flex items-center gap-1.5 whitespace-nowrap">
+                <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                Quick Starter Topics:
+              </span>
+              <div className="flex items-center space-x-1.5 overflow-x-auto scrollbar-none text-xs">
+                {['All', 'Resume & ATS', 'Coding & DSA', 'System Design', 'Behavioral & STAR', 'Salary & Career'].map(
+                  (cat) => (
+                    <button
+                      key={cat}
+                      onClick={() => setActiveCategory(cat)}
+                      className={`px-2.5 py-1 rounded-lg font-medium whitespace-nowrap transition text-xs ${
+                        activeCategory === cat
+                          ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/30'
+                          : 'bg-slate-900/90 text-slate-400 hover:text-slate-200 border border-slate-800'
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  )
+                )}
+              </div>
+            </div>
+
+            {/* Hide Starter Topics Button */}
+            <button
+              onClick={() => setShowPrompts(false)}
+              title="Hide starter topics to maximize screen reading height"
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs text-slate-400 hover:text-rose-300 hover:bg-slate-800 bg-slate-800/40 border border-slate-700/60 transition font-medium ml-2 shrink-0"
+            >
+              <EyeOff className="w-3 h-3 text-slate-400" />
+              <span className="hidden sm:inline">Hide Topics</span>
+              <X className="w-3.5 h-3.5 sm:hidden" />
+            </button>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
             {allPrompts.slice(0, 4).map((item, idx) => (
               <button
                 key={idx}
                 onClick={() => handleSend(item.text)}
                 disabled={isLoading}
-                className="text-xs p-2.5 rounded-xl bg-slate-900/80 hover:bg-indigo-950/40 border border-slate-800 hover:border-indigo-500/40 text-slate-300 hover:text-white transition text-left flex items-start space-x-2 group"
+                className="text-xs p-2.5 rounded-xl bg-slate-950/80 hover:bg-indigo-950/40 border border-slate-800/90 hover:border-indigo-500/40 text-slate-300 hover:text-white transition text-left flex items-start space-x-2 group"
               >
                 <Sparkles className="w-3.5 h-3.5 text-indigo-400 mt-0.5 shrink-0 group-hover:text-indigo-300" />
                 <div className="flex-1">
@@ -532,6 +656,19 @@ export default function ChatPage() {
             ))}
           </div>
         </div>
+      ) : (
+        /* When Hidden: Minimal 1-line button so screen space is 100% maximized */
+        <div className="shrink-0 flex items-center justify-between px-1">
+          <button
+            onClick={() => setShowPrompts(true)}
+            title="Unhide Starter Topics"
+            className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-indigo-300 py-0.5 transition font-medium"
+          >
+            <Lightbulb className="w-3.5 h-3.5 text-amber-400" />
+            <span>Show Starter Topics</span>
+            <ChevronDown className="w-3.5 h-3.5" />
+          </button>
+        </div>
       )}
 
       {/* Input Box with Auto-Expanding Multi-line Support */}
@@ -542,9 +679,8 @@ export default function ChatPage() {
           value={input}
           onChange={(e) => {
             setInput(e.target.value);
-            // auto resize up to 120px
             e.target.style.height = 'auto';
-            e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
+            e.target.style.height = `${Math.min(e.target.scrollHeight, 140)}px`;
           }}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
@@ -553,17 +689,17 @@ export default function ChatPage() {
             }
           }}
           disabled={isLoading}
-          placeholder="Ask your coach anything (e.g. 'Explain caching strategies', 'Review my tech stack')... [Enter to send]"
-          className="flex-1 bg-slate-950/90 border border-slate-800/90 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all placeholder:text-slate-500 disabled:opacity-50 resize-none max-h-[120px] scrollbar-thin scrollbar-thumb-slate-700"
+          placeholder="Ask your coach anything (e.g. 'Explain caching strategies', 'Non-tech se Data Analyst kaise bane?')... [Enter to send]"
+          className="flex-1 bg-slate-950/90 border border-slate-800/90 rounded-xl px-4 py-3 text-sm sm:text-base text-slate-100 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all placeholder:text-slate-500 disabled:opacity-50 resize-none max-h-[140px] scrollbar-thin scrollbar-thumb-slate-700"
         />
 
         <button
           onClick={() => handleSend()}
           disabled={isLoading || !input.trim()}
-          className="p-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 text-white transition-all shadow-md shadow-indigo-600/30 disabled:shadow-none disabled:text-slate-500 flex items-center justify-center shrink-0 mb-0.5"
+          className="p-3 sm:p-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 text-white transition-all shadow-md shadow-indigo-600/30 disabled:shadow-none disabled:text-slate-500 flex items-center justify-center shrink-0 mb-0.5"
           title="Send message"
         >
-          {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+          {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
         </button>
       </div>
 

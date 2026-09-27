@@ -65,8 +65,8 @@ const THEME_OPTIONS: {
   },
   {
     id: 'light',
-    name: 'Crisp Modern Light',
-    desc: 'Clean, high-contrast professional light mode',
+    name: 'Eye-Friendly Soft Light',
+    desc: 'Gentle warm tones, anti-glare canvas & high readability',
     icon: Sun,
     bgPreview: 'bg-slate-100',
     accentPreview: 'from-indigo-600 to-blue-600',

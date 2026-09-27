@@ -123,6 +123,16 @@ async def get_current_resume(
     resume = res.scalars().first()
 
     if not resume:
+        demo_stmt = select(Resume).where(Resume.user_id == "demo-user-12345").order_by(Resume.created_at.desc())
+        demo_res = await db.execute(demo_stmt)
+        demo_resume = demo_res.scalars().first()
+        if demo_resume:
+            demo_resume.user_id = user_id
+            db.add(demo_resume)
+            await db.commit()
+            resume = demo_resume
+
+    if not resume:
         return APIResponse(
             success=True,
             message="No resume uploaded yet",
@@ -157,6 +167,17 @@ async def get_resume_analysis(
     stmt = select(Resume).where(Resume.user_id == user_id).order_by(Resume.created_at.desc())
     res = await db.execute(stmt)
     resume = res.scalars().first()
+
+    if not resume:
+        demo_stmt = select(Resume).where(Resume.user_id == "demo-user-12345").order_by(Resume.created_at.desc())
+        demo_res = await db.execute(demo_stmt)
+        demo_resume = demo_res.scalars().first()
+        if demo_resume and demo_resume.ats_breakdown_json:
+            demo_resume.user_id = user_id
+            db.add(demo_resume)
+            await db.commit()
+            await db.refresh(demo_resume)
+            resume = demo_resume
 
     if not resume or not resume.ats_breakdown_json:
         return APIResponse(
@@ -227,6 +248,16 @@ async def get_resume_skills(
     stmt = select(Resume).where(Resume.user_id == user_id).order_by(Resume.created_at.desc())
     res = await db.execute(stmt)
     resume = res.scalars().first()
+
+    if not resume:
+        demo_stmt = select(Resume).where(Resume.user_id == "demo-user-12345").order_by(Resume.created_at.desc())
+        demo_res = await db.execute(demo_stmt)
+        demo_resume = demo_res.scalars().first()
+        if demo_resume:
+            demo_resume.user_id = user_id
+            db.add(demo_resume)
+            await db.commit()
+            resume = demo_resume
 
     if not resume or not resume.parsed_skills:
         return APIResponse(
