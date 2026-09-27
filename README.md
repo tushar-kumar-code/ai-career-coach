@@ -35,9 +35,13 @@ The platform integrates 13 connected modules — from career discovery and resum
 | Service | Access Link |
 |---|---|
 | 🌐 **Live Demo of Project** | [https://ai-career-coach-frontend-live.onrender.com](https://ai-career-coach-frontend-live.onrender.com) |
-| 🚀 **Direct Project Access** | [https://ai-career-coach-frontend-live.onrender.com](https://ai-career-coach-frontend-live.onrender.com) |
+| 🤖 **Direct AI Career Coach (Current Version)** | [https://ai-career-coach-frontend-live.onrender.com/chat](https://ai-career-coach-frontend-live.onrender.com/chat) |
+| 📦 **Current Updated Project (GitHub `main`)** | [https://github.com/tushar-kumar-code/ai-career-coach/tree/main](https://github.com/tushar-kumar-code/ai-career-coach/tree/main) |
+| 🔄 **Latest Version Updates & Commits** | [https://github.com/tushar-kumar-code/ai-career-coach/commits/main](https://github.com/tushar-kumar-code/ai-career-coach/commits/main) |
 | ⚡ **Live API & Backend (Render)** | [https://ai-career-coach-qdza.onrender.com](https://ai-career-coach-qdza.onrender.com) |
 | 📖 **Direct API Docs (Swagger)** | [https://ai-career-coach-qdza.onrender.com/docs](https://ai-career-coach-qdza.onrender.com/docs) |
+
+> 💡 **Real-Time Access Note**: Pushing updates to the `main` branch immediately updates the repository tree at [Current Updated Project](https://github.com/tushar-kumar-code/ai-career-coach/tree/main) and triggers automated cloud deployment to the live demo.
 
 ---
 
