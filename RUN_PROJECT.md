@@ -1,6 +1,6 @@
 # AI Career Coach — How to Run the Project locally
 
-This document provides simple, step-by-step instructions for running the **AI Career Coach** application (FastAPI Backend + Next.js Frontend) on your Windows machine using terminal commands.
+This document provides simple, step-by-step instructions for running the **AI Career Coach** application (FastAPI Backend + Next.js Frontend) on your Windows machine, as well as pushing code to GitHub.
 
 ---
 
@@ -17,7 +17,7 @@ This document provides simple, step-by-step instructions for running the **AI Ca
 
 ## 🚀 How to Run the Project (Step-by-Step)
 
-To run the complete application, you will open **two terminal windows** (PowerShell or Command Prompt).
+To run the complete application, open **two terminal windows** (PowerShell or Command Prompt).
 
 ---
 
@@ -27,7 +27,7 @@ Open your first terminal window and execute:
 
 ```powershell
 # 1. Navigate to the backend directory
-cd c:\Users\user\tushar\ai-career-coach-old\backend
+cd c:\Users\user\tushar\ai-career-coach\backend
 
 # 2. Activate the Python virtual environment
 .\venv\Scripts\activate
@@ -49,7 +49,7 @@ Open a **second terminal window** and execute:
 
 ```powershell
 # 1. Navigate to the frontend directory
-cd c:\Users\user\tushar\ai-career-coach-old\frontend
+cd c:\Users\user\tushar\ai-career-coach\frontend
 
 # 2. Start the Next.js development server
 npm run dev
@@ -78,13 +78,74 @@ Once both servers are running:
 
 ## ⚡ Option: Launch Both Servers Simultaneously (Single PowerShell Command)
 
-If you prefer to start both backend and frontend automatically with a single command, open PowerShell in the project root (`c:\Users\user\tushar\ai-career-coach-old`) and run:
+If you prefer to start both backend and frontend automatically with a single command, open PowerShell in the project root (`c:\Users\user\tushar\ai-career-coach`) and run:
 
 ```powershell
-Start-Process powershell -ArgumentList "-NoExit -Command cd c:\Users\user\tushar\ai-career-coach-old\backend; .\venv\Scripts\activate; python -m uvicorn app.main:app --port 8000 --reload"; Start-Process powershell -ArgumentList "-NoExit -Command cd c:\Users\user\tushar\ai-career-coach-old\frontend; npm run dev"
+Start-Process powershell -ArgumentList "-NoExit -Command cd c:\Users\user\tushar\ai-career-coach\backend; .\venv\Scripts\activate; python -m uvicorn app.main:app --port 8000 --reload"; Start-Process powershell -ArgumentList "-NoExit -Command cd c:\Users\user\tushar\ai-career-coach\frontend; npm run dev"
 ```
 
 This will automatically launch two separate terminal windows—one for backend and one for frontend!
+
+---
+
+## 🐙 GitHub Push Guide (Terminal Ke Through Code Push Kaise Karein)
+
+Aapka remote repository already configured hai:
+`https://github.com/tushar-kumar-code/ai-career-coach.git` (Branch: `main`)
+
+### ⚡ Abhi Current Changes Push Karne Ke Liye:
+
+Aapke saare changes locally commit ho chuke hain! Bas terminal (PowerShell) open karein aur ye run karein:
+
+```powershell
+cd c:\Users\user\tushar\ai-career-coach
+git push origin main
+```
+
+---
+
+### 📝 Har Baar Naye Changes Push Karne Ka Complete Process:
+
+Jab bhi aap code me koi change karein ya naya feature add karein, terminal me ye 4 steps follow karein:
+
+#### 1. Status Check Karein:
+```powershell
+cd c:\Users\user\tushar\ai-career-coach
+git status
+```
+*(Isse aapko pata chalega kaun kaun si files modify ya create hui hain)*
+
+#### 2. Saare Changes Stage Karein:
+```powershell
+git add .
+```
+
+#### 3. Commit Message Likhein:
+```powershell
+git commit -m "Aapka commit message yaha likhein"
+```
+
+#### 4. GitHub Par Push Karein:
+```powershell
+git push origin main
+```
+
+---
+
+### 🔐 Agar GitHub Authentication / Password Maange:
+
+Jab aap pehli baar `git push origin main` karte hain, toh Git aapse login maang sakta hai:
+
+1. **Option 1 (Browser Login - Sabse Aasan):**
+   - Agar browser window popup hoti hai, toh **"Sign in with your browser"** par click karein aur GitHub account authorize kar dein.
+2. **Option 2 (Personal Access Token - PAT):**
+   - Agar password maange, toh apna regular GitHub account password mat daaliye (GitHub security reasons se direct password allow nahi karta).
+   - Apne GitHub account me jayein:
+     - **GitHub.com** → **Settings** (top-right avatar) → **Developer settings** (bottom-left) → **Personal access tokens** → **Tokens (classic)**
+     - Click **Generate new token (classic)**
+     - Name de dijiye (e.g., `career-coach-token`), Expiration choose karein, aur **`repo`** checkbox par tick karein.
+     - Token generate hone ke baad use copy karein.
+   - Terminal me jab `Password for 'https://...':` puche, toh wahi Token paste kar dein (paste karte waqt characters dikhai nahi denge, bus paste karke Enter daba dein).
 
 ---
 
@@ -95,7 +156,7 @@ The project uses SQLite located at `backend/aicareercoach.db`.
 If you ever add new database models or need to re-apply migrations:
 
 ```powershell
-cd c:\Users\user\tushar\ai-career-coach-old\backend
+cd c:\Users\user\tushar\ai-career-coach\backend
 .\venv\Scripts\activate
 
 # Apply all database migrations
@@ -109,7 +170,7 @@ python -m alembic upgrade head
 ### Run Backend Pytest Suite:
 
 ```powershell
-cd c:\Users\user\tushar\ai-career-coach-old\backend
+cd c:\Users\user\tushar\ai-career-coach\backend
 .\venv\Scripts\activate
 python -m pytest
 ```
@@ -117,7 +178,7 @@ python -m pytest
 ### Run Frontend TypeScript Check:
 
 ```powershell
-cd c:\Users\user\tushar\ai-career-coach-old\frontend
+cd c:\Users\user\tushar\ai-career-coach\frontend
 npx tsc --noEmit
 ```
 
