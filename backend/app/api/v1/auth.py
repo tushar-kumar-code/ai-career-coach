@@ -16,6 +16,7 @@ from app.core.security import (
 )
 from app.models.user import User
 from app.models.profile import UserProfile
+from app.models.assessment import AssessmentResponse
 from app.schemas.health import APIResponse
 from app.schemas.auth import (
     UserRegisterRequest,
@@ -40,6 +41,21 @@ OTP_EXPIRY_SECONDS = 600  # 10 minutes validity
 def _generate_otp_code() -> str:
     """Generate a random 6-digit verification security code."""
     return f"{random.randint(100000, 999999)}"
+
+
+async def _check_user_assessment_completed(db: AsyncSession, user_id: str) -> bool:
+    """Check if user has an authentic completed career assessment."""
+    try:
+        stmt = select(AssessmentResponse.id).where(
+            AssessmentResponse.user_id == user_id,
+            AssessmentResponse.status == "COMPLETED",
+            AssessmentResponse.ai_analysis_json.isnot(None)
+        ).limit(1)
+        res = await db.execute(stmt)
+        return res.scalar_one_or_none() is not None
+    except Exception as e:
+        logger.warning(f"Error checking assessment status for {user_id}: {e}")
+        return False
 
 
 @router.post("/register", response_model=APIResponse[AuthResponse], summary="Register a new user account")
@@ -68,11 +84,12 @@ async def register(req: UserRegisterRequest, db: AsyncSession = Depends(get_db))
     )
     db.add(user)
 
-    # 3. Create initial UserProfile
+    # 3. Create initial clean UserProfile with NO placeholder career
     profile = UserProfile(
         user_id=new_user_id,
-        target_career="Software Developer",
-        primary_archetype="Systems Builder",
+        target_career=None,
+        primary_archetype=None,
+        job_readiness_score=0,
         skills_matrix={}
     )
     db.add(profile)
@@ -92,7 +109,8 @@ async def register(req: UserRegisterRequest, db: AsyncSession = Depends(get_db))
                 email=user.email,
                 full_name=user.full_name,
                 is_active=user.is_active,
-                is_superuser=user.is_superuser
+                is_superuser=user.is_superuser,
+                has_completed_assessment=False
             )
         ),
         message="Registration successful"
@@ -120,7 +138,10 @@ async def login(req: UserLoginRequest, db: AsyncSession = Depends(get_db)):
             detail="This account has been disabled."
         )
 
-    # 2. Issue JWT token
+    # 2. Check if assessment is completed
+    has_completed_assessment = await _check_user_assessment_completed(db, user.id)
+
+    # 3. Issue JWT token
     token = create_access_token(data={"sub": user.id, "email": user.email, "name": user.full_name})
 
     return APIResponse(
@@ -133,7 +154,8 @@ async def login(req: UserLoginRequest, db: AsyncSession = Depends(get_db)):
                 email=user.email,
                 full_name=user.full_name,
                 is_active=user.is_active,
-                is_superuser=user.is_superuser
+                is_superuser=user.is_superuser,
+                has_completed_assessment=has_completed_assessment
             )
         ),
         message="Login successful"
@@ -230,6 +252,7 @@ async def verify_otp_login(req: VerifyOTPLoginRequest, db: AsyncSession = Depend
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User account not found.")
 
     token = create_access_token(data={"sub": user.id, "email": user.email, "name": user.full_name})
+    has_completed_assessment = await _check_user_assessment_completed(db, user.id)
 
     return APIResponse(
         success=True,
@@ -241,7 +264,8 @@ async def verify_otp_login(req: VerifyOTPLoginRequest, db: AsyncSession = Depend
                 email=user.email,
                 full_name=user.full_name,
                 is_active=user.is_active,
-                is_superuser=user.is_superuser
+                is_superuser=user.is_superuser,
+                has_completed_assessment=has_completed_assessment
             )
         ),
         message="2FA Verification successful! Logged in."
@@ -325,6 +349,7 @@ async def demo_login(db: AsyncSession = Depends(get_db)):
         await db.refresh(demo_user)
 
     token = create_access_token(data={"sub": demo_user.id, "email": demo_user.email, "name": demo_user.full_name})
+    has_completed_assessment = await _check_user_assessment_completed(db, demo_user.id)
 
     return APIResponse(
         success=True,
@@ -336,7 +361,8 @@ async def demo_login(db: AsyncSession = Depends(get_db)):
                 email=demo_user.email,
                 full_name=demo_user.full_name,
                 is_active=demo_user.is_active,
-                is_superuser=demo_user.is_superuser
+                is_superuser=demo_user.is_superuser,
+                has_completed_assessment=has_completed_assessment
             )
         ),
         message="Logged in as Demo User"
@@ -349,6 +375,8 @@ async def get_me(user_id: str = Depends(get_current_user_id), db: AsyncSession =
     res = await db.execute(stmt)
     user = res.scalar_one_or_none()
 
+    has_completed_assessment = await _check_user_assessment_completed(db, user_id)
+
     if not user:
         # Fallback profile for dev identity
         return APIResponse(
@@ -357,7 +385,8 @@ async def get_me(user_id: str = Depends(get_current_user_id), db: AsyncSession =
                 id=user_id,
                 email="user@aicareercoach.ai",
                 full_name="Career Discovery User",
-                is_active=True
+                is_active=True,
+                has_completed_assessment=has_completed_assessment
             ),
             message="User profile fetched"
         )
@@ -369,7 +398,8 @@ async def get_me(user_id: str = Depends(get_current_user_id), db: AsyncSession =
             email=user.email,
             full_name=user.full_name,
             is_active=user.is_active,
-            is_superuser=user.is_superuser
+            is_superuser=user.is_superuser,
+            has_completed_assessment=has_completed_assessment
         ),
         message="User profile fetched"
     )

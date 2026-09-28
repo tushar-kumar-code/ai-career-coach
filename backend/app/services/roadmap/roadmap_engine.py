@@ -32,12 +32,13 @@ class RoadmapEngine:
         target_career: str,
         user_skills: List[Skill],
         missing_gaps: List[SkillGapSchema],
+        user_level: str = "Beginner",
         hours_per_day: int = 1,
         days_per_week: int = 5,
         learning_style: str = "Hands-on",
         preserve_progress: bool = True
     ) -> Roadmap:
-        """Generates a personalized, adaptive learning roadmap derived from actual user skill gaps and study schedule."""
+        """Generates a personalized, adaptive learning roadmap derived from actual user skill gaps, level, and study schedule."""
 
         # 1. Collect user's known/verified skills vs missing/weak skills
         known_skill_names = [s.normalized_name for s in user_skills if s.proficiency_percent >= 75 or s.confidence_status == "Verified"]
@@ -48,29 +49,63 @@ class RoadmapEngine:
         learning_skill_pool = list(dict.fromkeys(missing_skill_names + skills_to_improve))
         learning_skill_pool = [s for s in learning_skill_pool if s.lower() not in [k.lower() for k in known_skill_names]]
 
+        is_scratch_beginner = user_level.lower() in ["beginner", "scratch"] or len(known_skill_names) == 0
+
+        # Expand prerequisites recursively so beginners get all foundational basics
+        expanded_pool = list(learning_skill_pool)
+        for s in learning_skill_pool:
+            prereqs = self.dep_engine.get_prerequisites(s)
+            for p in prereqs:
+                if p.lower() not in [k.lower() for k in known_skill_names] and p.lower() not in [e.lower() for e in expanded_pool]:
+                    expanded_pool.append(p)
+
+        # For absolute scratch beginners (or users with 0 known skills), ensure fundamental coding & setup are explicitly present
+        if is_scratch_beginner:
+            scratch_foundations = ["Programming Fundamentals & Logic", "Developer Setup & Git Basics"]
+            for sf in reversed(scratch_foundations):
+                if sf.lower() not in [e.lower() for e in expanded_pool] and sf.lower() not in [k.lower() for k in known_skill_names]:
+                    expanded_pool.insert(0, sf)
+
         # Topologically sort learning skills by prerequisites
-        ordered_skills = self.dep_engine.sort_by_dependencies(learning_skill_pool)
+        ordered_skills = self.dep_engine.sort_by_dependencies(expanded_pool)
 
         if not ordered_skills:
-            # Fallback if profile has no gaps
-            ordered_skills = ["Advanced Architecture", "System Performance", "Portfolio Integration"]
+            ordered_skills = ["Programming Fundamentals & Logic", "Developer Setup & Git Basics", "Core Language Mastery", "Portfolio Integration"]
 
-        # 2. Divide ordered skills into 4-5 adaptive phases
-        chunks_count = min(4, max(2, len(ordered_skills) // 2))
-        chunk_size = max(1, len(ordered_skills) // chunks_count)
-        
-        phase_types = ["Foundation", "Core Skills", "Advanced Skills", "Portfolio Projects", "Job & Interview Readiness"]
+        # 2. Divide ordered skills into 5 coherent, progressive career phases
+        phase_types = [
+            ("Foundations from Scratch" if is_scratch_beginner else "Skill Foundations"),
+            "Core Programming & Applied Problem Solving",
+            "Essential Frameworks & Databases",
+            "Full-Stack Integration & Architecture",
+            "Production Projects & Job Readiness"
+        ]
+
+        total_learning_phases = 4
+        chunk_size = max(1, (len(ordered_skills) + total_learning_phases - 1) // total_learning_phases)
         phase_definitions: List[Tuple[str, List[str]]] = []
 
-        for i in range(chunks_count):
+        for i in range(total_learning_phases):
             start_idx = i * chunk_size
-            end_idx = (i + 1) * chunk_size if i < chunks_count - 1 else len(ordered_skills)
-            p_skills = ordered_skills[start_idx:end_idx]
-            p_type = phase_types[i] if i < len(phase_types) else f"Specialization {i+1}"
+            end_idx = min(len(ordered_skills), (i + 1) * chunk_size)
+            if start_idx < len(ordered_skills):
+                p_skills = ordered_skills[start_idx:end_idx]
+            else:
+                if i == 1:
+                    p_skills = [f"{target_career} Core Patterns", "Data Flow & Algorithms"]
+                elif i == 2:
+                    p_skills = [f"{target_career} Frameworks", "Database & API Integration"]
+                else:
+                    p_skills = [f"{target_career} Architecture", "Security & Performance"]
+            
+            p_type = phase_types[i]
             phase_definitions.append((p_type, p_skills))
 
-        # Always append Job Readiness final phase
-        phase_definitions.append(("Job & Interview Readiness", [f"{target_career} Interview Prep", "Portfolio Optimization"]))
+        # Phase 5 is always Job & Interview Readiness
+        phase_definitions.append((
+            "Production Projects & Job Readiness",
+            [f"{target_career} Capstone Project", f"{target_career} Technical Interview Prep", "Resume & Portfolio Optimization"]
+        ))
 
         # 3. Generate rich AI phase content for each phase
         generated_phases: List[Dict[str, Any]] = []
@@ -86,6 +121,7 @@ class RoadmapEngine:
                 target_career=target_career,
                 phase_skills=p_skills,
                 user_known_skills=known_skill_names,
+                user_level=user_level,
                 learning_style=learning_style,
                 hours_per_day=hours_per_day
             )
@@ -103,7 +139,14 @@ class RoadmapEngine:
                     "why_it_matters": task_ai.why_it_matters,
                     "is_completed": False,
                     "completed_at": None,
-                    # Learning resource fields (Phase 3)
+                    # Topic-wise syllabus & guidance fields (WHAT TO LEARN)
+                    "topics_to_learn": task_ai.topics_to_learn or [],
+                    "learning_focus": task_ai.learning_focus or "",
+                    "practice_goal": task_ai.practice_goal or "",
+                    "recommended_resources": task_ai.recommended_resources or [],
+                    "difficulty_level": task_ai.difficulty_level or ("Scratch" if is_scratch_beginner and idx == 1 else "Beginner"),
+                    "prerequisites": task_ai.prerequisites or [],
+                    # Legacy learning resource fields
                     "concept_explanation": task_ai.concept_explanation or "",
                     "practice_exercise": task_ai.practice_exercise or "",
                     "check_quiz_question": task_ai.check_quiz_question or "",
@@ -194,6 +237,7 @@ class RoadmapEngine:
             roadmap = Roadmap(
                 user_id=user_id,
                 target_role=target_career,
+                user_level=user_level,
                 overall_progress_percent=overall_progress,
                 is_active=True,
                 is_outdated=False,
@@ -209,6 +253,7 @@ class RoadmapEngine:
             db.add(roadmap)
         else:
             existing_roadmap.target_role = target_career
+            existing_roadmap.user_level = user_level
             existing_roadmap.overall_progress_percent = overall_progress
             existing_roadmap.is_outdated = False
             existing_roadmap.hours_per_day = hours_per_day

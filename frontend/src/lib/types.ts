@@ -91,6 +91,24 @@ export interface CareerRoleCatalogItem {
   learning_areas: string[];
 }
 
+export interface DirectCareerGoalPayload {
+  target_career: string;
+  career_slug?: string;
+  experience_level: 'scratch' | 'beginner' | 'intermediate' | 'advanced' | string;
+  known_skills: string[];
+  custom_notes?: string;
+}
+
+export interface DirectCareerGoalResult {
+  target_career: string;
+  experience_level: string;
+  readiness_score: number;
+  known_skills: string[];
+  missing_gaps: string[];
+  total_required: number;
+  analysis: any;
+}
+
 // ----------------------------------------------------
 // Resume Intelligence Types
 // ----------------------------------------------------
@@ -220,7 +238,14 @@ export interface RoadmapTask {
   why_it_matters: string;
   is_completed: boolean;
   completed_at?: string;
-  // Learning resources (Phase 3)
+  // Detailed Topic-wise Syllabus & What to Learn fields
+  topics_to_learn?: string[];
+  learning_focus?: string;
+  practice_goal?: string;
+  recommended_resources?: string[];
+  difficulty_level?: string;
+  prerequisites?: string[];
+  // Legacy learning resources
   concept_explanation?: string;
   practice_exercise?: string;
   check_quiz_question?: string;
@@ -800,6 +825,14 @@ export interface UserAuthData {
   full_name?: string;
   is_active: boolean;
   is_superuser?: boolean;
+  has_completed_assessment?: boolean;
+}
+
+export interface AssessmentStatusData {
+  has_completed_assessment: boolean;
+  target_career: string | null;
+  primary_archetype: string | null;
+  job_readiness_score: number;
 }
 
 export interface AuthResponseData {

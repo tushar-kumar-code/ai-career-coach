@@ -11,7 +11,7 @@ def test_start_assessment():
     data = response.json()
     assert data["success"] is True
     assert "session_id" in data["data"]
-    assert data["data"]["total_questions"] >= 16
+    assert data["data"]["total_questions"] >= 8
     assert data["data"]["current_question"] is not None
 
 

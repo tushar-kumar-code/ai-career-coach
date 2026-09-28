@@ -1,4 +1,4 @@
-﻿"""
+"""
 Career Readiness Engine
 =======================
 Deterministic 0-100 score computed entirely from real DB evidence.
@@ -172,7 +172,7 @@ class ReadinessEngine:
         )
         profile = profile_result.scalar_one_or_none()
 
-        if profile and profile.job_readiness_score:
+        if profile and profile.target_career and profile.job_readiness_score:
             job_match_score = min(profile.job_readiness_score, 100)
             evidence["job_match"] = {
                 "job_readiness_score": profile.job_readiness_score,

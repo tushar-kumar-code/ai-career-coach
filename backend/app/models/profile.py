@@ -12,9 +12,9 @@ class UserProfile(Base, TimestampMixin):
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), unique=True, nullable=False, index=True)
     
-    target_career = Column(String, nullable=True, default="Software Developer")
-    primary_archetype = Column(String, nullable=True, default="Systems Builder")
-    job_readiness_score = Column(Integer, default=50, nullable=False)
+    target_career = Column(String, nullable=True, default=None)
+    primary_archetype = Column(String, nullable=True, default=None)
+    job_readiness_score = Column(Integer, default=0, nullable=False)
     
     # JSON structure storing evidence-backed verified skills & gaps
     skills_matrix = Column(JSON, default=dict, nullable=False)

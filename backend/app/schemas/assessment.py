@@ -48,6 +48,14 @@ class TargetCareerSelectRequest(BaseModel):
     career_slug: str
 
 
+class DirectCareerGoalRequest(BaseModel):
+    target_career: str
+    career_slug: Optional[str] = None
+    experience_level: str = "scratch"  # scratch, beginner, intermediate, advanced
+    known_skills: List[str] = []
+    custom_notes: Optional[str] = None
+
+
 # ----------------------------------------------------
 # Gemini AI Structured Analysis Output Schemas
 # ----------------------------------------------------

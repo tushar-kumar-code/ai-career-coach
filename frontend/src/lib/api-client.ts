@@ -4,6 +4,8 @@ import {
   AssessmentSession,
   AssessmentResultData,
   CareerRoleCatalogItem,
+  DirectCareerGoalPayload,
+  DirectCareerGoalResult,
   ResumeAnalysisData,
   BulletImprovement,
   ExtractedSkill,
@@ -33,7 +35,8 @@ import {
   TestKeyResponseData,
   AIConfigStatusData,
   UserAuthData,
-  AuthResponseData
+  AuthResponseData,
+  AssessmentStatusData
 } from './types';
 
 const RAW_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api/v1';
@@ -194,6 +197,19 @@ export async function getAssessmentResult(): Promise<AssessmentResultData | null
   }
 }
 
+export async function getAssessmentStatus(): Promise<AssessmentStatusData> {
+  try {
+    return await request<AssessmentStatusData>('/assessment/status', { cache: 'no-store' });
+  } catch (err) {
+    return {
+      has_completed_assessment: false,
+      target_career: null,
+      primary_archetype: null,
+      job_readiness_score: 0,
+    };
+  }
+}
+
 export async function getCareerCatalog(): Promise<CareerRoleCatalogItem[]> {
   return request<CareerRoleCatalogItem[]>('/assessment/careers');
 }
@@ -206,6 +222,13 @@ export async function selectTargetCareer(slug: string): Promise<{ target_career:
   return request<{ target_career: string; slug: string }>('/assessment/target-career', {
     method: 'POST',
     body: JSON.stringify({ career_slug: slug }),
+  });
+}
+
+export async function submitDirectCareerGoal(payload: DirectCareerGoalPayload): Promise<DirectCareerGoalResult> {
+  return request<DirectCareerGoalResult>('/assessment/direct-goal', {
+    method: 'POST',
+    body: JSON.stringify(payload),
   });
 }
 

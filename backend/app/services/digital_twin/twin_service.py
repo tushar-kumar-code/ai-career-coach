@@ -1,4 +1,4 @@
-﻿"""
+"""
 Digital Twin Service (Orchestrator)
 ====================================
 Assembles the full Career Digital Twin by calling all sub-services.
@@ -38,15 +38,19 @@ class DigitalTwinService:
         today = datetime.date.today()
         now = datetime.datetime.utcnow()
 
-        # Check if today''s twin already computed recently
+        # Check if today's twin already computed recently and profile hasn't changed
         existing_res = await db.execute(
             select(CareerDigitalTwin).where(CareerDigitalTwin.user_id == user_id)
         )
         existing = existing_res.scalar_one_or_none()
 
+        profile_res = await db.execute(select(UserProfile).where(UserProfile.user_id == user_id))
+        profile = profile_res.scalar_one_or_none()
+
         if existing:
             age_minutes = (now - existing.last_computed_at).total_seconds() / 60
-            if age_minutes < 60:
+            target_changed = bool(profile and profile.target_career != existing.target_career)
+            if age_minutes < 60 and not target_changed:
                 # Return cached within last hour
                 return self._to_dict(existing)
 

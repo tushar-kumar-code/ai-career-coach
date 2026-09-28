@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useEffect, useState } from 'react';
 import {
@@ -198,14 +198,21 @@ export default function ProgressPage() {
               'bg-red-500/20 text-red-400'
             }`}>{label}</span>
           </div>
-          {twin?.target_career && (
-            <div className="flex items-center space-x-2 text-sm text-slate-400">
+          {twin?.target_career ? (
+            <div className="flex items-center space-x-2 text-sm text-slate-300">
               <Target className="w-4 h-4 text-indigo-400" />
               <span>{twin.target_career}</span>
             </div>
+          ) : (
+            <div className="flex items-center space-x-2 text-xs text-amber-400/90 bg-amber-500/10 px-2.5 py-1 rounded-full border border-amber-500/20">
+              <Target className="w-3.5 h-3.5 text-amber-400" />
+              <span>Career Goal Pending Assessment</span>
+            </div>
           )}
-          {twin?.primary_archetype && (
-            <p className="text-xs text-slate-500">Archetype: {twin.primary_archetype}</p>
+          {twin?.primary_archetype ? (
+            <p className="text-xs text-slate-400">Archetype: {twin.primary_archetype}</p>
+          ) : (
+            <p className="text-xs text-slate-500">Archetype: Pending Assessment</p>
           )}
         </div>
 

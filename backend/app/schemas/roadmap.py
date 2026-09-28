@@ -3,12 +3,14 @@ from pydantic import BaseModel, Field
 
 
 class RoadmapGenerateRequest(BaseModel):
+    user_level: Optional[str] = Field(default="Beginner", description="Beginner (Scratch), Intermediate, or Advanced")
     hours_per_day: int = Field(default=1, ge=1, le=8, description="Available study hours per day")
     days_per_week: int = Field(default=5, ge=1, le=7, description="Available study days per week")
     preferred_learning_style: str = Field(default="Hands-on", description="Hands-on, Visual, or Reading")
 
 
 class RoadmapPreferencesRequest(BaseModel):
+    user_level: Optional[str] = Field(default="Beginner", description="Beginner (Scratch), Intermediate, or Advanced")
     hours_per_day: int = Field(..., ge=1, le=8)
     days_per_week: int = Field(..., ge=1, le=7)
     preferred_learning_style: str = Field(...)
@@ -23,7 +25,14 @@ class RoadmapTaskSchema(BaseModel):
     why_it_matters: str
     is_completed: bool
     completed_at: Optional[str] = None
-    # Learning resource fields (Phase 3 — optional so existing tasks still serialize)
+    # Topic-wise syllabus & guidance fields (tells user WHAT to learn)
+    topics_to_learn: Optional[List[str]] = Field(default_factory=list, description="Exhaustive list of specific subtopics/concepts to learn")
+    learning_focus: Optional[str] = Field(default=None, description="Key advice on what to prioritize during study")
+    practice_goal: Optional[str] = Field(default=None, description="Concrete coding or hands-on practice exercise")
+    recommended_resources: Optional[List[str]] = Field(default_factory=list, description="Recommended standard docs or study topics")
+    difficulty_level: Optional[str] = Field(default="Beginner", description="Scratch, Beginner, Intermediate, or Advanced")
+    prerequisites: Optional[List[str]] = Field(default_factory=list, description="Prerequisite concepts")
+    # Learning resource fields (Phase 3 legacy support)
     concept_explanation: Optional[str] = None
     practice_exercise: Optional[str] = None
     check_quiz_question: Optional[str] = None
@@ -69,6 +78,7 @@ class RoadmapResponse(BaseModel):
     id: str
     user_id: str
     target_role: str
+    user_level: Optional[str] = "Beginner"
     overall_progress_percent: int
     is_active: bool
     is_outdated: bool

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useLanguage } from '@/context/LanguageContext';
 import {
@@ -16,7 +16,11 @@ import {
   Zap,
   CheckCircle,
   Compass,
-  BookOpen
+  BookOpen,
+  Dumbbell,
+  GraduationCap,
+  ChevronRight,
+  Check
 } from 'lucide-react';
 import {
   getAssessmentResult,
@@ -87,7 +91,8 @@ export default function DashboardPage() {
   const subScores = twin?.sub_scores;
 
   // ----------------------------------------------------
-  // Dynamic 4-Step Onboarding Checklist Calculation (Real DB State)
+  // Dynamic 8-Step Career Working Flow Calculation (Real DB State)
+  // Workflow: Discovery → Resume → Skills → Roadmap → Practice → Interview → Jobs → Readiness
   // ----------------------------------------------------
   const isStep1Done = Boolean(
     targetCareer || 
@@ -97,60 +102,205 @@ export default function DashboardPage() {
 
   const isStep2Done = Boolean(resumeData && resumeData.ats_score > 0);
 
-  const isStep3Done = Boolean(roadmapData && roadmapData.phases && roadmapData.phases.length > 0);
+  const verifiedSkillsCount = (twin?.top_skills && twin.top_skills.length) || (resumeData?.extracted_skills && resumeData.extracted_skills.length) || 0;
+  const isStep3Done = Boolean(verifiedSkillsCount > 0 || (assessmentData?.analysis?.skills_identified && assessmentData.analysis.skills_identified.length > 0));
+
+  const isStep4Done = Boolean(roadmapData && roadmapData.phases && roadmapData.phases.length > 0);
+
+  const practiceCount = (twin?.evidence_summary?.tasks as any)?.completed_count || 0;
+  const isStep5Done = Boolean(practiceCount > 0 || (roadmapData?.phases?.some(p => p.milestones?.some(m => m.is_completed))));
 
   const completedInterviews = interviewHistory.filter(i => i.is_completed);
-  const isStep4Done = Boolean(
+  const isStep6Done = Boolean(
     completedInterviews.length > 0 || 
     (twin?.evidence_summary?.interviews as any)?.completed_count > 0 ||
     (twin?.sub_scores?.interview_readiness ?? 0) > 0
   );
 
-  const completedStepsCount = [isStep1Done, isStep2Done, isStep3Done, isStep4Done].filter(Boolean).length;
-  const onboardingProgressPct = (completedStepsCount / 4) * 100;
+  const isStep7Done = Boolean(userApps.length > 0 || jobMatches.length > 0);
 
-  // Determine the next incomplete step
+  const isStep8Done = Boolean(readinessScore >= 70);
+
+  const stepsState = [
+    {
+      num: 1,
+      id: 'discovery',
+      name: 'Discovery Assessment',
+      shortName: 'Discovery',
+      href: '/assessment',
+      icon: Compass,
+      isDone: isStep1Done,
+      desc: '12-dimension strength & role analysis',
+      statusText: isStep1Done ? `Role: ${targetCareer || 'Discovered'}` : 'Not yet completed',
+      actionText: isStep1Done ? 'Revisit Assessment' : 'Start Assessment',
+    },
+    {
+      num: 2,
+      id: 'resume',
+      name: 'Resume & ATS',
+      shortName: 'Resume',
+      href: '/resume',
+      icon: FileText,
+      isDone: isStep2Done,
+      desc: 'ATS scan & verified skill extraction',
+      statusText: isStep2Done ? `ATS Score: ${atsScore}%` : 'Resume not scanned',
+      actionText: isStep2Done ? 'View Resume ATS' : 'Upload Resume',
+    },
+    {
+      num: 3,
+      id: 'skills',
+      name: 'Skill Matrix',
+      shortName: 'Skills',
+      href: '/skills',
+      icon: Award,
+      isDone: isStep3Done,
+      desc: 'Target benchmark gaps & proficiencies',
+      statusText: isStep3Done ? `${verifiedSkillsCount} Verified Skills` : 'No skills mapped',
+      actionText: isStep3Done ? 'Manage Skills' : 'Explore Matrix',
+    },
+    {
+      num: 4,
+      id: 'roadmap',
+      name: 'Roadmap & Tasks',
+      shortName: 'Roadmap',
+      href: '/roadmap',
+      icon: MapPin,
+      isDone: isStep4Done,
+      desc: 'Personalized milestone-driven curriculum',
+      statusText: isStep4Done ? `${roadmapData?.phases?.length || 0} Phases (${roadmapData?.overall_progress_percent || 0}% Done)` : 'No active roadmap',
+      actionText: isStep4Done ? 'View Roadmap' : 'Generate Roadmap',
+    },
+    {
+      num: 5,
+      id: 'practice',
+      name: 'Micro Practice',
+      shortName: 'Practice',
+      href: '/practice',
+      icon: Dumbbell,
+      isDone: isStep5Done,
+      desc: 'Daily skill challenges & proof-of-work',
+      statusText: isStep5Done ? `${practiceCount} Evidence Points` : 'Start first challenge',
+      actionText: isStep5Done ? 'Practice Daily' : 'Start Practice',
+    },
+    {
+      num: 6,
+      id: 'interview',
+      name: 'Mock Interview',
+      shortName: 'Interview',
+      href: '/interview',
+      icon: Mic,
+      isDone: isStep6Done,
+      desc: 'Adaptive technical & STAR behavioral prep',
+      statusText: isStep6Done ? `${completedInterviews.length} Sessions Complete` : 'No sessions taken',
+      actionText: isStep6Done ? 'Practice Again' : 'Start Interview',
+    },
+    {
+      num: 7,
+      id: 'jobs',
+      name: 'Job Engine',
+      shortName: 'Jobs',
+      href: '/jobs',
+      icon: Briefcase,
+      isDone: isStep7Done,
+      desc: 'Live listings & AI role compatibility',
+      statusText: isStep7Done ? `${jobMatches.length} Matching Roles` : 'Check opportunities',
+      actionText: isStep7Done ? 'Explore Jobs' : 'Find Matches',
+    },
+    {
+      num: 8,
+      id: 'readiness',
+      name: 'Placement Readiness',
+      shortName: 'Readiness',
+      href: '/placement',
+      icon: GraduationCap,
+      isDone: isStep8Done,
+      desc: '10-point checklist & Student Career Brief',
+      statusText: isStep8Done ? `${readinessScore}% - Placement Ready` : `${readinessScore}% current score`,
+      actionText: isStep8Done ? 'Export Career Brief' : 'Review Checklist',
+    },
+  ];
+
+  const completedStepsCount = stepsState.filter((s) => s.isDone).length;
+  const workflowProgressPct = Math.round((completedStepsCount / 8) * 100);
+
+  // Determine the next incomplete step as Today's Focus
   const getNextStepInfo = () => {
     if (!isStep1Done) {
       return {
         stepNum: 1,
-        title: t('dashboard.startAssessment', 'Discover Your Target Career Role'),
-        desc: 'Take the 12-dimension discovery assessment to identify your natural strengths and ideal career direction.',
+        title: 'Step 1 Focus: Complete Discovery Assessment',
+        desc: 'Take the 12-dimension discovery assessment to identify your natural strengths, work archetype, and recommended career trajectories.',
         href: '/assessment',
-        btnText: `${t('dashboard.startAssessment', 'Start Career Discovery')} →`,
+        btnText: 'Start Discovery Assessment →',
       };
     }
     if (!isStep2Done) {
       return {
         stepNum: 2,
-        title: 'Upload & Optimize Your Resume',
-        desc: 'Scan your resume against ATS benchmarks and automatically extract verified skills into your skill matrix.',
+        title: 'Step 2 Focus: Upload & Optimize Your Resume',
+        desc: 'Scan your resume against ATS benchmarks to measure your keyword compatibility and automatically extract verified skills.',
         href: '/resume',
-        btnText: `${t('dashboard.analyzeResume', 'Upload Resume')} →`,
+        btnText: 'Upload & Scan Resume →',
       };
     }
     if (!isStep3Done) {
       return {
         stepNum: 3,
-        title: 'Generate Personalized Learning Roadmap',
-        desc: 'Build your custom, prerequisite-ordered learning path tailored to close your verified skill gaps.',
-        href: '/roadmap',
-        btnText: 'Build Roadmap →',
+        title: 'Step 3 Focus: Review Skill Matrix & Gaps',
+        desc: 'Inspect your target career benchmark, verify existing skill proficiencies, and pinpoint high-priority missing prerequisites.',
+        href: '/skills',
+        btnText: 'Explore Skill Matrix →',
       };
     }
     if (!isStep4Done) {
       return {
         stepNum: 4,
-        title: 'Practice Your First AI Mock Interview',
+        title: 'Step 4 Focus: Generate Personalized Learning Roadmap',
+        desc: 'Build your custom, prerequisite-ordered learning path tailored to close your verified skill gaps with clear milestones.',
+        href: '/roadmap',
+        btnText: 'Generate Roadmap →',
+      };
+    }
+    if (!isStep5Done) {
+      return {
+        stepNum: 5,
+        title: 'Step 5 Focus: Complete Your First Micro Practice Task',
+        desc: 'Solve bite-sized daily challenges to reinforce your technical knowledge and earn verified proof-of-work evidence.',
+        href: '/practice',
+        btnText: 'Start Micro Practice →',
+      };
+    }
+    if (!isStep6Done) {
+      return {
+        stepNum: 6,
+        title: 'Step 6 Focus: Practice Your First AI Mock Interview',
         desc: 'Test your technical, HR, and STAR behavioral answers with real-time feedback and skill evidence points.',
         href: '/interview',
-        btnText: `${t('dashboard.practiceInterview', 'Start Mock Interview')} →`,
+        btnText: 'Start Mock Interview →',
+      };
+    }
+    if (!isStep7Done) {
+      return {
+        stepNum: 7,
+        title: 'Step 7 Focus: Explore Matching Job Opportunities',
+        desc: 'Browse live tech openings ranked by compatibility with your Digital Twin profile and apply with 1-click tailored readiness.',
+        href: '/jobs',
+        btnText: 'Explore Job Engine →',
+      };
+    }
+    if (!isStep8Done) {
+      return {
+        stepNum: 8,
+        title: 'Step 8 Focus: Boost Placement Readiness & Export Brief',
+        desc: 'Achieve 80%+ readiness score, verify your 10-point placement checklist, and export your 1-Page Student Career Brief.',
+        href: '/placement',
+        btnText: 'Review Placement Checklist →',
       };
     }
     return {
       stepNum: 0,
-      title: "🎉 You're Job Ready to Move Forward",
-      desc: 'All foundational onboarding steps are complete! Review your 10-point Placement Readiness checklist and export your 1-Page Student Career Brief.',
+      title: "🎉 Full Career Trajectory Activated!",
+      desc: 'All 8 foundational milestones are underway! Review your 10-point Placement Readiness checklist and export your 1-Page Student Career Brief.',
       href: '/placement',
       btnText: 'Check Placement Readiness & Brief →',
     };
@@ -216,7 +366,8 @@ export default function DashboardPage() {
       </div>
 
       {/* ---------------------------------------------------- */}
-      {/* FEATURE 1: Interactive 4-Step Onboarding Checklist   */}
+      {/* FEATURE 1: Interactive 8-Step Career Working Flow    */}
+      {/* Workflow: Discovery → Resume → Skills → Roadmap → Practice → Interview → Jobs → Readiness */}
       {/* ---------------------------------------------------- */}
       <section className="p-6 sm:p-7 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-xl space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-5">
@@ -224,39 +375,76 @@ export default function DashboardPage() {
             <div className="flex items-center space-x-2">
               <Compass className="w-5 h-5 text-indigo-400" />
               <h2 className="text-lg font-bold text-white tracking-tight">
-                Getting Started: 4 Steps to Job-Ready
+                Career Working Flow: 8 Steps to Placement
               </h2>
             </div>
             <p className="text-xs text-slate-400">
-              {completedStepsCount === 4
-                ? 'All foundational steps completed. Your Career Digital Twin is continuously learning!'
-                : 'Complete these essential milestones to activate your complete Career Digital Twin.'}
+              Follow your guided trajectory from assessment to final placement readiness.
             </p>
           </div>
 
           <div className="flex items-center space-x-3 shrink-0">
             <div className="text-right">
               <span className="text-xs font-bold text-slate-200">
-                Progress: <span className="text-indigo-400">{completedStepsCount}</span> / 4 Completed
+                Progress: <span className="text-indigo-400">{completedStepsCount}</span> / 8 Steps
               </span>
-              <p className="text-[11px] text-slate-500">{Math.round(onboardingProgressPct)}% Complete</p>
+              <p className="text-[11px] text-slate-500">{workflowProgressPct}% Complete</p>
             </div>
-            <div className="w-16 sm:w-24 bg-slate-800 h-2.5 rounded-full overflow-hidden border border-slate-700">
+            <div className="w-20 sm:w-28 bg-slate-800 h-2.5 rounded-full overflow-hidden border border-slate-700">
               <div
-                className="bg-gradient-to-r from-indigo-500 to-emerald-500 h-full rounded-full transition-all duration-700"
-                style={{ width: `${onboardingProgressPct}%` }}
+                className="bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-500 h-full rounded-full transition-all duration-700"
+                style={{ width: `${workflowProgressPct}%` }}
               />
             </div>
           </div>
         </div>
 
-        {/* Dynamic Priority Callout Banner */}
-        <div className="p-4 sm:p-5 rounded-xl bg-gradient-to-r from-indigo-950/60 to-purple-950/60 border border-indigo-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        {/* Workflow Horizontal Stepper Pipeline */}
+        <div className="overflow-x-auto pb-2 scrollbar-none">
+          <div className="flex items-center justify-between min-w-[700px] gap-1 px-1">
+            {stepsState.map((st, idx) => {
+              const isCurrentFocus = nextStep.stepNum === st.num;
+              return (
+                <React.Fragment key={st.id}>
+                  <Link
+                    href={st.href}
+                    className={`group flex items-center space-x-2 px-3 py-1.5 rounded-xl border text-xs font-medium transition-all ${
+                      st.isDone
+                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20'
+                        : isCurrentFocus
+                        ? 'bg-amber-500/15 border-amber-500/40 text-amber-300 ring-2 ring-amber-500/30 shadow-md shadow-amber-500/10'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
+                    }`}
+                  >
+                    <div
+                      className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
+                        st.isDone
+                          ? 'bg-emerald-500 text-slate-950'
+                          : isCurrentFocus
+                          ? 'bg-amber-400 text-slate-950 animate-pulse'
+                          : 'bg-slate-800 text-slate-400'
+                      }`}
+                    >
+                      {st.isDone ? <Check className="w-3 h-3 stroke-[3]" /> : st.num}
+                    </div>
+                    <span className="whitespace-nowrap font-semibold">{st.shortName}</span>
+                  </Link>
+                  {idx < stepsState.length - 1 && (
+                    <ChevronRight className="w-3.5 h-3.5 text-slate-600 shrink-0" />
+                  )}
+                </React.Fragment>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Dynamic Priority Callout Banner: Next Step / Today's Focus */}
+        <div className="p-4 sm:p-5 rounded-xl bg-gradient-to-r from-indigo-950/70 via-purple-950/60 to-slate-900 border border-indigo-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-lg">
           <div className="space-y-1">
             <div className="flex items-center space-x-2">
               <Zap className="w-4 h-4 text-amber-400 animate-pulse" />
               <span className="text-[11px] font-bold uppercase tracking-wider text-amber-400">
-                {nextStep.stepNum > 0 ? `Step ${nextStep.stepNum} Recommended` : 'Full Readiness Activated'}
+                {nextStep.stepNum > 0 ? `Today's Focus • Step ${nextStep.stepNum} of 8` : 'All 8 Steps Active'}
               </span>
             </div>
             <h3 className="text-base font-bold text-white">{nextStep.title}</h3>
@@ -265,209 +453,87 @@ export default function DashboardPage() {
 
           <Link
             href={nextStep.href}
-            className="px-4 sm:px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs sm:text-sm flex items-center justify-center space-x-2 shrink-0 transition-colors shadow-lg shadow-indigo-600/30 self-start sm:self-auto"
+            className="px-4 sm:px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-xs sm:text-sm flex items-center justify-center space-x-2 shrink-0 transition shadow-lg shadow-indigo-600/30 self-start sm:self-auto"
           >
             <span>{nextStep.btnText}</span>
           </Link>
         </div>
 
-        {/* 4 Interactive Step Cards Grid */}
+        {/* 8 Interactive Step Cards Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Step 1 Card: Career Discovery */}
-          <div
-            className={`p-4 rounded-xl border flex flex-col justify-between transition-all duration-200 ${
-              isStep1Done
-                ? 'bg-slate-950/60 border-emerald-500/30 shadow-sm'
-                : 'bg-slate-950 border-slate-800 hover:border-slate-700'
-            }`}
-          >
-            <div className="space-y-2.5">
-              <div className="flex items-center justify-between">
-                <div className="w-8 h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
-                  <Compass className="w-4 h-4" />
-                </div>
-                {isStep1Done ? (
-                  <span className="flex items-center space-x-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                    <CheckCircle className="w-3 h-3" />
-                    <span>Done</span>
-                  </span>
-                ) : (
-                  <span className="w-5 h-5 rounded-full border border-slate-700 text-slate-500 flex items-center justify-center text-[10px] font-bold">
-                    1
-                  </span>
-                )}
-              </div>
-              <div>
-                <h4 className="text-sm font-bold text-white">1. Discover Career</h4>
-                <p className="text-[11px] text-slate-400 mt-1 line-clamp-2">
-                  {isStep1Done
-                    ? `Selected: ${targetCareer || 'Career Discovered'}`
-                    : '12-dimension survey matching natural strengths.'}
-                </p>
-              </div>
-            </div>
-
-            <div className="pt-4 border-t border-slate-800/60 mt-3">
-              <Link
-                href="/assessment"
-                className={`w-full py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center space-x-1 transition-colors ${
-                  isStep1Done
-                    ? 'bg-slate-900 text-slate-300 hover:bg-slate-800 border border-slate-800'
-                    : 'bg-indigo-600 text-white hover:bg-indigo-500'
+          {stepsState.map((st) => {
+            const StepIcon = st.icon;
+            const isCurrentFocus = nextStep.stepNum === st.num;
+            return (
+              <div
+                key={st.id}
+                className={`p-4 rounded-xl border flex flex-col justify-between transition-all duration-200 ${
+                  st.isDone
+                    ? 'bg-slate-950/60 border-emerald-500/30 shadow-sm'
+                    : isCurrentFocus
+                    ? 'bg-slate-950 border-amber-500/50 ring-1 ring-amber-500/30 shadow-md shadow-amber-500/5'
+                    : 'bg-slate-950 border-slate-800 hover:border-slate-700'
                 }`}
               >
-                <span>{isStep1Done ? 'Revisit Role' : 'Discover Career'}</span>
-                <ArrowRight className="w-3 h-3" />
-              </Link>
-            </div>
-          </div>
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <div
+                      className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                        st.isDone
+                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                          : isCurrentFocus
+                          ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
+                          : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
+                      }`}
+                    >
+                      <StepIcon className="w-4 h-4" />
+                    </div>
 
-          {/* Step 2 Card: Resume Intelligence */}
-          <div
-            className={`p-4 rounded-xl border flex flex-col justify-between transition-all duration-200 ${
-              isStep2Done
-                ? 'bg-slate-950/60 border-emerald-500/30 shadow-sm'
-                : 'bg-slate-950 border-slate-800 hover:border-slate-700'
-            }`}
-          >
-            <div className="space-y-2.5">
-              <div className="flex items-center justify-between">
-                <div className="w-8 h-8 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400">
-                  <FileText className="w-4 h-4" />
+                    {st.isDone ? (
+                      <span className="flex items-center space-x-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                        <CheckCircle className="w-3 h-3" />
+                        <span>Done</span>
+                      </span>
+                    ) : isCurrentFocus ? (
+                      <span className="flex items-center space-x-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30 animate-pulse">
+                        <span>Today&apos;s Focus</span>
+                      </span>
+                    ) : (
+                      <span className="w-5 h-5 rounded-full border border-slate-700 text-slate-500 flex items-center justify-center text-[10px] font-bold">
+                        {st.num}
+                      </span>
+                    )}
+                  </div>
+
+                  <div>
+                    <h4 className="text-sm font-bold text-white">
+                      {st.num}. {st.name}
+                    </h4>
+                    <p className="text-[11px] text-slate-400 mt-1 line-clamp-1">{st.desc}</p>
+                    <p className="text-[11px] text-indigo-300 font-medium mt-1 truncate">
+                      {st.statusText}
+                    </p>
+                  </div>
                 </div>
-                {isStep2Done ? (
-                  <span className="flex items-center space-x-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                    <CheckCircle className="w-3 h-3" />
-                    <span>Done</span>
-                  </span>
-                ) : (
-                  <span className="w-5 h-5 rounded-full border border-slate-700 text-slate-500 flex items-center justify-center text-[10px] font-bold">
-                    2
-                  </span>
-                )}
-              </div>
-              <div>
-                <h4 className="text-sm font-bold text-white">2. Upload Resume</h4>
-                <p className="text-[11px] text-slate-400 mt-1 line-clamp-2">
-                  {isStep2Done
-                    ? `ATS Score: ${atsScore}% (${resumeData?.filename || 'Uploaded'})`
-                    : 'Scan PDF/DOCX for ATS score & verified skills.'}
-                </p>
-              </div>
-            </div>
 
-            <div className="pt-4 border-t border-slate-800/60 mt-3">
-              <Link
-                href="/resume"
-                className={`w-full py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center space-x-1 transition-colors ${
-                  isStep2Done
-                    ? 'bg-slate-900 text-slate-300 hover:bg-slate-800 border border-slate-800'
-                    : 'bg-indigo-600 text-white hover:bg-indigo-500'
-                }`}
-              >
-                <span>{isStep2Done ? 'View Analysis' : 'Upload Resume'}</span>
-                <ArrowRight className="w-3 h-3" />
-              </Link>
-            </div>
-          </div>
-
-          {/* Step 3 Card: Personalized Roadmap */}
-          <div
-            className={`p-4 rounded-xl border flex flex-col justify-between transition-all duration-200 ${
-              isStep3Done
-                ? 'bg-slate-950/60 border-emerald-500/30 shadow-sm'
-                : 'bg-slate-950 border-slate-800 hover:border-slate-700'
-            }`}
-          >
-            <div className="space-y-2.5">
-              <div className="flex items-center justify-between">
-                <div className="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
-                  <MapPin className="w-4 h-4" />
+                <div className="pt-4 border-t border-slate-800/60 mt-3">
+                  <Link
+                    href={st.href}
+                    className={`w-full py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center space-x-1 transition-colors ${
+                      st.isDone
+                        ? 'bg-slate-900 text-slate-300 hover:bg-slate-800 border border-slate-800'
+                        : isCurrentFocus
+                        ? 'bg-gradient-to-r from-amber-500 to-indigo-600 text-white hover:from-amber-400 hover:to-indigo-500 shadow-md'
+                        : 'bg-indigo-600 text-white hover:bg-indigo-500'
+                    }`}
+                  >
+                    <span>{st.actionText}</span>
+                    <ArrowRight className="w-3 h-3" />
+                  </Link>
                 </div>
-                {isStep3Done ? (
-                  <span className="flex items-center space-x-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                    <CheckCircle className="w-3 h-3" />
-                    <span>Done</span>
-                  </span>
-                ) : (
-                  <span className="w-5 h-5 rounded-full border border-slate-700 text-slate-500 flex items-center justify-center text-[10px] font-bold">
-                    3
-                  </span>
-                )}
               </div>
-              <div>
-                <h4 className="text-sm font-bold text-white">3. Build Roadmap</h4>
-                <p className="text-[11px] text-slate-400 mt-1 line-clamp-2">
-                  {isStep3Done
-                    ? `${roadmapData?.phases?.length || 0} Phases active (${roadmapData?.overall_progress_percent || 0}% progress)`
-                    : 'Prerequisite-ordered daily tasks & projects.'}
-                </p>
-              </div>
-            </div>
-
-            <div className="pt-4 border-t border-slate-800/60 mt-3">
-              <Link
-                href="/roadmap"
-                className={`w-full py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center space-x-1 transition-colors ${
-                  isStep3Done
-                    ? 'bg-slate-900 text-slate-300 hover:bg-slate-800 border border-slate-800'
-                    : 'bg-indigo-600 text-white hover:bg-indigo-500'
-                }`}
-              >
-                <span>{isStep3Done ? 'Open Roadmap' : 'Build Roadmap'}</span>
-                <ArrowRight className="w-3 h-3" />
-              </Link>
-            </div>
-          </div>
-
-          {/* Step 4 Card: AI Mock Interview */}
-          <div
-            className={`p-4 rounded-xl border flex flex-col justify-between transition-all duration-200 ${
-              isStep4Done
-                ? 'bg-slate-950/60 border-emerald-500/30 shadow-sm'
-                : 'bg-slate-950 border-slate-800 hover:border-slate-700'
-            }`}
-          >
-            <div className="space-y-2.5">
-              <div className="flex items-center justify-between">
-                <div className="w-8 h-8 rounded-lg bg-pink-500/10 border border-pink-500/20 flex items-center justify-center text-pink-400">
-                  <Mic className="w-4 h-4" />
-                </div>
-                {isStep4Done ? (
-                  <span className="flex items-center space-x-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                    <CheckCircle className="w-3 h-3" />
-                    <span>Done</span>
-                  </span>
-                ) : (
-                  <span className="w-5 h-5 rounded-full border border-slate-700 text-slate-500 flex items-center justify-center text-[10px] font-bold">
-                    4
-                  </span>
-                )}
-              </div>
-              <div>
-                <h4 className="text-sm font-bold text-white">4. Mock Interview</h4>
-                <p className="text-[11px] text-slate-400 mt-1 line-clamp-2">
-                  {isStep4Done
-                    ? `${completedInterviews.length} Completed Session(s) Recorded`
-                    : 'Adaptive technical & STAR behavioral practice.'}
-                </p>
-              </div>
-            </div>
-
-            <div className="pt-4 border-t border-slate-800/60 mt-3">
-              <Link
-                href="/interview"
-                className={`w-full py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center space-x-1 transition-colors ${
-                  isStep4Done
-                    ? 'bg-slate-900 text-slate-300 hover:bg-slate-800 border border-slate-800'
-                    : 'bg-indigo-600 text-white hover:bg-indigo-500'
-                }`}
-              >
-                <span>{isStep4Done ? 'Practice Again' : 'Start Interview'}</span>
-                <ArrowRight className="w-3 h-3" />
-              </Link>
-            </div>
-          </div>
+            );
+          })}
         </div>
       </section>
 

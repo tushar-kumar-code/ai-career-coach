@@ -21,24 +21,74 @@ import {
   LogOut,
   Settings,
   BookOpen,
-  X
+  X,
+  Lock
 } from 'lucide-react';
 
-const NAV_ITEMS = [
-  { key: 'dashboard', label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { key: 'guide', label: 'How to Use', href: '/guide', icon: BookOpen },
-  { key: 'assessment', label: 'Discovery Assessment', href: '/assessment', icon: Compass },
-  { key: 'profile', label: 'Digital Twin Profile', href: '/profile', icon: Sparkles },
-  { key: 'resume', label: 'Resume & ATS', href: '/resume', icon: FileText },
-  { key: 'skills', label: 'Skill Matrix', href: '/skills', icon: Award },
-  { key: 'jobs', label: 'Job Engine', href: '/jobs', icon: Briefcase },
-  { key: 'roadmap', label: 'Roadmap & Tasks', href: '/roadmap', icon: MapPin },
-  { key: 'practice', label: 'Micro Practice', href: '/practice', icon: Dumbbell },
-  { key: 'interview', label: 'Mock Interview', href: '/interview', icon: Mic },
-  { key: 'placement', label: 'Placement Readiness', href: '/placement', icon: GraduationCap },
-  { key: 'progress', label: 'Progress & Readiness', href: '/progress', icon: TrendingUp },
-  { key: 'chat', label: 'AI Career Coach', href: '/chat', icon: MessageSquare },
-  { key: 'settings', label: 'Settings', href: '/settings', icon: Settings },
+interface NavItemConfig {
+  key: string;
+  label: string;
+  href: string;
+  icon: React.ElementType;
+  step?: string;
+}
+
+interface NavGroupConfig {
+  group: string;
+  title?: string;
+  items: NavItemConfig[];
+}
+
+const NAV_GROUPS: NavGroupConfig[] = [
+  {
+    group: 'overview',
+    items: [
+      { key: 'dashboard', label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+    ]
+  },
+  {
+    group: 'foundation',
+    title: 'Career Foundation',
+    items: [
+      { key: 'assessment', label: 'Discovery Assessment', href: '/assessment', icon: Compass, step: '1' },
+      { key: 'resume', label: 'Resume & ATS', href: '/resume', icon: FileText, step: '2' },
+      { key: 'skills', label: 'Skill Matrix', href: '/skills', icon: Award, step: '3' },
+      { key: 'roadmap', label: 'Roadmap & Tasks', href: '/roadmap', icon: MapPin, step: '4' },
+    ]
+  },
+  {
+    group: 'prep',
+    title: 'Skill & Prep',
+    items: [
+      { key: 'practice', label: 'Micro Practice', href: '/practice', icon: Dumbbell, step: '5' },
+      { key: 'interview', label: 'Mock Interview', href: '/interview', icon: Mic, step: '6' },
+    ]
+  },
+  {
+    group: 'opportunities',
+    title: 'Opportunities',
+    items: [
+      { key: 'jobs', label: 'Job Engine', href: '/jobs', icon: Briefcase, step: '7' },
+    ]
+  },
+  {
+    group: 'readiness',
+    title: 'Readiness & Profile',
+    items: [
+      { key: 'progress', label: 'Progress & Readiness', href: '/progress', icon: TrendingUp, step: '8' },
+      { key: 'profile', label: 'Digital Twin Profile', href: '/profile', icon: Sparkles },
+      { key: 'placement', label: 'Placement Readiness', href: '/placement', icon: GraduationCap },
+    ]
+  },
+  {
+    group: 'support',
+    title: 'Support & Settings',
+    items: [
+      { key: 'chat', label: 'AI Career Assistant', href: '/chat', icon: MessageSquare },
+      { key: 'guide', label: 'Help / Guide', href: '/guide', icon: BookOpen },
+      { key: 'settings', label: 'Settings', href: '/settings', icon: Settings },
+    ]
+  }
 ];
 
 interface SidebarProps {
@@ -48,7 +98,7 @@ interface SidebarProps {
 
 export default function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
   const pathname = usePathname();
-  const { user, logout } = useAuth();
+  const { user, logout, hasCompletedAssessment } = useAuth();
   const { t } = useLanguage();
 
   // Close mobile drawer on Escape key press
@@ -85,30 +135,84 @@ export default function Sidebar({ isMobileOpen = false, onClose }: SidebarProps)
     ? user.email[0].toUpperCase()
     : 'CC';
 
+  const visibleGroups = !hasCompletedAssessment
+    ? [
+        {
+          group: 'foundation',
+          title: 'Mandatory First Step',
+          items: [
+            { key: 'assessment', label: 'Discovery Assessment', href: '/assessment', icon: Compass, step: '1' },
+          ],
+        },
+      ]
+    : NAV_GROUPS;
+
   const renderNavLinks = () => (
-    <nav className="flex-1 overflow-y-auto p-4 space-y-1">
-      {NAV_ITEMS.map((item) => {
-        const Icon = item.icon;
-        const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
-        const itemLabel = t(`nav.${item.key}`, item.label);
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            onClick={() => {
-              if (onClose) onClose();
-            }}
-            className={`flex items-center space-x-3 px-3.5 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
-              isActive
-                ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 shadow-sm'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
-            }`}
-          >
-            <Icon className={`w-4 h-4 ${isActive ? 'text-indigo-400' : 'text-slate-400'}`} />
-            <span>{itemLabel}</span>
-          </Link>
-        );
-      })}
+    <nav className="flex-1 overflow-y-auto px-3.5 py-4 space-y-5">
+      {visibleGroups.map((grp) => (
+        <div key={grp.group} className="space-y-1">
+          {grp.title && (
+            <div className="px-3 pt-1 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+              {grp.title}
+            </div>
+          )}
+          <div className="space-y-1">
+            {grp.items.map((item) => {
+              const Icon = item.icon;
+              const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(`${item.href}/`));
+              const itemLabel = t(`nav.${item.key}`, item.label);
+              const isDiscovery = item.key === 'assessment';
+              const showPulse = isDiscovery && !hasCompletedAssessment;
+
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => {
+                    if (onClose) onClose();
+                  }}
+                  className={`group flex items-center justify-between px-3 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 ${
+                    isActive
+                      ? 'bg-indigo-600/20 text-indigo-300 border border-indigo-500/40 shadow-sm shadow-indigo-500/10'
+                      : showPulse
+                      ? 'bg-amber-500/10 text-amber-300 border border-amber-500/30 hover:bg-amber-500/20'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
+                  }`}
+                >
+                  <div className="flex items-center space-x-2.5 truncate">
+                    <Icon className={`w-4 h-4 shrink-0 transition-colors ${
+                      isActive ? 'text-indigo-400' : showPulse ? 'text-amber-400 animate-pulse' : 'text-slate-400 group-hover:text-slate-300'
+                    }`} />
+                    <span className="truncate">{itemLabel}</span>
+                  </div>
+
+                  {showPulse ? (
+                    <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30 animate-pulse">
+                      Step 1
+                    </span>
+                  ) : item.step && (
+                    <span className="text-[10px] text-slate-600 font-semibold opacity-0 group-hover:opacity-100 transition-opacity">
+                      {item.step}
+                    </span>
+                  )}
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+
+      {!hasCompletedAssessment && (
+        <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs space-y-1.5">
+          <div className="flex items-center space-x-1.5 font-bold">
+            <Lock className="w-3.5 h-3.5 text-amber-400" />
+            <span>Features Locked</span>
+          </div>
+          <p className="text-[11px] text-slate-400 leading-snug">
+            Complete your Discovery Assessment to unlock your Dashboard, Resume ATS, Skill Matrix, Roadmap, and other features.
+          </p>
+        </div>
+      )}
     </nav>
   );
 
@@ -128,14 +232,16 @@ export default function Sidebar({ isMobileOpen = false, onClose }: SidebarProps)
         </div>
 
         <div className="flex items-center gap-1 shrink-0 ml-1">
-          <Link
-            href="/settings"
-            onClick={() => { if (onClose) onClose(); }}
-            title={t('nav.settings', 'Settings')}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-400 hover:bg-indigo-500/10 transition"
-          >
-            <Settings className="w-4 h-4" />
-          </Link>
+          {hasCompletedAssessment && (
+            <Link
+              href="/settings"
+              onClick={() => { if (onClose) onClose(); }}
+              title={t('nav.settings', 'Settings')}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-400 hover:bg-indigo-500/10 transition"
+            >
+              <Settings className="w-4 h-4" />
+            </Link>
+          )}
           <button
             onClick={logout}
             title={t('nav.signOut', 'Sign Out')}

@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState, useEffect } from 'react';
 import {
@@ -49,8 +49,8 @@ export default function DigitalTwinProfilePage() {
     );
   }
 
-  const targetRole = twin?.target_career || skillsProfile?.target_career || assessmentData?.selected_target_career || 'Software Developer';
-  const archetype = twin?.primary_archetype || assessmentData?.archetype || 'Systems Builder';
+  const targetRole = twin?.target_career || skillsProfile?.target_career || assessmentData?.selected_target_career || 'Not Set (Take Assessment)';
+  const archetype = twin?.primary_archetype || assessmentData?.archetype || 'Pending Assessment';
   const readinessScore = twin?.overall_readiness_score ?? 0;
   const readinessLabel = twin?.readiness_label ?? 'In Progress';
   const subScores = twin?.sub_scores;

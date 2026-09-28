@@ -46,6 +46,7 @@ class UserResponse(BaseModel):
     full_name: Optional[str] = None
     is_active: bool = True
     is_superuser: bool = False
+    has_completed_assessment: bool = False
 
 
 class AuthResponse(BaseModel):

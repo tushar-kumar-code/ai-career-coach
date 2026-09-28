@@ -114,3 +114,31 @@ def test_recalculate_roadmap_preserves_completed():
 
     assert new_r_data["is_outdated"] == False
     assert t_id in new_r_data["completed_task_ids"]
+
+
+def test_beginner_scratch_roadmap_structure():
+    """Verify that a beginner roadmap starts from scratch foundations and includes detailed topic-wise syllabus fields."""
+    resp = client.post(
+        "/api/v1/roadmap/generate",
+        json={
+            "user_level": "Beginner",
+            "hours_per_day": 1,
+            "days_per_week": 5,
+            "preferred_learning_style": "Hands-on"
+        }
+    )
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+
+    assert data["user_level"] == "Beginner"
+    assert len(data["phases"]) == 5
+    first_phase = data["phases"][0]
+    assert "Scratch" in first_phase["type"] or "Foundation" in first_phase["type"]
+
+    # Verify tasks contain topic-wise what-to-learn fields
+    first_task = first_phase["tasks"][0]
+    assert "title" in first_task
+    assert "topics_to_learn" in first_task
+    assert isinstance(first_task["topics_to_learn"], list)
+    assert "difficulty_level" in first_task
+

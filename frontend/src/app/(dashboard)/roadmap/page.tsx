@@ -17,7 +17,9 @@ import {
   Layers,
   CheckSquare,
   Square,
-  ArrowRight
+  ArrowRight,
+  ListChecks,
+  Lightbulb
 } from 'lucide-react';
 import { 
   getCurrentRoadmap, 
@@ -362,9 +364,9 @@ export default function RoadmapPage() {
                 onChange={(e) => setUserLevel(e.target.value)}
                 className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-slate-200"
               >
-                <option value="Beginner">Beginner</option>
-                <option value="Intermediate">Intermediate</option>
-                <option value="Advanced">Advanced</option>
+                <option value="Beginner">Beginner (Start from Scratch - No prior knowledge)</option>
+                <option value="Intermediate">Intermediate (Core & Frameworks)</option>
+                <option value="Advanced">Advanced (System Architecture & Interview Mastery)</option>
               </select>
             </div>
           </div>
@@ -533,13 +535,24 @@ export default function RoadmapPage() {
 
                   {/* Tasks List with Expandable Learning Resources */}
                   <div className="space-y-3">
-                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Actionable Learning Tasks</h4>
-                    <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center space-x-1.5">
+                        <ListChecks className="w-3.5 h-3.5 text-indigo-400" />
+                        <span>Topic-Wise Learning Curriculum</span>
+                      </h4>
+                      <span className="text-[11px] text-slate-500">
+                        Detailed syllabus • What to learn & practice
+                      </span>
+                    </div>
+
+                    <div className="space-y-3">
                       {phaseTasks.map((task: any) => {
                         const isTaskOpen = openTaskId === task.id;
                         const isCompleted = task.is_completed || task.completed;
                         const isPriority = task.is_priority;
-                        const hasLearning = task.concept_explanation || task.practice_exercise || task.check_quiz_question;
+                        const hasTopics = task.topics_to_learn && task.topics_to_learn.length > 0;
+                        const hasLegacyLearning = task.concept_explanation || task.practice_exercise || task.check_quiz_question;
+                        const hasExpandableContent = hasTopics || task.learning_focus || task.practice_goal || hasLegacyLearning;
 
                         return (
                           <div
@@ -564,12 +577,17 @@ export default function RoadmapPage() {
                                   )}
                                 </button>
                                 <div>
-                                  <div className="flex items-center flex-wrap gap-1.5 mb-0.5">
+                                  <div className="flex items-center flex-wrap gap-1.5 mb-1">
                                     <h5 className={`text-sm font-semibold ${
                                       isCompleted ? 'line-through text-slate-500' : 'text-slate-200'
                                     }`}>
                                       {task.title}
                                     </h5>
+                                    {task.difficulty_level && (
+                                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 font-medium">
+                                        {task.difficulty_level}
+                                      </span>
+                                    )}
                                     {isPriority && (
                                       <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-violet-500/20 text-violet-300 border border-violet-500/20 font-bold">
                                         ⚡ Interview Priority
@@ -584,7 +602,7 @@ export default function RoadmapPage() {
                                   <p className="text-xs text-slate-400">{task.description}</p>
                                   {(task.why_it_matters || task.why_matters) && (
                                     <p className="text-[11px] text-indigo-300/80 mt-1 font-medium">
-                                      Why: {task.why_it_matters || task.why_matters}
+                                      Goal: {task.why_it_matters || task.why_matters}
                                     </p>
                                   )}
                                   {isPriority && task.priority_reason && (
@@ -597,12 +615,12 @@ export default function RoadmapPage() {
                                 <span className="block px-2.5 py-1 rounded bg-slate-900 text-[11px] text-slate-400 font-medium">
                                   {task.estimated_minutes} min
                                 </span>
-                                {hasLearning && !isCompleted && (
+                                {hasExpandableContent && (
                                   <button
                                     onClick={() => setOpenTaskId(isTaskOpen ? null : task.id)}
-                                    className="block w-full text-[10px] text-indigo-400 hover:text-indigo-300 font-semibold"
+                                    className="block w-full text-[11px] text-indigo-400 hover:text-indigo-300 font-semibold transition-colors"
                                   >
-                                    {isTaskOpen ? '▲ Hide' : '▼ Learn'}
+                                    {isTaskOpen ? '▲ Hide Syllabus' : '▼ What to Learn'}
                                   </button>
                                 )}
                                 <a
@@ -614,70 +632,83 @@ export default function RoadmapPage() {
                               </div>
                             </div>
 
-                            {/* Expandable Learning Resources */}
-                            {isTaskOpen && hasLearning && (
-                              <div className="border-t border-slate-800 p-4 space-y-4 bg-slate-900/60">
-                                {/* Learn */}
-                                {task.concept_explanation && (
-                                  <div className="space-y-1.5">
+                            {/* Expandable Topic-wise Syllabus & What to Learn */}
+                            {isTaskOpen && hasExpandableContent && (
+                              <div className="border-t border-slate-800 p-5 space-y-4 bg-slate-900/60">
+                                {/* What to Learn (Subtopics Checklist) */}
+                                {hasTopics && (
+                                  <div className="space-y-2">
+                                    <h6 className="text-[11px] font-bold text-indigo-400 uppercase tracking-wider flex items-center space-x-1.5">
+                                      <ListChecks className="w-3.5 h-3.5 text-indigo-400" />
+                                      <span>Topics & Concepts to Cover (Syllabus)</span>
+                                    </h6>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                                      {task.topics_to_learn.map((subtopic: string, sIdx: number) => (
+                                        <div key={sIdx} className="flex items-start space-x-2 p-2 rounded-lg bg-slate-950/60 border border-slate-800/80">
+                                          <CheckCircle2 className="w-3.5 h-3.5 text-indigo-400 mt-0.5 flex-shrink-0" />
+                                          <span className="text-xs text-slate-200">{subtopic}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Learning Focus */}
+                                {task.learning_focus && (
+                                  <div className="p-3 rounded-lg bg-indigo-950/30 border border-indigo-500/20 space-y-1">
+                                    <h6 className="text-[10px] font-bold text-indigo-300 uppercase tracking-wider flex items-center space-x-1">
+                                      <Lightbulb className="w-3 h-3 text-indigo-400" />
+                                      <span>Learning Focus</span>
+                                    </h6>
+                                    <p className="text-xs text-slate-300 leading-relaxed">{task.learning_focus}</p>
+                                  </div>
+                                )}
+
+                                {/* Hands-on Practice Goal */}
+                                {(task.practice_goal || task.practice_exercise) && (
+                                  <div className="p-3 rounded-lg bg-emerald-950/30 border border-emerald-500/20 space-y-1">
+                                    <h6 className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider flex items-center space-x-1">
+                                      <Code className="w-3 h-3 text-emerald-400" />
+                                      <span>Hands-on Practice Goal (What to Build)</span>
+                                    </h6>
+                                    <p className="text-xs text-emerald-200/90 leading-relaxed">
+                                      {task.practice_goal || task.practice_exercise}
+                                    </p>
+                                  </div>
+                                )}
+
+                                {/* Recommended Study Topics & Documentation References */}
+                                {task.recommended_resources && task.recommended_resources.length > 0 && (
+                                  <div className="space-y-1.5 pt-1">
+                                    <h6 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center space-x-1">
+                                      <BookOpen className="w-3 h-3 text-slate-400" />
+                                      <span>Recommended Study Topics & Documentation</span>
+                                    </h6>
+                                    <div className="flex flex-wrap gap-1.5">
+                                      {task.recommended_resources.map((res: string, rIdx: number) => (
+                                        <span key={rIdx} className="px-2.5 py-1 rounded bg-slate-950 border border-slate-800 text-[11px] text-slate-300">
+                                          📖 {res}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Prerequisites / Details */}
+                                {task.prerequisites && task.prerequisites.length > 0 && (
+                                  <div className="text-[11px] text-slate-400 pt-1">
+                                    <strong className="text-slate-300">Prerequisites: </strong>
+                                    {task.prerequisites.join(', ')}
+                                  </div>
+                                )}
+
+                                {/* Legacy Concept Explanation if exists and no topics_to_learn */}
+                                {!hasTopics && task.concept_explanation && (
+                                  <div className="space-y-1">
                                     <h6 className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider flex items-center space-x-1">
-                                      <BookOpen className="w-3 h-3" /><span>Understand the Concept</span>
+                                      <BookOpen className="w-3 h-3" /><span>Concept Overview</span>
                                     </h6>
                                     <p className="text-xs text-slate-300 leading-relaxed">{task.concept_explanation}</p>
-                                  </div>
-                                )}
-
-                                {/* Practice */}
-                                {task.practice_exercise && (
-                                  <div className="space-y-1.5">
-                                    <h6 className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider flex items-center space-x-1">
-                                      <Code className="w-3 h-3" /><span>Hands-on Exercise</span>
-                                    </h6>
-                                    <div className="p-3 rounded-lg bg-emerald-950/30 border border-emerald-500/20 text-xs text-emerald-200">
-                                      {task.practice_exercise}
-                                    </div>
-                                  </div>
-                                )}
-
-                                {/* Quiz */}
-                                {task.check_quiz_question && (
-                                  <div className="space-y-2">
-                                    <h6 className="text-[10px] font-bold text-amber-400 uppercase tracking-wider flex items-center space-x-1">
-                                      <CheckSquare className="w-3 h-3" /><span>Check Yourself</span>
-                                    </h6>
-                                    <p className="text-xs text-slate-200 font-medium">{task.check_quiz_question}</p>
-                                    <div className="space-y-1.5">
-                                      {(task.check_quiz_options || []).map((opt: string, oi: number) => {
-                                        const letter = opt.charAt(0);
-                                        const answered = quizAnswered[task.id];
-                                        const isCorrect = task.check_quiz_answer?.startsWith(letter);
-                                        const wasChosen = answered === letter;
-                                        return (
-                                          <button
-                                            key={oi}
-                                            onClick={() => setQuizAnswered(prev => ({ ...prev, [task.id]: letter }))}
-                                            className={`w-full text-left p-2.5 rounded-lg border text-xs transition-all ${
-                                              !answered
-                                                ? 'border-slate-700 bg-slate-900 text-slate-300 hover:border-indigo-500/50 hover:bg-indigo-950/20'
-                                                : wasChosen && isCorrect
-                                                ? 'border-emerald-500/50 bg-emerald-950/30 text-emerald-300'
-                                                : wasChosen && !isCorrect
-                                                ? 'border-red-500/40 bg-red-950/20 text-red-300'
-                                                : isCorrect
-                                                ? 'border-emerald-500/30 bg-emerald-950/20 text-emerald-400'
-                                                : 'border-slate-700 bg-slate-900 text-slate-500'
-                                            }`}
-                                          >
-                                            {opt}
-                                          </button>
-                                        );
-                                      })}
-                                    </div>
-                                    {quizAnswered[task.id] && task.check_quiz_answer && (
-                                      <div className="p-2.5 rounded-lg bg-indigo-950/40 border border-indigo-500/20 text-[11px] text-indigo-300">
-                                        <strong>Explanation:</strong> {task.check_quiz_answer}
-                                      </div>
-                                    )}
                                   </div>
                                 )}
                               </div>
