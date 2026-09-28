@@ -26,8 +26,11 @@ from app.services.interview.adaptive_engine import AdaptiveInterviewEngine
 from app.services.interview.feedback_loop import InterviewFeedbackLoop
 
 import copy
+import logging
+from app.services.firestore.interview_repo import InterviewRepository
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 question_generator = InterviewQuestionGenerator()
 evaluator = InterviewEvaluator()
 adaptive_engine = AdaptiveInterviewEngine()
@@ -110,6 +113,11 @@ async def start_interview_session(
         updated_at=session.updated_at.isoformat() if session.updated_at else ""
     )
 
+    try:
+        await InterviewRepository.save_session(user_id, session.id, resp.model_dump())
+    except Exception as e:
+        logger.warning(f"Firestore interview session save error: {e}")
+
     return APIResponse(
         success=True,
         message="Interview session started successfully",
@@ -127,12 +135,26 @@ async def get_interview_session(
     db: AsyncSession = Depends(get_db),
     user_id: str = Depends(get_current_user_id)
 ):
+    # 1. Check Firestore first
+    try:
+        fs_session = await InterviewRepository.get_session(user_id, session_id)
+        if fs_session and "current_question" in fs_session:
+            return APIResponse(
+                success=True,
+                message="Session details retrieved",
+                data=InterviewSessionResponse(**fs_session)
+            )
+    except Exception as e:
+        logger.warning(f"Firestore get_interview_session warning: {e}")
+
+    # 2. SQLite fallback
     stmt = select(InterviewSession).where(InterviewSession.id == session_id, InterviewSession.user_id == user_id)
     res = await db.execute(stmt)
     session = res.scalars().first()
 
     if not session:
         raise HTTPException(status_code=404, detail=f"Interview session '{session_id}' not found")
+
 
     q_data_list = session.questions_data or []
     curr_idx = session.current_question_index
@@ -438,6 +460,23 @@ async def complete_interview_session(
         questions_review=review_list
     )
 
+    try:
+        await InterviewRepository.save_session(user_id, session.id, {
+            "id": session.id,
+            "target_role": session.target_role,
+            "mode": session.mode,
+            "difficulty": session.difficulty,
+            "is_completed": True,
+            "overall_score": overall_score,
+            "category_scores": category_scores,
+            "readiness_status": readiness_status,
+            "readiness_explanation": readiness_explanation,
+            "weak_areas": weak_topics,
+            "questions_review": [q.model_dump() for q in review_list]
+        })
+    except Exception as e:
+        logger.warning(f"Firestore complete interview save warning: {e}")
+
     return APIResponse(
         success=True,
         message="Interview completed and final report generated",
@@ -454,6 +493,26 @@ async def get_interview_history(
     db: AsyncSession = Depends(get_db),
     user_id: str = Depends(get_current_user_id)
 ):
+    # 1. Check Firestore first
+    try:
+        fs_sessions = await InterviewRepository.list_sessions(user_id)
+        if fs_sessions:
+            responses = []
+            for s in fs_sessions:
+                try:
+                    responses.append(InterviewSessionResponse(**s))
+                except Exception:
+                    pass
+            if responses:
+                return APIResponse(
+                    success=True,
+                    message="Interview history retrieved",
+                    data=responses
+                )
+    except Exception as e:
+        logger.warning(f"Firestore get_interview_history warning: {e}")
+
+    # 2. SQLite fallback
     stmt = select(InterviewSession).where(InterviewSession.user_id == user_id).order_by(InterviewSession.created_at.desc())
     res = await db.execute(stmt)
     sessions = res.scalars().all()
@@ -484,6 +543,7 @@ async def get_interview_history(
         message="Interview history retrieved",
         data=responses
     )
+
 
 
 @router.get(

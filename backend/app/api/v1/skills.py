@@ -1,3 +1,4 @@
+import logging
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,8 +18,10 @@ from app.schemas.skill import (
 )
 from app.services.skill.ingestion_engine import SkillIngestionEngine
 from app.services.skill.gap_engine import SkillGapEngine
+from app.services.firestore.skills_repo import SkillsRepository
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 ingestion_engine = SkillIngestionEngine()
 gap_engine = SkillGapEngine()
 
@@ -32,6 +35,37 @@ async def get_user_skills(
     db: AsyncSession = Depends(get_db),
     user_id: str = Depends(get_current_user_id)
 ):
+    # 1. Check Firestore first
+    try:
+        fs_skills = await SkillsRepository.list_skills(user_id)
+        if fs_skills:
+            schema_list = [
+                UserSkillSchema(
+                    id=s.get("id"),
+                    skill_name=s.get("skill_name"),
+                    normalized_name=s.get("normalized_name"),
+                    category=s.get("category", "Technical"),
+                    proficiency_percent=s.get("proficiency_percent", 50),
+                    proficiency_level=s.get("proficiency_level", "Beginner"),
+                    confidence_score=s.get("confidence_score", 50),
+                    confidence_status=s.get("confidence_status", "Claimed"),
+                    target_required_level=s.get("target_required_level"),
+                    gap_status=s.get("gap_status", "Matched"),
+                    priority=s.get("priority", "Low"),
+                    priority_reason=s.get("priority_reason"),
+                    evidence_sources=s.get("evidence_sources") or []
+                )
+                for s in fs_skills
+            ]
+            return APIResponse(
+                success=True,
+                message="User skills retrieved successfully",
+                data=schema_list
+            )
+    except Exception as e:
+        logger.warning(f"Firestore get_user_skills warning: {e}")
+
+    # 2. SQLite fallback
     stmt = select(Skill).where(Skill.user_id == user_id)
     res = await db.execute(stmt)
     skills = res.scalars().all()
@@ -60,6 +94,7 @@ async def get_user_skills(
         message="User skills retrieved successfully",
         data=schema_list
     )
+
 
 
 @router.get(
@@ -162,6 +197,49 @@ async def get_skill_details(
     db: AsyncSession = Depends(get_db),
     user_id: str = Depends(get_current_user_id)
 ):
+    # 1. Check Firestore first
+    try:
+        fs_skill = await SkillsRepository.get_skill(user_id, skill_id)
+        if fs_skill:
+            evidence_schemas = [
+                SkillEvidenceSchema(
+                    id=e.get("id", str(idx)),
+                    source=e.get("source", "Manual"),
+                    description=e.get("description", ""),
+                    confidence_weight=e.get("confidence_weight", 1.0),
+                    evidence_date=e.get("created_at")
+                )
+                for idx, e in enumerate(fs_skill.get("evidences", []))
+            ]
+            skill_schema = UserSkillSchema(
+                id=fs_skill.get("id", skill_id),
+                skill_name=fs_skill.get("skill_name", "Skill"),
+                normalized_name=fs_skill.get("normalized_name"),
+                category=fs_skill.get("category", "Technical"),
+                proficiency_percent=fs_skill.get("proficiency_percent", 50),
+                proficiency_level=fs_skill.get("proficiency_level", "Beginner"),
+                confidence_score=fs_skill.get("confidence_score", 50),
+                confidence_status=fs_skill.get("confidence_status", "Claimed"),
+                target_required_level=fs_skill.get("target_required_level"),
+                gap_status=fs_skill.get("gap_status", "Matched"),
+                priority=fs_skill.get("priority", "Low"),
+                priority_reason=fs_skill.get("priority_reason"),
+                evidence_sources=fs_skill.get("evidence_sources") or []
+            )
+            return APIResponse(
+                success=True,
+                message="Skill details retrieved",
+                data=SkillDetailResponse(
+                    skill=skill_schema,
+                    evidence_records=evidence_schemas,
+                    target_career_requirement=fs_skill.get("target_required_level") or "Required",
+                    recommended_next_action=f"Continue applying {fs_skill.get('skill_name')} in complex system scenarios."
+                )
+            )
+    except Exception as e:
+        logger.warning(f"Firestore get_skill_details warning: {e}")
+
+    # 2. SQLite fallback
     stmt = select(Skill).where(Skill.id == skill_id, Skill.user_id == user_id)
     res = await db.execute(stmt)
     skill = res.scalars().first()
@@ -232,6 +310,27 @@ async def recalculate_skill_profile(
         db, user_id, user_skills
     )
 
+    # Sync to Firestore SkillsRepository
+    for s in user_skills:
+        try:
+            await SkillsRepository.save_skill(user_id, s.id, {
+                "id": s.id,
+                "skill_name": s.skill_name,
+                "normalized_name": s.normalized_name,
+                "category": s.category,
+                "proficiency_percent": s.proficiency_percent,
+                "proficiency_level": s.proficiency_level,
+                "confidence_score": s.confidence_score,
+                "confidence_status": s.confidence_status,
+                "target_required_level": s.target_required_level,
+                "gap_status": s.gap_status,
+                "priority": s.priority,
+                "priority_reason": s.priority_reason,
+                "evidence_sources": s.evidence_sources or []
+            })
+        except Exception as e:
+            logger.warning(f"Firestore sync skill error: {e}")
+
     verified_cnt = sum(1 for s in user_skills if s.confidence_status == "Verified")
     supported_cnt = sum(1 for s in user_skills if s.confidence_status == "Supported")
     claimed_cnt = sum(1 for s in user_skills if s.confidence_status == "Claimed")
@@ -254,3 +353,4 @@ async def recalculate_skill_profile(
         message="Skill profile recalculated successfully",
         data=profile_response
     )
+

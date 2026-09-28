@@ -1,15 +1,24 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter } from 'next/navigation';
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signInWithPopup,
+  signOut,
+  onAuthStateChanged,
+  updateProfile,
+  User as FirebaseUser,
+} from 'firebase/auth';
+import { auth, googleProvider } from '@/lib/firebase';
 import { UserAuthData } from '@/lib/types';
 import {
-  loginUser,
-  registerUser,
-  demoLoginUser,
   getMe,
   getSavedAuthToken,
+  saveAuthToken,
   clearAuthToken,
+  demoLoginUser,
 } from '@/lib/api-client';
 
 interface AuthContextType {
@@ -20,8 +29,9 @@ interface AuthContextType {
   hasCompletedAssessment: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, fullName?: string) => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
   demoLogin: () => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   markAssessmentCompleted: () => void;
   refreshUser: () => Promise<UserAuthData | undefined>;
 }
@@ -33,116 +43,208 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
-  const pathname = usePathname();
+
+  // Sync authenticated session with backend
+  const syncWithBackend = async (idToken: string, fbUser?: FirebaseUser | null): Promise<UserAuthData | null> => {
+    saveAuthToken(idToken);
+    setToken(idToken);
+    try {
+      const backendUser = await getMe();
+      setUser(backendUser);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('auth_user', JSON.stringify(backendUser));
+      }
+      return backendUser;
+    } catch (err) {
+      console.warn('Backend profile sync notice:', err);
+      // Fallback user from Firebase credentials if backend is temporarily offline
+      if (fbUser) {
+        const fallbackUser: UserAuthData = {
+          id: fbUser.uid,
+          email: fbUser.email || '',
+          full_name: fbUser.displayName || (fbUser.email ? fbUser.email.split('@')[0] : 'Candidate'),
+          is_active: true,
+          has_completed_assessment: false,
+        };
+        setUser(fallbackUser);
+        return fallbackUser;
+      }
+      return null;
+    }
+  };
 
   useEffect(() => {
     let isMounted = true;
-    const initAuth = async () => {
-      const savedToken = getSavedAuthToken();
-      if (!savedToken) {
-        if (isMounted) {
-          setUser(null);
-          setToken(null);
-          setIsLoading(false);
-        }
-        return;
-      }
 
-      if (isMounted) setToken(savedToken);
-      try {
-        // Try cached user first for instantaneous UI render
-        const cachedUserStr = localStorage.getItem('auth_user');
-        if (cachedUserStr && isMounted) {
+    // Load cached session for instantaneous UI responsiveness
+    if (typeof window !== 'undefined') {
+      const cachedToken = getSavedAuthToken();
+      const cachedUserStr = localStorage.getItem('auth_user');
+      if (cachedToken) setToken(cachedToken);
+      if (cachedUserStr) {
+        try {
+          setUser(JSON.parse(cachedUserStr));
+        } catch {}
+      }
+    }
+
+    const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
+      if (!isMounted) return;
+
+      if (fbUser) {
+        try {
+          const idToken = await fbUser.getIdToken();
+          if (isMounted) {
+            await syncWithBackend(idToken, fbUser);
+          }
+        } catch (err) {
+          console.error('Error fetching Firebase ID token:', err);
+        }
+      } else {
+        // If not logged in via Firebase, check if there is an active backend/demo session
+        const savedToken = getSavedAuthToken();
+        if (savedToken) {
           try {
-            setUser(JSON.parse(cachedUserStr));
-          } catch {}
-        }
-
-        // Verify with backend with 3.5s timeout
-        const fetchPromise = getMe();
-        const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('Auth verification timeout')), 3500)
-        );
-        const currentUser = await Promise.race([fetchPromise, timeoutPromise]);
-        if (isMounted) {
-          setUser(currentUser);
-          localStorage.setItem('auth_user', JSON.stringify(currentUser));
-        }
-      } catch (err) {
-        console.warn('Session verification notice:', err);
-        const cachedUserStr = localStorage.getItem('auth_user');
-        if (!cachedUserStr && isMounted) {
-          clearAuthToken();
-          setUser(null);
-          setToken(null);
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
+            const me = await getMe();
+            if (isMounted) {
+              setUser(me);
+              setToken(savedToken);
+            }
+          } catch {
+            clearAuthToken();
+            if (isMounted) {
+              setUser(null);
+              setToken(null);
+            }
+          }
+        } else {
+          if (isMounted) {
+            setUser(null);
+            setToken(null);
+          }
         }
       }
-    };
 
-    initAuth();
+      if (isMounted) {
+        setIsLoading(false);
+      }
+    });
+
     return () => {
       isMounted = false;
+      unsubscribe();
     };
   }, []);
+
+  const login = async (email: string, password: string) => {
+    setIsLoading(true);
+    try {
+      const cred = await signInWithEmailAndPassword(auth, email, password);
+      const idToken = await cred.user.getIdToken();
+      const syncedUser = await syncWithBackend(idToken, cred.user);
+      if (syncedUser && !syncedUser.has_completed_assessment) {
+        router.push('/assessment');
+      } else {
+        router.push('/dashboard');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const register = async (email: string, password: string, fullName?: string) => {
+    setIsLoading(true);
+    try {
+      const cred = await createUserWithEmailAndPassword(auth, email, password);
+      if (fullName && fullName.trim()) {
+        try {
+          await updateProfile(cred.user, { displayName: fullName.trim() });
+        } catch (e) {
+          console.warn('Profile name update notice:', e);
+        }
+      }
+      const idToken = await cred.user.getIdToken();
+      await syncWithBackend(idToken, cred.user);
+      router.push('/assessment');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const loginWithGoogle = async () => {
+    setIsLoading(true);
+    try {
+      const cred = await signInWithPopup(auth, googleProvider);
+      const idToken = await cred.user.getIdToken();
+      const syncedUser = await syncWithBackend(idToken, cred.user);
+      if (syncedUser && !syncedUser.has_completed_assessment) {
+        router.push('/assessment');
+      } else {
+        router.push('/dashboard');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const demoLogin = async () => {
+    setIsLoading(true);
+    try {
+      const res = await demoLoginUser();
+      setToken(res.access_token);
+      saveAuthToken(res.access_token);
+      setUser(res.user);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('auth_user', JSON.stringify(res.user));
+      }
+      if (!res.user.has_completed_assessment) {
+        router.push('/assessment');
+      } else {
+        router.push('/dashboard');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const logout = async () => {
+    try {
+      await signOut(auth);
+    } catch (e) {
+      console.warn('Sign out notice:', e);
+    }
+    clearAuthToken();
+    setUser(null);
+    setToken(null);
+    router.push('/login');
+  };
 
   const markAssessmentCompleted = () => {
     setUser((prev) => {
       if (!prev) return prev;
       const updated = { ...prev, has_completed_assessment: true };
-      localStorage.setItem('auth_user', JSON.stringify(updated));
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('auth_user', JSON.stringify(updated));
+      }
       return updated;
     });
   };
 
   const refreshUser = async () => {
     try {
+      if (auth.currentUser) {
+        const freshToken = await auth.currentUser.getIdToken(true);
+        return (await syncWithBackend(freshToken, auth.currentUser)) || undefined;
+      }
       const currentUser = await getMe();
       setUser(currentUser);
-      localStorage.setItem('auth_user', JSON.stringify(currentUser));
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('auth_user', JSON.stringify(currentUser));
+      }
       return currentUser;
     } catch {
       return undefined;
     }
-  };
-
-  const login = async (email: string, password: string) => {
-    const res = await loginUser(email, password);
-    setToken(res.access_token);
-    setUser(res.user);
-    if (!res.user.has_completed_assessment) {
-      router.push('/assessment');
-    } else {
-      router.push('/dashboard');
-    }
-  };
-
-  const register = async (email: string, password: string, fullName?: string) => {
-    const res = await registerUser(email, password, fullName);
-    setToken(res.access_token);
-    setUser(res.user);
-    router.push('/assessment');
-  };
-
-  const demoLogin = async () => {
-    const res = await demoLoginUser();
-    setToken(res.access_token);
-    setUser(res.user);
-    if (!res.user.has_completed_assessment) {
-      router.push('/assessment');
-    } else {
-      router.push('/dashboard');
-    }
-  };
-
-  const logout = () => {
-    clearAuthToken();
-    setUser(null);
-    setToken(null);
-    router.push('/login');
   };
 
   return (
@@ -150,11 +252,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       value={{
         user,
         token,
-        isAuthenticated: !!user && !!token,
+        isAuthenticated: !!user,
         isLoading,
         hasCompletedAssessment: !!user?.has_completed_assessment,
         login,
         register,
+        loginWithGoogle,
         demoLogin,
         logout,
         markAssessmentCompleted,

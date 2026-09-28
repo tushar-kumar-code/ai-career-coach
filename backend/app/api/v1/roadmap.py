@@ -27,12 +27,15 @@ from app.schemas.roadmap import (
     FocusSkillResponse
 )
 
+import logging
 from app.schemas.interview import PracticeSuggestionItem
 from app.services.skill.ingestion_engine import SkillIngestionEngine
 from app.services.skill.gap_engine import SkillGapEngine
 from app.services.roadmap.roadmap_engine import RoadmapEngine
+from app.services.firestore.roadmap_repo import RoadmapRepository
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 ingestion_engine = SkillIngestionEngine()
 gap_engine = SkillGapEngine()
 roadmap_engine = RoadmapEngine()
@@ -68,10 +71,16 @@ async def generate_roadmap(
         preserve_progress=True
     )
 
+    resp_data = _serialize_roadmap(roadmap)
+    try:
+        await RoadmapRepository.save_roadmap(user_id, roadmap.id, resp_data.model_dump())
+    except Exception as e:
+        logger.warning(f"Firestore save roadmap error: {e}")
+
     return APIResponse(
         success=True,
         message="Personalized roadmap generated successfully",
-        data=_serialize_roadmap(roadmap)
+        data=resp_data
     )
 
 
@@ -84,6 +93,33 @@ async def get_current_roadmap(
     db: AsyncSession = Depends(get_db),
     user_id: str = Depends(get_current_user_id)
 ):
+    # 1. Check Firestore first
+    try:
+        fs_roadmap = await RoadmapRepository.get_active_roadmap(user_id)
+        if fs_roadmap and fs_roadmap.get("phases"):
+            # Check if target career changed
+            user_profile = await UserRepository.get_user(user_id)
+            target_career = user_profile.get("target_career") if user_profile else None
+            if not target_career:
+                p_stmt = select(UserProfile).where(UserProfile.user_id == user_id)
+                p_res = await db.execute(p_stmt)
+                up = p_res.scalars().first()
+                if up:
+                    target_career = up.target_career
+
+            if target_career and target_career != fs_roadmap.get("target_role"):
+                fs_roadmap["is_outdated"] = True
+                await RoadmapRepository.save_roadmap(user_id, fs_roadmap.get("id"), {"is_outdated": True})
+
+            return APIResponse(
+                success=True,
+                message="Current roadmap retrieved",
+                data=RoadmapResponse(**fs_roadmap)
+            )
+    except Exception as e:
+        logger.warning(f"Firestore get_active_roadmap warning: {e}")
+
+    # 2. SQLite fallback
     stmt = select(Roadmap).where(Roadmap.user_id == user_id, Roadmap.is_active == True)
     res = await db.execute(stmt)
     roadmap = res.scalars().first()
@@ -110,6 +146,7 @@ async def get_current_roadmap(
         message="Current roadmap retrieved",
         data=_serialize_roadmap(roadmap)
     )
+
 
 
 @router.get(
@@ -355,10 +392,16 @@ async def complete_task(
     db.add(roadmap)
     await db.commit()
 
+    serialized = _serialize_roadmap(roadmap)
+    try:
+        await RoadmapRepository.save_roadmap(user_id, roadmap.id, serialized.model_dump())
+    except Exception as e:
+        logger.warning(f"Firestore update roadmap error: {e}")
+
     return APIResponse(
         success=True,
         message=f"Task '{task_id}' marked as completed",
-        data=_serialize_roadmap(roadmap)
+        data=serialized
     )
 
 
@@ -383,11 +426,18 @@ async def uncomplete_task(
     db.add(roadmap)
     await db.commit()
 
+    serialized = _serialize_roadmap(roadmap)
+    try:
+        await RoadmapRepository.save_roadmap(user_id, roadmap.id, serialized.model_dump())
+    except Exception as e:
+        logger.warning(f"Firestore update roadmap error: {e}")
+
     return APIResponse(
         success=True,
         message=f"Task '{task_id}' marked as uncompleted",
-        data=_serialize_roadmap(roadmap)
+        data=serialized
     )
+
 
 
 @router.get(
@@ -471,6 +521,11 @@ async def recalculate_roadmap(
         preserve_progress=True
     )
 
+    try:
+        await RoadmapRepository.save_roadmap(user_id, updated_roadmap.id, _serialize_roadmap(updated_roadmap).model_dump())
+    except Exception as e:
+        logger.warning(f"Firestore save_roadmap warning: {e}")
+
     return APIResponse(
         success=True,
         message="Roadmap recalculated and progress preserved",
@@ -507,6 +562,11 @@ async def update_preferences(
         learning_style=payload.preferred_learning_style,
         preserve_progress=True
     )
+
+    try:
+        await RoadmapRepository.save_roadmap(user_id, updated_roadmap.id, _serialize_roadmap(updated_roadmap).model_dump())
+    except Exception as e:
+        logger.warning(f"Firestore save_roadmap warning: {e}")
 
     return APIResponse(
         success=True,

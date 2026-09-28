@@ -60,12 +60,12 @@ export default function DashboardLayout({
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-center space-y-4">
-        <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-indigo-500/25 animate-pulse">
-          <Sparkles className="w-6 h-6 text-white" />
+      <div className="min-h-screen bg-[#FAF8F3] dark:bg-[#0F172A] text-[#273444] dark:text-[#F1F5F9] flex flex-col items-center justify-center space-y-4">
+        <div className="w-12 h-12 rounded-2xl bg-[#17324D] dark:bg-[#172235] border border-[#B89B72]/40 flex items-center justify-center shadow-sm">
+          <Compass className="w-6 h-6 text-[#B89B72] animate-pulse" />
         </div>
-        <div className="flex items-center space-x-2 text-xs text-slate-400">
-          <Loader2 className="w-4 h-4 animate-spin text-indigo-400" />
+        <div className="flex items-center space-x-2 text-xs text-[#64748B] dark:text-[#A8B3C2]">
+          <Loader2 className="w-4 h-4 animate-spin text-[#B89B72]" />
           <span>Authenticating Candidate Session...</span>
         </div>
       </div>
@@ -77,7 +77,7 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col lg:flex-row w-full overflow-x-hidden">
+    <div className="min-h-screen bg-[#FAF8F3] dark:bg-[#0F172A] text-[#273444] dark:text-[#F1F5F9] flex flex-col lg:flex-row w-full overflow-x-hidden">
       <Sidebar
         isMobileOpen={mobileMenuOpen}
         onClose={() => setMobileMenuOpen(false)}
@@ -87,21 +87,21 @@ export default function DashboardLayout({
         <Header onOpenMobileMenu={() => setMobileMenuOpen(true)} />
         <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto overflow-x-hidden">
           {!hasCompletedAssessment && pathname !== '/assessment' && (
-            <div className="mb-6 p-4 rounded-xl bg-gradient-to-r from-indigo-950/80 via-purple-950/60 to-slate-900 border border-indigo-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="mb-6 p-4 rounded-xl bg-white dark:bg-[#172235] border border-[#C78A20]/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm">
               <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center shrink-0">
+                <div className="w-10 h-10 rounded-lg bg-[#C78A20]/15 text-[#C78A20] flex items-center justify-center shrink-0">
                   <Compass className="w-5 h-5 animate-pulse" />
                 </div>
                 <div>
-                  <h4 className="text-sm font-bold text-white">First Step Required: Complete Career Assessment</h4>
-                  <p className="text-xs text-slate-300">
-                    To give you personalized roadmap tasks, realistic job matches, and your real Career Digital Twin, you must take the assessment first.
+                  <h4 className="text-sm font-bold text-[#17324D] dark:text-[#F1F5F9]">First Step Required: Complete Career Assessment</h4>
+                  <p className="text-xs text-[#64748B] dark:text-[#A8B3C2]">
+                    To unlock personalized roadmap tasks, realistic job matches, and your Career Digital Twin, you must take the assessment first.
                   </p>
                 </div>
               </div>
               <Link
                 href="/assessment"
-                className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shrink-0 transition shadow-lg shadow-indigo-600/30"
+                className="px-4 py-2 rounded-lg bg-[#17324D] hover:bg-[#102A43] text-white text-xs font-semibold shrink-0 transition shadow-sm"
               >
                 Go to Assessment 🎯
               </Link>

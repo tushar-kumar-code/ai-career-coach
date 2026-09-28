@@ -1,3 +1,5 @@
+import uuid
+import logging
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Header
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,8 +26,12 @@ from app.schemas.assessment import (
 )
 from app.services.assessment.adaptive_engine import AdaptiveAssessmentEngine
 from app.services.ai.discovery_ai import CareerDiscoveryAIService
+from app.services.firestore.assessment_repo import AssessmentRepository
+from app.services.firestore.user_repo import UserRepository
+from app.services.firestore.skills_repo import SkillsRepository
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 adaptive_engine = AdaptiveAssessmentEngine()
 ai_service = CareerDiscoveryAIService()
 
@@ -52,6 +58,25 @@ async def start_assessment(
     total_questions = adaptive_engine.MAX_QUESTIONS_PER_SESSION
 
     if not retake:
+        # Check Firestore for completed assessment
+        try:
+            fs_completed = await AssessmentRepository.get_latest_completed_assessment(user_id)
+            if fs_completed:
+                return APIResponse(
+                    success=True,
+                    message="User has already completed the assessment",
+                    data=AssessmentSessionResponse(
+                        session_id=fs_completed.get("id"),
+                        current_step=total_questions,
+                        total_questions=total_questions,
+                        is_completed=True,
+                        current_question=None,
+                        answers_count=total_questions
+                    )
+                )
+        except Exception as e:
+            logger.warning(f"Firestore completed assessment check warning: {e}")
+
         completed_stmt = select(AssessmentResponse).where(
             AssessmentResponse.user_id == user_id,
             AssessmentResponse.status == "COMPLETED"
@@ -108,6 +133,18 @@ async def start_assessment(
         db.add(session)
         await db.commit()
         await db.refresh(session)
+
+        try:
+            await AssessmentRepository.save_assessment(user_id, session.id, {
+                "id": session.id,
+                "status": "IN_PROGRESS",
+                "current_step": 1,
+                "user_level": user_level,
+                "dimension_answers": {}
+            })
+        except Exception as e:
+            logger.warning(f"Firestore session save warning: {e}")
+
         answered_ids = []
         next_q = await adaptive_engine.get_next_question(
             db=db,
@@ -116,6 +153,7 @@ async def start_assessment(
             language=x_language_preference,
             ai_provider=ai_provider
         )
+
 
     q_schema = None
     if next_q:
@@ -208,6 +246,16 @@ async def submit_answer(
     await db.commit()
     await db.refresh(session)
 
+    try:
+        await AssessmentRepository.save_assessment(user_id, session.id, {
+            "status": session.status,
+            "current_step": session.current_step,
+            "user_level": session.user_level,
+            "dimension_answers": updated_answers
+        })
+    except Exception as e:
+        logger.warning(f"Firestore save answer warning: {e}")
+
     total_questions = adaptive_engine.MAX_QUESTIONS_PER_SESSION
 
     answered_ids = list(updated_answers.keys())
@@ -272,21 +320,29 @@ async def complete_assessment(
     session = res.scalars().first()
 
     if not session:
-        raise HTTPException(status_code=404, detail="Assessment session not found")
+        # Check Firestore for session
+        fs_session = await AssessmentRepository.get_assessment(user_id, session_id)
+        if not fs_session or not fs_session.get("dimension_answers"):
+            raise HTTPException(status_code=404, detail="Assessment session not found")
+        # Build mock session object for backward compatibility
+        dimension_answers = fs_session.get("dimension_answers")
+    else:
+        dimension_answers = session.dimension_answers
 
-    if not session.dimension_answers:
+    if not dimension_answers:
         raise HTTPException(status_code=400, detail="Cannot complete assessment without answers")
 
     # Run AI Analysis
-    ai_result = await ai_service.analyze_assessment(db, session.dimension_answers, language=x_language_preference)
+    ai_result = await ai_service.analyze_assessment(db, dimension_answers, language=x_language_preference)
     ai_dict = ai_result.model_dump()
 
     # Update session status
-    session.status = "COMPLETED"
-    session.computed_archetype = ai_result.primary_archetype
-    session.role_recommendations = [r.model_dump() for r in ai_result.recommended_careers]
-    session.ai_analysis_json = ai_dict
-    db.add(session)
+    if session:
+        session.status = "COMPLETED"
+        session.computed_archetype = ai_result.primary_archetype
+        session.role_recommendations = [r.model_dump() for r in ai_result.recommended_careers]
+        session.ai_analysis_json = ai_dict
+        db.add(session)
 
     # Create or update UserProfile (Digital Twin)
     top_match = ai_result.recommended_careers[0] if ai_result.recommended_careers else None
@@ -321,11 +377,34 @@ async def complete_assessment(
     db.add(user_profile)
     await db.commit()
 
+    # Persist to Firestore AssessmentRepository & UserRepository
+    try:
+        await AssessmentRepository.save_assessment(user_id, session_id, {
+            "status": "COMPLETED",
+            "computed_archetype": ai_result.primary_archetype,
+            "role_recommendations": [r.model_dump() for r in ai_result.recommended_careers],
+            "ai_analysis_json": ai_dict,
+            "selected_target_career": target_role
+        })
+        await UserRepository.upsert_user(user_id, {
+            "target_career": target_role,
+            "primary_archetype": ai_result.primary_archetype,
+            "job_readiness_score": top_score,
+            "has_completed_assessment": True,
+            "skills_matrix": {
+                "verified_skills": [s.model_dump() for s in ai_result.top_strengths],
+                "interests": ai_result.interest_profile
+            },
+            "recommended_roles": [r.model_dump() for r in ai_result.recommended_careers]
+        })
+    except Exception as e:
+        logger.warning(f"Firestore complete assessment save warning: {e}")
+
     return APIResponse(
         success=True,
         message="Career Discovery Assessment completed successfully",
         data={
-            "session_id": session.id,
+            "session_id": session_id,
             "status": "COMPLETED",
             "archetype": ai_result.primary_archetype,
             "analysis": ai_dict
@@ -342,6 +421,27 @@ async def get_assessment_result(
     db: AsyncSession = Depends(get_db),
     user_id: str = Depends(get_current_user_id)
 ):
+    # 1. Check Firestore first
+    try:
+        fs_session = await AssessmentRepository.get_latest_completed_assessment(user_id)
+        if fs_session and fs_session.get("ai_analysis_json"):
+            fs_user = await UserRepository.get_user(user_id)
+            target_career = (fs_user.get("target_career") if fs_user else None) or fs_session.get("selected_target_career")
+            return APIResponse(
+                success=True,
+                message="Career Discovery Result retrieved",
+                data={
+                    "session_id": fs_session.get("id"),
+                    "selected_target_career": target_career,
+                    "archetype": fs_session.get("computed_archetype"),
+                    "analysis": fs_session.get("ai_analysis_json"),
+                    "completed_at": fs_session.get("updated_at")
+                }
+            )
+    except Exception as e:
+        logger.warning(f"Firestore get_assessment_result warning: {e}")
+
+    # 2. SQLite fallback
     stmt = select(AssessmentResponse).where(
         AssessmentResponse.user_id == user_id,
         AssessmentResponse.status == "COMPLETED",
@@ -387,6 +487,26 @@ async def get_assessment_status(
     user_id: str = Depends(get_current_user_id)
 ):
     """Returns whether the current user has completed their onboarding career assessment."""
+    # 1. Check Firestore first
+    try:
+        has_completed_fs = await AssessmentRepository.has_completed_assessment(user_id)
+        fs_user = await UserRepository.get_user(user_id)
+        if has_completed_fs or (fs_user and fs_user.get("has_completed_assessment")):
+            fs_session = await AssessmentRepository.get_latest_completed_assessment(user_id)
+            return APIResponse(
+                success=True,
+                message="Assessment status retrieved",
+                data={
+                    "has_completed_assessment": True,
+                    "target_career": (fs_user.get("target_career") if fs_user else None) or (fs_session.get("selected_target_career") if fs_session else None),
+                    "primary_archetype": (fs_user.get("primary_archetype") if fs_user else None) or (fs_session.get("computed_archetype") if fs_session else None),
+                    "job_readiness_score": fs_user.get("job_readiness_score", 0) if fs_user else 0
+                }
+            )
+    except Exception as e:
+        logger.warning(f"Firestore get_assessment_status warning: {e}")
+
+    # 2. SQLite fallback
     stmt = select(AssessmentResponse).where(
         AssessmentResponse.user_id == user_id,
         AssessmentResponse.status == "COMPLETED",
@@ -411,6 +531,7 @@ async def get_assessment_status(
             "job_readiness_score": user_profile.job_readiness_score if user_profile else 0
         }
     )
+
 
 
 @router.get(
@@ -533,6 +654,15 @@ async def select_target_career(
 
     await db.commit()
 
+    # Persist to Firestore UserRepository & AssessmentRepository
+    try:
+        await UserRepository.update_target_career(user_id, role.title, role.work_style)
+        fs_session = await AssessmentRepository.get_latest_completed_assessment(user_id)
+        if fs_session:
+            await AssessmentRepository.save_assessment(user_id, fs_session.get("id"), {"selected_target_career": role.title})
+    except Exception as e:
+        logger.warning(f"Firestore update target career error: {e}")
+
     # Recalculate skill profile & gap priorities for new target career
     try:
         from app.services.skill.ingestion_engine import SkillIngestionEngine
@@ -576,10 +706,23 @@ async def submit_direct_career_goal(
     role_title = role.title if role else target_career
     archetype = role.work_style if role and role.work_style else "Strategic Builder"
 
-    # 2. Ingest user's known skills into database
+    # 2. Ingest user's known skills into database & Firestore
     known_skills = [s.strip() for s in payload.known_skills if s.strip()]
     from app.models.skill import Skill
     for sk_name in known_skills:
+        try:
+            await SkillsRepository.upsert_skill_by_name(
+                user_id,
+                sk_name,
+                {
+                    "category": "Technical",
+                    "proficiency_level": "Intermediate" if payload.experience_level in ["intermediate", "advanced"] else "Beginner",
+                    "confidence_status": "Claimed"
+                }
+            )
+        except Exception as e:
+            logger.warning(f"Firestore skill upsert error for {sk_name}: {e}")
+
         sk_stmt = select(Skill).where(Skill.user_id == user_id, Skill.skill_name.ilike(sk_name))
         sk_res = await db.execute(sk_stmt)
         existing_sk = sk_res.scalars().first()
@@ -686,6 +829,27 @@ async def submit_direct_career_goal(
 
     await db.commit()
 
+    # Persist to Firestore UserRepository & AssessmentRepository
+    try:
+        await UserRepository.upsert_user(user_id, {
+            "target_career": role_title,
+            "primary_archetype": archetype,
+            "job_readiness_score": readiness_score,
+            "has_completed_assessment": True,
+            "skills_matrix": skills_matrix_payload
+        })
+        session_id = session.id if session else str(uuid.uuid4())
+        await AssessmentRepository.save_assessment(user_id, session_id, {
+            "id": session_id,
+            "status": "COMPLETED",
+            "user_level": payload.experience_level,
+            "computed_archetype": archetype,
+            "selected_target_career": role_title,
+            "ai_analysis_json": analysis_data
+        })
+    except Exception as e:
+        logger.warning(f"Firestore direct goal save error: {e}")
+
     # Recalculate skill gaps
     try:
         from app.services.skill.ingestion_engine import SkillIngestionEngine
@@ -708,4 +872,5 @@ async def submit_direct_career_goal(
             "analysis": analysis_data
         }
     )
+
 

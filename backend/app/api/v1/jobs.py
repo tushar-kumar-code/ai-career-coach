@@ -22,11 +22,15 @@ from app.schemas.job import (
 from app.services.job.providers.catalog_provider import CatalogJobProvider
 from app.services.job.matching_engine import JobMatchingEngine
 from app.services.job.tracker_service import JobTrackerService
+from app.services.firestore.jobs_repo import JobsRepository
+import logging
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 catalog_provider = CatalogJobProvider()
 matching_engine = JobMatchingEngine()
 tracker_service = JobTrackerService()
+
 
 
 async def _sync_catalog_jobs_to_db(db: AsyncSession):
@@ -174,6 +178,37 @@ async def get_saved_jobs(
     db: AsyncSession = Depends(get_db),
     user_id: str = Depends(get_current_user_id)
 ):
+    # 1. Check Firestore first
+    try:
+        fs_saved = await JobsRepository.get_saved_jobs(user_id)
+        if fs_saved:
+            responses = []
+            for s in fs_saved:
+                try:
+                    job_data = s.get("job")
+                    job_schema = JobSchema(**job_data) if job_data else None
+                    responses.append(
+                        SavedJobResponse(
+                            id=s.get("id", s.get("job_id")),
+                            user_id=user_id,
+                            job_id=s.get("job_id"),
+                            notes=s.get("notes"),
+                            saved_at=s.get("saved_at", ""),
+                            job=job_schema
+                        )
+                    )
+                except Exception:
+                    pass
+            if responses:
+                return APIResponse(
+                    success=True,
+                    message="Saved jobs retrieved successfully",
+                    data=responses
+                )
+    except Exception as e:
+        logger.warning(f"Firestore get_saved_jobs warning: {e}")
+
+    # 2. SQLite fallback
     stmt = select(SavedJob).options(selectinload(SavedJob.job)).where(SavedJob.user_id == user_id)
     res = await db.execute(stmt)
     saved_list = res.scalars().all()
@@ -220,6 +255,7 @@ async def get_saved_jobs(
         message="Saved jobs retrieved successfully",
         data=responses
     )
+
 
 
 @router.get(
@@ -349,6 +385,16 @@ async def save_job_endpoint(
         job=job_schema
     )
 
+    try:
+        await JobsRepository.save_job(user_id, job_id, {
+            "id": saved_obj.id,
+            "notes": notes,
+            "saved_at": saved_obj.saved_at.isoformat() if saved_obj.saved_at else "",
+            "job": job_schema.model_dump()
+        })
+    except Exception as e:
+        logger.warning(f"Firestore save_job error: {e}")
+
     return APIResponse(
         success=True,
         message="Job saved successfully",
@@ -366,6 +412,11 @@ async def delete_saved_job_endpoint(
     db: AsyncSession = Depends(get_db),
     user_id: str = Depends(get_current_user_id)
 ):
+    try:
+        await JobsRepository.unsave_job(user_id, job_id)
+    except Exception as e:
+        logger.warning(f"Firestore unsave_job error: {e}")
+
     success = await tracker_service.remove_saved_job(db, user_id, job_id)
     return APIResponse(
         success=success,
@@ -388,6 +439,28 @@ async def get_user_applications(
     db: AsyncSession = Depends(get_db),
     user_id: str = Depends(get_current_user_id)
 ):
+    # 1. Check Firestore first
+    try:
+        fs_apps = await JobsRepository.get_applications(user_id)
+        if fs_apps:
+            resp_list = []
+            for a in fs_apps:
+                try:
+                    if status_filter and a.get("status", "").lower() != status_filter.lower():
+                        continue
+                    resp_list.append(JobApplicationResponse(**a))
+                except Exception:
+                    pass
+            if resp_list:
+                return APIResponse(
+                    success=True,
+                    message="Applications retrieved successfully",
+                    data=resp_list
+                )
+    except Exception as e:
+        logger.warning(f"Firestore get_applications warning: {e}")
+
+    # 2. SQLite fallback
     stmt = select(JobApplication).options(selectinload(JobApplication.job)).where(JobApplication.user_id == user_id)
     if status_filter:
         stmt = stmt.where(JobApplication.status.ilike(status_filter))
@@ -475,6 +548,11 @@ async def create_job_application_endpoint(
         updated_at=app_obj.updated_at.isoformat() if app_obj.updated_at else ""
     )
 
+    try:
+        await JobsRepository.save_application(user_id, app_obj.id, resp.model_dump())
+    except Exception as e:
+        logger.warning(f"Firestore save_application error: {e}")
+
     return APIResponse(
         success=True,
         message="Application logged successfully",
@@ -527,11 +605,17 @@ async def update_job_application_endpoint(
         updated_at=app_obj.updated_at.isoformat() if app_obj.updated_at else ""
     )
 
+    try:
+        await JobsRepository.save_application(user_id, app_obj.id, resp.model_dump())
+    except Exception as e:
+        logger.warning(f"Firestore update application error: {e}")
+
     return APIResponse(
         success=True,
         message="Application updated successfully",
         data=resp
     )
+
 
 
 @router.delete(

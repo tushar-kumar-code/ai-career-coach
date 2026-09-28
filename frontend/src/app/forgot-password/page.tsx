@@ -67,34 +67,30 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-center items-center p-4 sm:p-6 relative overflow-hidden selection:bg-indigo-500 selection:text-white">
-      {/* Ambient background glows */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-indigo-600/15 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-10 right-10 w-80 h-80 bg-purple-600/10 rounded-full blur-3xl pointer-events-none" />
-
+    <div className="min-h-screen bg-[#FAF8F3] dark:bg-[#0F172A] text-[#273444] dark:text-[#F1F5F9] flex flex-col justify-center items-center p-4 sm:p-6 relative selection:bg-[#B89B72] selection:text-white">
       {/* Main Container */}
       <div className="relative w-full max-w-md">
         {/* Brand Header */}
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center space-x-3 group mb-4">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-indigo-500/25 group-hover:scale-105 transition">
-              <Sparkles className="w-6 h-6 text-white" />
+            <div className="w-12 h-12 rounded-2xl bg-[#17324D] dark:bg-[#102A43] border border-[#B89B72]/40 flex items-center justify-center shadow-sm group-hover:scale-105 transition">
+              <Sparkles className="w-6 h-6 text-[#B89B72]" />
             </div>
-            <span className="font-extrabold text-2xl text-white tracking-tight">AI Career Coach</span>
+            <span className="font-extrabold text-2xl text-[#17324D] dark:text-[#F1F5F9] tracking-tight">AI Career Coach</span>
           </Link>
-          <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+          <h1 className="text-xl sm:text-2xl font-bold text-[#17324D] dark:text-[#F1F5F9] tracking-tight">
             Reset Your Password
           </h1>
-          <p className="text-xs sm:text-sm text-slate-400 mt-1">
+          <p className="text-xs sm:text-sm text-[#64748B] dark:text-[#A8B3C2] mt-1">
             Enter your account email and choose a new password
           </p>
         </div>
 
         {/* Card */}
-        <div className="p-6 sm:p-8 rounded-3xl bg-slate-900/80 border border-slate-800 shadow-2xl backdrop-blur-xl space-y-6">
-          <div className="flex items-center space-x-2 text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 p-3 rounded-xl">
-            <KeyRound className="w-4 h-4 shrink-0" />
-            <p className="text-xs text-slate-300">
+        <div className="p-6 sm:p-8 rounded-3xl bg-white dark:bg-[#172235] border border-[#E7E2D8] dark:border-[#334155] shadow-sm space-y-6">
+          <div className="flex items-center space-x-2 text-[#17324D] dark:text-[#D9C19A] bg-[#FAF8F3] dark:bg-[#102A43] border border-[#E7E2D8] dark:border-[#334155] p-3 rounded-xl">
+            <KeyRound className="w-4 h-4 shrink-0 text-[#B89B72]" />
+            <p className="text-xs text-[#64748B] dark:text-[#A8B3C2]">
               Enter your registered email address to set a new password.
             </p>
           </div>
@@ -103,13 +99,13 @@ export default function ForgotPasswordPage() {
           {resetStatus && (
             <div className={`p-3.5 rounded-xl border text-xs flex items-start gap-2.5 animate-in fade-in ${
               resetStatus.success
-                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
-                : 'bg-rose-500/10 border-rose-500/30 text-rose-300'
+                ? 'bg-emerald-500/10 border-[#2E7D5B]/30 text-[#2E7D5B]'
+                : 'bg-rose-500/10 border-[#C75C5C]/30 text-[#C75C5C]'
             }`}>
               {resetStatus.success ? (
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                <CheckCircle2 className="w-4 h-4 text-[#2E7D5B] shrink-0 mt-0.5" />
               ) : (
-                <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                <AlertCircle className="w-4 h-4 text-[#C75C5C] shrink-0 mt-0.5" />
               )}
               <span>{resetStatus.message}</span>
             </div>
@@ -117,28 +113,28 @@ export default function ForgotPasswordPage() {
 
           <form onSubmit={handleResetPassword} className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+              <label className="block text-xs font-semibold text-[#273444] dark:text-[#F1F5F9] mb-1.5">
                 Registered Email Address
               </label>
               <div className="relative">
-                <Mail className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <Mail className="w-4 h-4 text-[#64748B] dark:text-[#A8B3C2] absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
                   type="email"
                   value={resetEmail}
                   onChange={(e) => setResetEmail(e.target.value)}
                   placeholder="student@university.edu"
                   required
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+                  className="w-full bg-[#FAF8F3] dark:bg-[#102A43] border border-[#E7E2D8] dark:border-[#334155] rounded-xl pl-10 pr-4 py-2.5 text-sm text-[#273444] dark:text-[#F1F5F9] placeholder-[#64748B] focus:outline-none focus:ring-2 focus:ring-[#B89B72] transition"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+              <label className="block text-xs font-semibold text-[#273444] dark:text-[#F1F5F9] mb-1.5">
                 New Password (min 6 characters)
               </label>
               <div className="relative">
-                <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <Lock className="w-4 h-4 text-[#64748B] dark:text-[#A8B3C2] absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
                   type={showNewPassword ? 'text' : 'password'}
                   value={newPassword}
@@ -146,12 +142,12 @@ export default function ForgotPasswordPage() {
                   placeholder="••••••••"
                   required
                   minLength={6}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-10 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+                  className="w-full bg-[#FAF8F3] dark:bg-[#102A43] border border-[#E7E2D8] dark:border-[#334155] rounded-xl pl-10 pr-10 py-2.5 text-sm text-[#273444] dark:text-[#F1F5F9] placeholder-[#64748B] focus:outline-none focus:ring-2 focus:ring-[#B89B72] transition"
                 />
                 <button
                   type="button"
                   onClick={() => setShowNewPassword(!showNewPassword)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#64748B] hover:text-[#273444] dark:hover:text-[#F1F5F9]"
                 >
                   {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -159,11 +155,11 @@ export default function ForgotPasswordPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+              <label className="block text-xs font-semibold text-[#273444] dark:text-[#F1F5F9] mb-1.5">
                 Confirm New Password
               </label>
               <div className="relative">
-                <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <Lock className="w-4 h-4 text-[#64748B] dark:text-[#A8B3C2] absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
                   type={showNewPassword ? 'text' : 'password'}
                   value={confirmPassword}
@@ -171,7 +167,7 @@ export default function ForgotPasswordPage() {
                   placeholder="••••••••"
                   required
                   minLength={6}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+                  className="w-full bg-[#FAF8F3] dark:bg-[#102A43] border border-[#E7E2D8] dark:border-[#334155] rounded-xl pl-10 pr-4 py-2.5 text-sm text-[#273444] dark:text-[#F1F5F9] placeholder-[#64748B] focus:outline-none focus:ring-2 focus:ring-[#B89B72] transition"
                 />
               </div>
             </div>
@@ -179,11 +175,11 @@ export default function ForgotPasswordPage() {
             <button
               type="submit"
               disabled={isResetting}
-              className="w-full py-3 px-4 rounded-xl font-bold text-sm bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 hover:opacity-95 text-white transition shadow-lg shadow-indigo-500/25 flex items-center justify-center space-x-2 disabled:opacity-50 mt-2"
+              className="w-full py-3 px-4 rounded-xl font-bold text-sm bg-[#17324D] hover:bg-[#102A43] text-white transition shadow-sm flex items-center justify-center space-x-2 disabled:opacity-50 mt-2"
             >
               {isResetting ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <Loader2 className="w-4 h-4 animate-spin text-[#B89B72]" />
                   <span>Updating Password...</span>
                 </>
               ) : (
@@ -196,10 +192,10 @@ export default function ForgotPasswordPage() {
           </form>
 
           {/* Back to Login Button */}
-          <div className="text-center pt-2 border-t border-slate-800/80">
+          <div className="text-center pt-2 border-t border-[#E7E2D8] dark:border-[#334155]">
             <Link
               href="/login"
-              className="inline-flex items-center space-x-1.5 text-xs text-slate-400 hover:text-white transition"
+              className="inline-flex items-center space-x-1.5 text-xs text-[#64748B] dark:text-[#A8B3C2] hover:text-[#17324D] dark:hover:text-white transition"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
               <span>Back to Sign In</span>
@@ -208,8 +204,8 @@ export default function ForgotPasswordPage() {
         </div>
 
         {/* Security badge */}
-        <div className="mt-6 flex items-center justify-center space-x-2 text-[11px] text-slate-500">
-          <ShieldCheck className="w-4 h-4 text-emerald-400" />
+        <div className="mt-6 flex items-center justify-center space-x-2 text-[11px] text-[#64748B] dark:text-[#A8B3C2]">
+          <ShieldCheck className="w-4 h-4 text-[#2E7D5B]" />
           <span>Encrypted Session & JWT Authentication Enabled</span>
         </div>
       </div>

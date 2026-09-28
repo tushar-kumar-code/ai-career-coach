@@ -555,19 +555,16 @@ export default function SettingsPage() {
                 </button>
               </div>
 
-              {/* Theme Presets Grid */}
+              {/* Theme Mode Selector */}
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2.5">
-                  Theme Presets (Instant Live Switch)
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2.5">
+                  Platform Color Theme
                 </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   {[
-                    { id: 'midnight' as const, name: 'Midnight Obsidian', desc: 'Deep slate with radiant indigo and purple aura', icon: Moon, bg: 'bg-slate-950', accent: 'from-indigo-500 to-purple-500' },
-                    { id: 'cyberpunk' as const, name: 'Cyber Neon', desc: 'Deep void black with vibrant neon violet & fuchsia glow', icon: Sparkles, bg: 'bg-[#07070d]', accent: 'from-purple-500 to-pink-500' },
-                    { id: 'ocean' as const, name: 'Ocean Deep', desc: 'Deep oceanic teal with electric cyan & emerald shine', icon: Layers, bg: 'bg-[#040e1a]', accent: 'from-cyan-500 to-blue-500' },
-                    { id: 'sunset' as const, name: 'Sunset Amber', desc: 'Rich espresso with warm golden amber & rose accents', icon: Zap, bg: 'bg-[#100b09]', accent: 'from-amber-500 to-orange-500' },
-                    { id: 'emerald' as const, name: 'Emerald Forest', desc: 'High-tech dark forest with mint green highlights', icon: Sparkles, bg: 'bg-[#041209]', accent: 'from-emerald-500 to-teal-500' },
-                    { id: 'light' as const, name: 'Crisp Modern Light', desc: 'Clean, high-contrast professional daytime mode', icon: Sun, bg: 'bg-slate-100', accent: 'from-indigo-600 to-blue-600' },
+                    { id: 'light' as const, name: 'Light Mode', desc: 'Crisp #F8FAFC canvas, pure white surfaces, Deep Navy typography & Teal accents', icon: Sun, bg: 'bg-[#F8FAFC]', border: 'border-slate-200', text: 'text-[#17324D]' },
+                    { id: 'dark' as const, name: 'Dark Mode', desc: 'Deep #0F172A slate canvas, #162235 navy surfaces & Teal highlights', icon: Moon, bg: 'bg-[#0F172A]', border: 'border-[#293548]', text: 'text-white' },
+                    { id: 'system' as const, name: 'System Default', desc: 'Automatically matches your device operating system theme preference', icon: RefreshCw, bg: 'bg-slate-100 dark:bg-slate-800', border: 'border-slate-300 dark:border-slate-700', text: 'text-slate-800 dark:text-white' },
                   ].map((t) => {
                     const Icon = t.icon;
                     const isSelected = theme === t.id;
@@ -576,63 +573,71 @@ export default function SettingsPage() {
                         key={t.id}
                         type="button"
                         onClick={() => setTheme(t.id)}
-                        className={`p-3.5 rounded-2xl border text-left transition-all relative flex flex-col justify-between group ${
+                        className={`p-4 rounded-2xl border text-left transition-all relative flex flex-col justify-between group ${
                           isSelected
-                            ? 'bg-slate-800/90 border-indigo-500 ring-2 ring-indigo-500/80 shadow-lg shadow-indigo-500/10'
-                            : 'bg-slate-950/60 border-slate-800/90 hover:border-slate-700'
+                            ? 'bg-[#247B7B]/10 dark:bg-[#247B7B]/20 border-[#247B7B] ring-2 ring-[#247B7B]/50 shadow-sm'
+                            : 'bg-white dark:bg-[#162235] border-slate-200 dark:border-[#293548] hover:border-slate-300 dark:hover:border-slate-700'
                         }`}
                       >
                         <div className="flex items-center justify-between mb-2 w-full">
                           <div className="flex items-center space-x-2.5">
-                            <div className={`w-7 h-7 rounded-xl ${t.bg} border border-slate-700/80 flex items-center justify-center shadow-inner`}>
-                              <div className={`w-3 h-3 rounded-full bg-gradient-to-tr ${t.accent}`} />
+                            <div className={`w-8 h-8 rounded-xl ${t.bg} border ${t.border} flex items-center justify-center shadow-xs`}>
+                              <Icon className="w-4 h-4 text-[#247B7B] dark:text-[#5FA8A8]" />
                             </div>
-                            <span className="font-bold text-xs text-white">{t.name}</span>
+                            <span className="font-bold text-xs text-[#17324D] dark:text-white">{t.name}</span>
                           </div>
                           {isSelected && (
-                            <span className="w-4 h-4 rounded-full bg-indigo-500 text-white flex items-center justify-center shadow-sm">
+                            <span className="w-4 h-4 rounded-full bg-[#247B7B] text-white flex items-center justify-center shadow-xs">
                               <CheckCircle2 className="w-3 h-3" />
                             </span>
                           )}
                         </div>
-                        <p className="text-[11px] text-slate-400 leading-snug">{t.desc}</p>
+                        <p className="text-[11px] text-[#64748B] dark:text-[#94A3B8] leading-snug">{t.desc}</p>
                       </button>
                     );
                   })}
                 </div>
               </div>
 
-              {/* Accent Color Palette */}
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2.5">
-                  Accent Color Highlight
-                </label>
-                <div className="grid grid-cols-3 sm:grid-cols-6 gap-2.5">
-                  {[
-                    { id: 'indigo' as const, name: 'Indigo', color: 'bg-indigo-500' },
-                    { id: 'emerald' as const, name: 'Emerald', color: 'bg-emerald-500' },
-                    { id: 'violet' as const, name: 'Violet', color: 'bg-purple-500' },
-                    { id: 'rose' as const, name: 'Rose', color: 'bg-rose-500' },
-                    { id: 'amber' as const, name: 'Amber', color: 'bg-amber-500' },
-                    { id: 'cyan' as const, name: 'Cyan', color: 'bg-cyan-500' },
-                  ].map((a) => {
-                    const isSelected = accent === a.id;
-                    return (
-                      <button
-                        key={a.id}
-                        type="button"
-                        onClick={() => setAccent(a.id)}
-                        className={`p-2.5 rounded-xl border flex flex-col items-center gap-1.5 transition ${
-                          isSelected
-                            ? 'bg-slate-800 border-indigo-500 ring-1 ring-indigo-500 shadow-md'
-                            : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
-                        }`}
-                      >
-                        <span className={`w-6 h-6 rounded-full ${a.color} shadow-sm`} />
-                        <span className="text-[11px] font-semibold text-slate-200">{a.name}</span>
-                      </button>
-                    );
-                  })}
+              {/* Brand Palette Summary Card */}
+              <div className="p-4 rounded-2xl bg-white dark:bg-[#162235] border border-slate-200 dark:border-[#293548] space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    Active Brand Color Language
+                  </h3>
+                  <span className="text-[10px] font-semibold text-[#247B7B] dark:text-[#5FA8A8]">
+                    Unified Across All 12 Modules
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+                  <div className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 flex items-center space-x-2">
+                    <span className="w-4 h-4 rounded-full bg-[#17324D] border border-white/20 shrink-0" />
+                    <div>
+                      <p className="font-bold text-[11px] text-[#17324D] dark:text-white">Primary Navy</p>
+                      <p className="text-[10px] text-slate-400 font-mono">#17324D</p>
+                    </div>
+                  </div>
+                  <div className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 flex items-center space-x-2">
+                    <span className="w-4 h-4 rounded-full bg-[#247B7B] shrink-0" />
+                    <div>
+                      <p className="font-bold text-[11px] text-[#247B7B] dark:text-[#5FA8A8]">Accent Teal</p>
+                      <p className="text-[10px] text-slate-400 font-mono">#247B7B</p>
+                    </div>
+                  </div>
+                  <div className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 flex items-center space-x-2">
+                    <span className="w-4 h-4 rounded-full bg-[#2E7D5B] shrink-0" />
+                    <div>
+                      <p className="font-bold text-[11px] text-[#2E7D5B]">Success Status</p>
+                      <p className="text-[10px] text-slate-400 font-mono">#2E7D5B</p>
+                    </div>
+                  </div>
+                  <div className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 flex items-center space-x-2">
+                    <span className="w-4 h-4 rounded-full bg-[#C78A20] shrink-0" />
+                    <div>
+                      <p className="font-bold text-[11px] text-[#C78A20]">Warning / Alerts</p>
+                      <p className="text-[10px] text-slate-400 font-mono">#C78A20</p>
+                    </div>
+                  </div>
                 </div>
               </div>
 

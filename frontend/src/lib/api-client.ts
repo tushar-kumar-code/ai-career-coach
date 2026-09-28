@@ -49,6 +49,21 @@ export function getSavedAuthToken(): string | null {
   return localStorage.getItem('auth_token');
 }
 
+export async function getFreshAuthToken(): Promise<string | null> {
+  if (typeof window === 'undefined') return null;
+  try {
+    const { auth } = await import('./firebase');
+    if (auth?.currentUser) {
+      const freshToken = await auth.currentUser.getIdToken();
+      if (freshToken) {
+        saveAuthToken(freshToken);
+        return freshToken;
+      }
+    }
+  } catch {}
+  return getSavedAuthToken();
+}
+
 export function saveAuthToken(token: string) {
   if (typeof window === 'undefined') return;
   localStorage.setItem('auth_token', token);
@@ -88,7 +103,7 @@ export function clearSavedAIConfig() {
 
 async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
   const aiConfig = getSavedAIConfig();
-  const token = getSavedAuthToken();
+  const token = await getFreshAuthToken();
 
   const customHeaders: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -237,7 +252,7 @@ export async function uploadResumeFile(file: File): Promise<ResumeAnalysisData> 
   const formData = new FormData();
   formData.append('file', file);
 
-  const token = getSavedAuthToken();
+  const token = await getFreshAuthToken();
   const aiConfig = getSavedAIConfig();
   const lang = typeof window !== 'undefined' ? (localStorage.getItem('ai_career_language') || 'en') : 'en';
 

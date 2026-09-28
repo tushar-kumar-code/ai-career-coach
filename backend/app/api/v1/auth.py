@@ -369,16 +369,46 @@ async def demo_login(db: AsyncSession = Depends(get_db)):
     )
 
 
+from app.services.firestore.user_repo import UserRepository
+from app.services.firestore.assessment_repo import AssessmentRepository
+
+
 @router.get("/me", response_model=APIResponse[UserResponse], summary="Get current logged in user profile")
 async def get_me(user_id: str = Depends(get_current_user_id), db: AsyncSession = Depends(get_db)):
+    # 1. Check Firestore first
+    try:
+        fs_user = await UserRepository.get_user(user_id)
+        has_completed_fs = await AssessmentRepository.has_completed_assessment(user_id)
+        if fs_user:
+            return APIResponse(
+                success=True,
+                data=UserResponse(
+                    id=user_id,
+                    email=fs_user.get("email", "user@aicareercoach.ai"),
+                    full_name=fs_user.get("full_name") or fs_user.get("displayName") or "User",
+                    is_active=fs_user.get("is_active", True),
+                    is_superuser=fs_user.get("is_superuser", False),
+                    has_completed_assessment=has_completed_fs or fs_user.get("has_completed_assessment", False)
+                ),
+                message="User profile fetched"
+            )
+    except Exception as e:
+        logger.warning(f"Firestore get_me error: {e}")
+
+    # 2. Check SQLite
     stmt = select(User).where(User.id == user_id)
     res = await db.execute(stmt)
     user = res.scalar_one_or_none()
 
     has_completed_assessment = await _check_user_assessment_completed(db, user_id)
+    if not has_completed_assessment:
+        try:
+            has_completed_assessment = await AssessmentRepository.has_completed_assessment(user_id)
+        except Exception:
+            pass
 
     if not user:
-        # Fallback profile for dev identity
+        # Fallback profile for dev identity or new Firebase user
         return APIResponse(
             success=True,
             data=UserResponse(
@@ -403,6 +433,7 @@ async def get_me(user_id: str = Depends(get_current_user_id), db: AsyncSession =
         ),
         message="User profile fetched"
     )
+
 
 
 @router.post("/reset-password", response_model=APIResponse[dict], summary="Reset user password using registered email")

@@ -311,54 +311,53 @@ export default function DashboardPage() {
   return (
     <div className="space-y-8 max-w-7xl mx-auto pb-12">
       {/* Welcome Banner */}
-      <div className="p-6 sm:p-8 rounded-2xl bg-gradient-to-r from-indigo-950/70 via-slate-900 to-purple-950/70 border border-indigo-500/20 relative overflow-hidden">
-        <div className="absolute right-0 top-0 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="p-6 sm:p-8 rounded-2xl bg-white dark:bg-[#172235] border border-[#E7E2D8] dark:border-[#334155] relative shadow-sm">
         <div className="relative z-10 max-w-3xl space-y-3 sm:space-y-4">
-          <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs font-semibold">
-            <Sparkles className="w-3.5 h-3.5" />
+          <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-[#B89B72]/15 border border-[#B89B72]/30 text-[#17324D] dark:text-[#D9C19A] text-xs font-semibold">
+            <Sparkles className="w-3.5 h-3.5 text-[#B89B72]" />
             <span>{t('app.title', 'AI Career Coach')}</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-white tracking-tight">
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-[#17324D] dark:text-[#F1F5F9] tracking-tight">
             {t('dashboard.welcome', 'Welcome back')}! {t('header.cockpit', 'AI Career Coach Cockpit')}
           </h1>
-          <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+          <p className="text-xs sm:text-sm text-[#64748B] dark:text-[#A8B3C2] leading-relaxed">
             {t('dashboard.subtitle', 'Your single unified Career Digital Twin brings together assessments, resume ATS optimization, verified skill matrix, learning roadmaps, job opportunities, and AI mock interviews.')}
           </p>
 
           <div className="pt-2 flex flex-wrap gap-2.5 sm:gap-3">
             <Link
               href="/guide"
-              className="px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs sm:text-sm transition-all shadow-lg shadow-purple-600/30 flex items-center space-x-2"
+              className="px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl bg-[#17324D] hover:bg-[#102A43] text-white font-bold text-xs sm:text-sm transition-all shadow-sm flex items-center space-x-2"
             >
-              <BookOpen className="w-4 h-4" />
+              <BookOpen className="w-4 h-4 text-[#B89B72]" />
               <span>{t('nav.guide', 'How to Use / Guide')}</span>
             </Link>
             <Link
               href="/progress"
-              className="px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 font-semibold text-xs sm:text-sm transition-all flex items-center space-x-2"
+              className="px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl bg-[#FAF8F3] dark:bg-[#102A43] hover:bg-[#F5F1E8] dark:hover:bg-[#1E2D44] border border-[#E7E2D8] dark:border-[#334155] text-[#273444] dark:text-[#F1F5F9] font-semibold text-xs sm:text-sm transition-all flex items-center space-x-2"
             >
-              <TrendingUp className="w-4 h-4 text-indigo-400" />
+              <TrendingUp className="w-4 h-4 text-[#B89B72]" />
               <span>{t('nav.progress', 'Progress & Readiness')}</span>
             </Link>
             <Link
               href="/jobs"
-              className="px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 font-semibold text-xs sm:text-sm transition-all flex items-center space-x-2"
+              className="px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl bg-[#FAF8F3] dark:bg-[#102A43] hover:bg-[#F5F1E8] dark:hover:bg-[#1E2D44] border border-[#E7E2D8] dark:border-[#334155] text-[#273444] dark:text-[#F1F5F9] font-semibold text-xs sm:text-sm transition-all flex items-center space-x-2"
             >
-              <Briefcase className="w-4 h-4 text-emerald-400" />
+              <Briefcase className="w-4 h-4 text-[#2E7D5B]" />
               <span>{t('nav.jobs', 'Job Engine')}</span>
             </Link>
             <Link
               href="/interview"
-              className="px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 font-semibold text-xs sm:text-sm transition-all flex items-center space-x-2"
+              className="px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl bg-[#FAF8F3] dark:bg-[#102A43] hover:bg-[#F5F1E8] dark:hover:bg-[#1E2D44] border border-[#E7E2D8] dark:border-[#334155] text-[#273444] dark:text-[#F1F5F9] font-semibold text-xs sm:text-sm transition-all flex items-center space-x-2"
             >
-              <Mic className="w-4 h-4 text-pink-400" />
+              <Mic className="w-4 h-4 text-[#B89B72]" />
               <span>{t('nav.interview', 'Mock Interview')}</span>
             </Link>
             <Link
               href="/roadmap"
-              className="px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 font-semibold text-xs sm:text-sm transition-all flex items-center space-x-2"
+              className="px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl bg-[#FAF8F3] dark:bg-[#102A43] hover:bg-[#F5F1E8] dark:hover:bg-[#1E2D44] border border-[#E7E2D8] dark:border-[#334155] text-[#273444] dark:text-[#F1F5F9] font-semibold text-xs sm:text-sm transition-all flex items-center space-x-2"
             >
-              <MapPin className="w-4 h-4 text-indigo-400" />
+              <MapPin className="w-4 h-4 text-[#17324D] dark:text-[#D9C19A]" />
               <span>{t('nav.roadmap', 'Roadmap & Tasks')}</span>
             </Link>
           </div>
@@ -369,30 +368,30 @@ export default function DashboardPage() {
       {/* FEATURE 1: Interactive 8-Step Career Working Flow    */}
       {/* Workflow: Discovery → Resume → Skills → Roadmap → Practice → Interview → Jobs → Readiness */}
       {/* ---------------------------------------------------- */}
-      <section className="p-6 sm:p-7 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-xl space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-5">
+      <section className="p-6 sm:p-7 rounded-2xl bg-white dark:bg-[#172235] border border-[#E7E2D8] dark:border-[#334155] shadow-sm space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#E7E2D8] dark:border-[#334155] pb-5">
           <div className="space-y-1">
             <div className="flex items-center space-x-2">
-              <Compass className="w-5 h-5 text-indigo-400" />
-              <h2 className="text-lg font-bold text-white tracking-tight">
+              <Compass className="w-5 h-5 text-[#B89B72]" />
+              <h2 className="text-lg font-bold text-[#17324D] dark:text-[#F1F5F9] tracking-tight">
                 Career Working Flow: 8 Steps to Placement
               </h2>
             </div>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-[#64748B] dark:text-[#A8B3C2]">
               Follow your guided trajectory from assessment to final placement readiness.
             </p>
           </div>
 
           <div className="flex items-center space-x-3 shrink-0">
             <div className="text-right">
-              <span className="text-xs font-bold text-slate-200">
-                Progress: <span className="text-indigo-400">{completedStepsCount}</span> / 8 Steps
+              <span className="text-xs font-bold text-[#273444] dark:text-[#F1F5F9]">
+                Progress: <span className="text-[#B89B72]">{completedStepsCount}</span> / 8 Steps
               </span>
-              <p className="text-[11px] text-slate-500">{workflowProgressPct}% Complete</p>
+              <p className="text-[11px] text-[#64748B] dark:text-[#A8B3C2]">{workflowProgressPct}% Complete</p>
             </div>
-            <div className="w-20 sm:w-28 bg-slate-800 h-2.5 rounded-full overflow-hidden border border-slate-700">
+            <div className="w-20 sm:w-28 bg-[#FAF8F3] dark:bg-[#102A43] h-2.5 rounded-full overflow-hidden border border-[#E7E2D8] dark:border-[#334155]">
               <div
-                className="bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-500 h-full rounded-full transition-all duration-700"
+                className="bg-[#17324D] dark:bg-[#B89B72] h-full rounded-full transition-all duration-700"
                 style={{ width: `${workflowProgressPct}%` }}
               />
             </div>
@@ -410,19 +409,19 @@ export default function DashboardPage() {
                     href={st.href}
                     className={`group flex items-center space-x-2 px-3 py-1.5 rounded-xl border text-xs font-medium transition-all ${
                       st.isDone
-                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20'
+                        ? 'bg-emerald-500/10 border-[#2E7D5B]/30 text-[#2E7D5B] hover:bg-emerald-500/20'
                         : isCurrentFocus
-                        ? 'bg-amber-500/15 border-amber-500/40 text-amber-300 ring-2 ring-amber-500/30 shadow-md shadow-amber-500/10'
-                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
+                        ? 'bg-[#B89B72]/15 border-[#B89B72]/50 text-[#17324D] dark:text-[#D9C19A] ring-1 ring-[#B89B72]/30 shadow-sm'
+                        : 'bg-[#FAF8F3] dark:bg-[#102A43] border-[#E7E2D8] dark:border-[#334155] text-[#64748B] dark:text-[#A8B3C2] hover:text-[#17324D] dark:hover:text-white'
                     }`}
                   >
                     <div
                       className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
                         st.isDone
-                          ? 'bg-emerald-500 text-slate-950'
+                          ? 'bg-[#2E7D5B] text-white'
                           : isCurrentFocus
-                          ? 'bg-amber-400 text-slate-950 animate-pulse'
-                          : 'bg-slate-800 text-slate-400'
+                          ? 'bg-[#B89B72] text-white animate-pulse'
+                          : 'bg-white dark:bg-[#172235] text-[#64748B] dark:text-[#A8B3C2]'
                       }`}
                     >
                       {st.isDone ? <Check className="w-3 h-3 stroke-[3]" /> : st.num}
@@ -430,7 +429,7 @@ export default function DashboardPage() {
                     <span className="whitespace-nowrap font-semibold">{st.shortName}</span>
                   </Link>
                   {idx < stepsState.length - 1 && (
-                    <ChevronRight className="w-3.5 h-3.5 text-slate-600 shrink-0" />
+                    <ChevronRight className="w-3.5 h-3.5 text-[#64748B] dark:text-[#A8B3C2] shrink-0" />
                   )}
                 </React.Fragment>
               );
@@ -439,21 +438,21 @@ export default function DashboardPage() {
         </div>
 
         {/* Dynamic Priority Callout Banner: Next Step / Today's Focus */}
-        <div className="p-4 sm:p-5 rounded-xl bg-gradient-to-r from-indigo-950/70 via-purple-950/60 to-slate-900 border border-indigo-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-lg">
+        <div className="p-4 sm:p-5 rounded-xl bg-[#FAF8F3] dark:bg-[#102A43] border border-[#E7E2D8] dark:border-[#334155] flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
           <div className="space-y-1">
             <div className="flex items-center space-x-2">
-              <Zap className="w-4 h-4 text-amber-400 animate-pulse" />
-              <span className="text-[11px] font-bold uppercase tracking-wider text-amber-400">
+              <Zap className="w-4 h-4 text-[#C78A20] animate-pulse" />
+              <span className="text-[11px] font-bold uppercase tracking-wider text-[#C78A20]">
                 {nextStep.stepNum > 0 ? `Today's Focus • Step ${nextStep.stepNum} of 8` : 'All 8 Steps Active'}
               </span>
             </div>
-            <h3 className="text-base font-bold text-white">{nextStep.title}</h3>
-            <p className="text-xs text-slate-300 max-w-2xl">{nextStep.desc}</p>
+            <h3 className="text-base font-bold text-[#17324D] dark:text-[#F1F5F9]">{nextStep.title}</h3>
+            <p className="text-xs text-[#64748B] dark:text-[#A8B3C2] max-w-2xl">{nextStep.desc}</p>
           </div>
 
           <Link
             href={nextStep.href}
-            className="px-4 sm:px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-xs sm:text-sm flex items-center justify-center space-x-2 shrink-0 transition shadow-lg shadow-indigo-600/30 self-start sm:self-auto"
+            className="px-4 sm:px-5 py-2.5 rounded-xl bg-[#17324D] hover:bg-[#102A43] text-white font-bold text-xs sm:text-sm flex items-center justify-center space-x-2 shrink-0 transition shadow-sm self-start sm:self-auto"
           >
             <span>{nextStep.btnText}</span>
           </Link>
@@ -467,12 +466,12 @@ export default function DashboardPage() {
             return (
               <div
                 key={st.id}
-                className={`p-4 rounded-xl border flex flex-col justify-between transition-all duration-200 ${
+                className={`p-4 rounded-xl border flex flex-col justify-between transition-all duration-200 bg-white dark:bg-[#172235] ${
                   st.isDone
-                    ? 'bg-slate-950/60 border-emerald-500/30 shadow-sm'
+                    ? 'border-[#2E7D5B]/30 shadow-sm'
                     : isCurrentFocus
-                    ? 'bg-slate-950 border-amber-500/50 ring-1 ring-amber-500/30 shadow-md shadow-amber-500/5'
-                    : 'bg-slate-950 border-slate-800 hover:border-slate-700'
+                    ? 'border-[#B89B72]/60 ring-1 ring-[#B89B72]/30 shadow-sm'
+                    : 'border-[#E7E2D8] dark:border-[#334155] hover:border-[#B89B72]/40'
                 }`}
               >
                 <div className="space-y-2.5">
@@ -480,51 +479,51 @@ export default function DashboardPage() {
                     <div
                       className={`w-8 h-8 rounded-lg flex items-center justify-center ${
                         st.isDone
-                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                          ? 'bg-emerald-500/10 text-[#2E7D5B] border border-[#2E7D5B]/20'
                           : isCurrentFocus
-                          ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
-                          : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
+                          ? 'bg-[#B89B72]/15 text-[#B89B72] border border-[#B89B72]/30'
+                          : 'bg-[#FAF8F3] dark:bg-[#102A43] text-[#17324D] dark:text-[#D9C19A] border border-[#E7E2D8] dark:border-[#334155]'
                       }`}
                     >
                       <StepIcon className="w-4 h-4" />
                     </div>
 
                     {st.isDone ? (
-                      <span className="flex items-center space-x-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                      <span className="flex items-center space-x-1 px-2 py-0.5 rounded text-[10px] font-bold bg-[#2E7D5B]/15 text-[#2E7D5B] border border-[#2E7D5B]/30">
                         <CheckCircle className="w-3 h-3" />
                         <span>Done</span>
                       </span>
                     ) : isCurrentFocus ? (
-                      <span className="flex items-center space-x-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30 animate-pulse">
+                      <span className="flex items-center space-x-1 px-2 py-0.5 rounded text-[10px] font-bold bg-[#C78A20]/15 text-[#C78A20] border border-[#C78A20]/30 animate-pulse">
                         <span>Today&apos;s Focus</span>
                       </span>
                     ) : (
-                      <span className="w-5 h-5 rounded-full border border-slate-700 text-slate-500 flex items-center justify-center text-[10px] font-bold">
+                      <span className="w-5 h-5 rounded-full border border-[#E7E2D8] dark:border-[#334155] text-[#64748B] dark:text-[#A8B3C2] flex items-center justify-center text-[10px] font-bold">
                         {st.num}
                       </span>
                     )}
                   </div>
 
                   <div>
-                    <h4 className="text-sm font-bold text-white">
+                    <h4 className="text-sm font-bold text-[#17324D] dark:text-[#F1F5F9]">
                       {st.num}. {st.name}
                     </h4>
-                    <p className="text-[11px] text-slate-400 mt-1 line-clamp-1">{st.desc}</p>
-                    <p className="text-[11px] text-indigo-300 font-medium mt-1 truncate">
+                    <p className="text-[11px] text-[#64748B] dark:text-[#A8B3C2] mt-1 line-clamp-1">{st.desc}</p>
+                    <p className="text-[11px] text-[#B89B72] font-medium mt-1 truncate">
                       {st.statusText}
                     </p>
                   </div>
                 </div>
 
-                <div className="pt-4 border-t border-slate-800/60 mt-3">
+                <div className="pt-4 border-t border-[#E7E2D8] dark:border-[#334155] mt-3">
                   <Link
                     href={st.href}
                     className={`w-full py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center space-x-1 transition-colors ${
                       st.isDone
-                        ? 'bg-slate-900 text-slate-300 hover:bg-slate-800 border border-slate-800'
+                        ? 'bg-[#FAF8F3] dark:bg-[#102A43] text-[#64748B] dark:text-[#A8B3C2] hover:bg-[#F5F1E8] border border-[#E7E2D8] dark:border-[#334155]'
                         : isCurrentFocus
-                        ? 'bg-gradient-to-r from-amber-500 to-indigo-600 text-white hover:from-amber-400 hover:to-indigo-500 shadow-md'
-                        : 'bg-indigo-600 text-white hover:bg-indigo-500'
+                        ? 'bg-[#17324D] hover:bg-[#102A43] text-white shadow-sm'
+                        : 'bg-[#FAF8F3] dark:bg-[#102A43] text-[#17324D] dark:text-[#D9C19A] hover:bg-[#F5F1E8] border border-[#E7E2D8] dark:border-[#334155]'
                     }`}
                   >
                     <span>{st.actionText}</span>
@@ -539,19 +538,19 @@ export default function DashboardPage() {
 
       {/* Next Best Action Widget */}
       {nextAction && nextAction.title && (
-        <div className="p-5 sm:p-6 rounded-2xl bg-slate-900/80 border border-indigo-500/30 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-lg">
+        <div className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-[#172235] border border-[#E7E2D8] dark:border-[#334155] flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm">
           <div className="space-y-1">
             <div className="flex items-center space-x-2">
-              <Zap className="w-4 h-4 text-amber-400" />
-              <span className="text-xs font-bold uppercase text-amber-400">Next Best Action for You</span>
-              <span className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-400 font-semibold">{nextAction.related_goal}</span>
+              <Zap className="w-4 h-4 text-[#C78A20]" />
+              <span className="text-xs font-bold uppercase text-[#C78A20]">Next Best Action for You</span>
+              <span className="text-[10px] px-2 py-0.5 rounded bg-[#FAF8F3] dark:bg-[#102A43] border border-[#E7E2D8] dark:border-[#334155] text-[#64748B] dark:text-[#A8B3C2] font-semibold">{nextAction.related_goal}</span>
             </div>
-            <h3 className="text-base font-bold text-white">{nextAction.title}</h3>
-            <p className="text-xs text-slate-400">{nextAction.why_it_matters}</p>
+            <h3 className="text-base font-bold text-[#17324D] dark:text-[#F1F5F9]">{nextAction.title}</h3>
+            <p className="text-xs text-[#64748B] dark:text-[#A8B3C2]">{nextAction.why_it_matters}</p>
           </div>
           <Link
             href={nextAction.action_link}
-            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center space-x-2 shrink-0 self-start md:self-auto transition-colors shadow-md shadow-indigo-600/20"
+            className="px-4 py-2 rounded-xl bg-[#17324D] hover:bg-[#102A43] text-white font-bold text-xs flex items-center space-x-2 shrink-0 self-start md:self-auto transition-colors shadow-sm"
           >
             <span>Start Now</span>
             <ArrowRight className="w-3.5 h-3.5" />

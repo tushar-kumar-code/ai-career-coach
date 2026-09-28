@@ -109,23 +109,28 @@ git push origin main
 Jab bhi aap code me koi change karein ya naya feature add karein, terminal me ye 4 steps follow karein:
 
 #### 1. Status Check Karein:
+
 ```powershell
 cd c:\Users\user\tushar\ai-career-coach
 git status
 ```
+
 *(Isse aapko pata chalega kaun kaun si files modify ya create hui hain)*
 
 #### 2. Saare Changes Stage Karein:
+
 ```powershell
 git add .
 ```
 
 #### 3. Commit Message Likhein:
+
 ```powershell
 git commit -m "Aapka commit message yaha likhein"
 ```
 
 #### 4. GitHub Par Push Karein:
+
 ```powershell
 git push origin main
 ```

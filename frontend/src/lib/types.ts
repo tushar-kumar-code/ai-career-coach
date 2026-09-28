@@ -67,6 +67,7 @@ export interface CareerDiscoveryAIAnalysis {
   motivation_profile: string;
   recommended_careers: CareerMatch[];
   alternative_careers: string[];
+  skills_identified?: string[];
 }
 
 export interface AssessmentResultData {
@@ -272,6 +273,7 @@ export interface RoadmapMilestone {
   title: string;
   criteria: string;
   completed: boolean;
+  is_completed?: boolean;
 }
 
 export interface RoadmapSkillItem {
@@ -582,6 +584,7 @@ export interface CareerDigitalTwinData {
   primary_archetype?: string;
   experience_level: string;
   top_strengths: CareerStrength[];
+  top_skills?: string[];
   priority_gaps: CareerGap[];
   critical_missing_skills: string[];
   next_action: NextBestAction;
@@ -794,6 +797,7 @@ export interface ChatRequestPayload {
 
 export interface ChatResponseData {
   response: string;
+  reply?: string;
   provider: string;
   timestamp?: string;
 }

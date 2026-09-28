@@ -1,4 +1,4 @@
-﻿"""
+"""
 Digital Twin API Router
 ========================
 All endpoints under /api/v1/digital-twin/
@@ -22,6 +22,7 @@ from app.services.digital_twin.gap_analyzer import GapAnalyzer
 from app.services.digital_twin.recommendation_engine import RecommendationEngine
 from app.services.digital_twin.achievement_engine import AchievementEngine
 from app.services.digital_twin.weekly_report_engine import WeeklyReportEngine
+from app.services.firestore.digital_twin_repo import DigitalTwinRepository
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -49,6 +50,12 @@ async def get_digital_twin_profile(
     """
     try:
         result = await twin_service.get_or_compute(db, user_id)
+        # Sync to Firestore DigitalTwinRepository
+        try:
+            await DigitalTwinRepository.save_digital_twin(user_id, result)
+        except Exception as err:
+            logger.warning(f"Firestore digital twin save warning: {err}")
+
         return APIResponse(
             success=True,
             message="Career Digital Twin computed successfully.",
@@ -92,6 +99,32 @@ async def get_readiness_history(
 ):
     """Returns up to 30 daily readiness snapshots for progress trend visualization."""
     try:
+        # 1. Check Firestore first
+        try:
+            fs_snapshots = await DigitalTwinRepository.list_snapshots(user_id, limit=30)
+            if fs_snapshots:
+                history = [
+                    {
+                        "date": str(s.get("snapshot_date") or s.get("created_at", "")[:10]),
+                        "overall": s.get("overall_readiness_score", 0),
+                        "skill": s.get("skill_readiness", 0),
+                        "resume": s.get("resume_readiness", 0),
+                        "interview": s.get("interview_readiness", 0),
+                        "roadmap": s.get("roadmap_progress", 0),
+                        "job_match": s.get("job_match_readiness", 0),
+                        "portfolio": s.get("portfolio_readiness", 0),
+                    }
+                    for s in fs_snapshots
+                ]
+                return APIResponse(
+                    success=True,
+                    message=f"Returned {len(history)} historical snapshots.",
+                    data=history,
+                )
+        except Exception as err:
+            logger.warning(f"Firestore list_snapshots warning: {err}")
+
+        # 2. SQLite fallback
         cutoff = datetime.date.today() - datetime.timedelta(days=30)
         result = await db.execute(
             select(ReadinessSnapshot)
@@ -122,6 +155,7 @@ async def get_readiness_history(
     except Exception as e:
         logger.error(f"Readiness history error: {e}")
         return APIResponse(success=False, message=str(e), data=None)
+
 
 
 @router.get(
@@ -198,6 +232,11 @@ async def get_achievements(
             db, user_id,
             overall_readiness_score=scores["overall_readiness_score"],
         )
+        try:
+            await DigitalTwinRepository.save_achievements(user_id, achievements)
+        except Exception as err:
+            logger.warning(f"Firestore achievements save warning: {err}")
+
         return APIResponse(
             success=True,
             message=f"Found {len(achievements)} earned achievements.",
@@ -224,6 +263,11 @@ async def get_weekly_report(
     try:
         scores = await readiness_engine.compute(db, user_id)
         report = await weekly_report_engine.generate(db, user_id, scores)
+        try:
+            await DigitalTwinRepository.save_weekly_report(user_id, report)
+        except Exception as err:
+            logger.warning(f"Firestore weekly report save warning: {err}")
+
         return APIResponse(
             success=True,
             message="Weekly career report generated.",
@@ -281,6 +325,18 @@ async def save_snapshot(
 
         await db.commit()
 
+        # Sync to Firestore DigitalTwinRepository
+        try:
+            await DigitalTwinRepository.save_snapshot(user_id, str(today), {
+                "snapshot_date": str(today),
+                **{k: scores[k] for k in [
+                    "overall_readiness_score", "skill_readiness", "resume_readiness",
+                    "interview_readiness", "roadmap_progress", "job_match_readiness", "portfolio_readiness"
+                ]}
+            })
+        except Exception as err:
+            logger.warning(f"Firestore snapshot save warning: {err}")
+
         return APIResponse(
             success=True,
             message="Readiness snapshot saved.",
@@ -292,3 +348,4 @@ async def save_snapshot(
     except Exception as e:
         logger.error(f"Snapshot save error: {e}")
         return APIResponse(success=False, message=str(e), data=None)
+

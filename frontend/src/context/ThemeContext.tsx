@@ -2,11 +2,13 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
-export type ThemePreset = 'midnight' | 'cyberpunk' | 'ocean' | 'sunset' | 'emerald' | 'light';
-export type AccentColor = 'indigo' | 'emerald' | 'violet' | 'rose' | 'amber' | 'cyan';
+export type ThemeMode = 'light' | 'dark' | 'system';
+export type ThemePreset = ThemeMode | 'midnight' | 'cyberpunk' | 'ocean' | 'sunset' | 'emerald';
+export type AccentColor = 'teal' | 'indigo' | 'emerald' | 'violet' | 'rose' | 'amber' | 'cyan';
 
 export interface ThemeSettings {
   theme: ThemePreset;
+  mode: ThemeMode;
   accent: AccentColor;
   compactMode: boolean;
   animations: boolean;
@@ -14,15 +16,17 @@ export interface ThemeSettings {
 }
 
 const DEFAULT_SETTINGS: ThemeSettings = {
-  theme: 'midnight',
-  accent: 'indigo',
+  theme: 'light',
+  mode: 'light',
+  accent: 'teal',
   compactMode: false,
   animations: true,
-  glowEffects: true,
+  glowEffects: false,
 };
 
 interface ThemeContextType extends ThemeSettings {
   setTheme: (theme: ThemePreset) => void;
+  setMode: (mode: ThemeMode) => void;
   setAccent: (accent: AccentColor) => void;
   setCompactMode: (compact: boolean) => void;
   setAnimations: (animations: boolean) => void;
@@ -44,9 +48,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
+        const resolvedTheme = parsed.theme || parsed.mode || 'light';
+        const mode: ThemeMode = (resolvedTheme === 'dark' || resolvedTheme === 'midnight') ? 'dark' : (resolvedTheme === 'system' ? 'system' : 'light');
         setSettings({
           ...DEFAULT_SETTINGS,
           ...parsed,
+          theme: mode,
+          mode: mode,
         });
       }
     } catch (err) {
@@ -55,51 +63,37 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     setMounted(true);
   }, []);
 
-  // Apply theme classes and attributes to document root whenever settings change
+  // Synchronize theme mode with document.documentElement
   useEffect(() => {
     if (!mounted || typeof document === 'undefined') return;
 
     const root = document.documentElement;
 
-    // 1. Remove all existing theme and accent classes
-    const themeClasses = ['theme-midnight', 'theme-cyberpunk', 'theme-ocean', 'theme-sunset', 'theme-emerald', 'theme-light'];
-    const accentClasses = ['accent-indigo', 'accent-emerald', 'accent-violet', 'accent-rose', 'accent-amber', 'accent-cyan'];
-    
-    themeClasses.forEach((cls) => root.classList.remove(cls));
-    accentClasses.forEach((cls) => root.classList.remove(cls));
+    const applyTheme = (isDark: boolean) => {
+      if (isDark) {
+        root.classList.remove('light');
+        root.classList.add('dark');
+        root.setAttribute('data-theme', 'dark');
+      } else {
+        root.classList.remove('dark');
+        root.classList.add('light');
+        root.setAttribute('data-theme', 'light');
+      }
+    };
 
-    // 2. Add active theme & accent class
-    root.classList.add(`theme-${settings.theme}`);
-    root.classList.add(`accent-${settings.accent}`);
+    if (settings.mode === 'system' || settings.theme === 'system') {
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      applyTheme(mediaQuery.matches);
 
-    // 3. Handle dark / light root class
-    if (settings.theme === 'light') {
-      root.classList.remove('dark');
-      root.classList.add('light');
+      const handleChange = (e: MediaQueryListEvent) => {
+        applyTheme(e.matches);
+      };
+
+      mediaQuery.addEventListener('change', handleChange);
+      return () => mediaQuery.removeEventListener('change', handleChange);
     } else {
-      root.classList.remove('light');
-      root.classList.add('dark');
-    }
-
-    // 4. Handle compact mode
-    if (settings.compactMode) {
-      root.classList.add('compact-ui');
-    } else {
-      root.classList.remove('compact-ui');
-    }
-
-    // 5. Handle animations
-    if (!settings.animations) {
-      root.classList.add('no-animations');
-    } else {
-      root.classList.remove('no-animations');
-    }
-
-    // 6. Handle glow effects
-    if (settings.glowEffects) {
-      root.classList.add('enable-glow');
-    } else {
-      root.classList.remove('enable-glow');
+      const isDark = settings.mode === 'dark' || settings.theme === 'dark' || settings.theme === 'midnight';
+      applyTheme(isDark);
     }
 
     // Save to localStorage
@@ -111,7 +105,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }, [settings, mounted]);
 
   const setTheme = (theme: ThemePreset) => {
-    setSettings((prev) => ({ ...prev, theme }));
+    const resolvedMode: ThemeMode = (theme === 'dark' || theme === 'midnight') ? 'dark' : (theme === 'system' ? 'system' : 'light');
+    setSettings((prev) => ({ ...prev, theme: resolvedMode, mode: resolvedMode }));
+  };
+
+  const setMode = (mode: ThemeMode) => {
+    setSettings((prev) => ({ ...prev, theme: mode, mode }));
   };
 
   const setAccent = (accent: AccentColor) => {
@@ -139,6 +138,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       value={{
         ...settings,
         setTheme,
+        setMode,
         setAccent,
         setCompactMode,
         setAnimations,

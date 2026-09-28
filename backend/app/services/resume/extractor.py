@@ -1,36 +1,36 @@
-import os
 import re
+import io
+import uuid
 import pymupdf
 import docx
 from typing import Tuple
 from fastapi import UploadFile, HTTPException
+from app.services.firestore.client import FirestoreClient
 
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
 ALLOWED_EXTENSIONS = {".pdf", ".docx"}
-UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "..", "uploads", "resumes")
 
 
 class DocumentExtractor:
-    """Service for validating, storing, and extracting raw text from PDF and DOCX files."""
-
-    def __init__(self):
-        os.makedirs(UPLOAD_DIR, exist_ok=True)
+    """Service for validating, processing in-memory, and storing resumes in Firebase Storage."""
 
     async def process_uploaded_file(self, file: UploadFile, user_id: str) -> Tuple[str, str, str]:
         """
-        Validates file, saves securely to disk, and extracts raw text.
-        Returns: (file_path, filename, raw_text)
+        Validates file, processes PDF/DOCX entirely in memory,
+        and uploads to Firebase Storage at users/{user_id}/resumes/{unique_filename}.
+        Returns: (storage_path, filename, raw_text)
         """
         if not file.filename:
             raise HTTPException(status_code=400, detail="Filename is empty")
 
-        filename = os.path.basename(file.filename)
-        ext = os.path.splitext(filename)[1].lower()
+        filename = re.sub(r"[/\\]", "_", file.filename.strip())
+        ext = re.search(r"(\.[a-zA-Z0-9]+)$", filename)
+        ext_str = ext.group(1).lower() if ext else ""
 
-        if ext not in ALLOWED_EXTENSIONS:
+        if ext_str not in ALLOWED_EXTENSIONS:
             raise HTTPException(
                 status_code=400,
-                detail=f"Unsupported file format '{ext}'. Only PDF (.pdf) and Word (.docx) files are supported."
+                detail=f"Unsupported file format '{ext_str}'. Only PDF (.pdf) and Word (.docx) files are supported."
             )
 
         content = await file.read()
@@ -40,20 +40,13 @@ class DocumentExtractor:
         if len(content) > MAX_FILE_SIZE:
             raise HTTPException(status_code=400, detail="File size exceeds maximum limit of 10MB")
 
-        # Save file securely
-        safe_filename = f"{user_id}_{re.sub(r'[^a-zA-Z0-9_.-]', '_', filename)}"
-        file_path = os.path.join(UPLOAD_DIR, safe_filename)
-
-        with open(file_path, "wb") as f:
-            f.write(content)
-
-        # Extract text based on file format
+        # 1. In-memory text extraction without writing to local disk
         raw_text = ""
         try:
-            if ext == ".pdf":
-                raw_text = self._extract_text_from_pdf(file_path)
-            elif ext == ".docx":
-                raw_text = self._extract_text_from_docx(file_path)
+            if ext_str == ".pdf":
+                raw_text = self._extract_text_from_pdf_bytes(content)
+            elif ext_str == ".docx":
+                raw_text = self._extract_text_from_docx_bytes(content)
         except Exception as e:
             raise HTTPException(
                 status_code=400,
@@ -67,18 +60,26 @@ class DocumentExtractor:
                 detail="Extracted text is too short or empty. Please upload a document containing readable text."
             )
 
-        return file_path, filename, raw_text_clean
+        # 2. Upload directly to Firebase Storage under users/{user_id}/resumes/{unique_filename}
+        clean_name = re.sub(r"[^a-zA-Z0-9_.-]", "_", filename)
+        unique_filename = f"{uuid.uuid4().hex[:8]}_{clean_name}"
+        storage_path = f"users/{user_id}/resumes/{unique_filename}"
 
-    def _extract_text_from_pdf(self, path: str) -> str:
+        content_type = file.content_type or ("application/pdf" if ext_str == ".pdf" else "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+        storage_uri = await FirestoreClient.upload_file(storage_path, content, content_type=content_type)
+
+        return storage_uri, filename, raw_text_clean
+
+    def _extract_text_from_pdf_bytes(self, content: bytes) -> str:
         text_content = []
-        doc = pymupdf.open(path)
+        doc = pymupdf.open(stream=content, filetype="pdf")
         for page in doc:
             text_content.append(page.get_text())
         doc.close()
         return "\n".join(text_content)
 
-    def _extract_text_from_docx(self, path: str) -> str:
-        doc = docx.Document(path)
+    def _extract_text_from_docx_bytes(self, content: bytes) -> str:
+        doc = docx.Document(io.BytesIO(content))
         text_content = [p.text for p in doc.paragraphs if p.text]
         for table in doc.tables:
             for row in table.rows:
