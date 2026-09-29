@@ -112,9 +112,19 @@ export default function RegisterPage() {
 
           {/* Error Banner */}
           {error && (
-            <div className="mb-5 p-3.5 rounded-xl bg-rose-500/10 border border-[#C75C5C]/30 text-[#C75C5C] text-xs flex items-start gap-2.5 animate-in fade-in">
-              <AlertCircle className="w-4 h-4 text-[#C75C5C] shrink-0 mt-0.5" />
-              <span>{error}</span>
+            <div className="mb-5 p-3.5 rounded-xl bg-rose-500/10 border border-[#C75C5C]/30 text-[#C75C5C] text-xs flex flex-col gap-2.5 animate-in fade-in">
+              <div className="flex items-start gap-2.5">
+                <AlertCircle className="w-4 h-4 text-[#C75C5C] shrink-0 mt-0.5" />
+                <span className="flex-1 leading-relaxed">{error}</span>
+              </div>
+              {(error.toLowerCase().includes('domain') || error.toLowerCase().includes('firebase')) && (
+                <Link
+                  href="/login"
+                  className="w-full py-2 px-3 rounded-lg bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-semibold text-xs transition cursor-pointer flex items-center justify-center space-x-1.5 shadow-xs text-center"
+                >
+                  <span>⚡ 1-Click Instant Mobile Access (on Login)</span>
+                </Link>
+              )}
             </div>
           )}
 
