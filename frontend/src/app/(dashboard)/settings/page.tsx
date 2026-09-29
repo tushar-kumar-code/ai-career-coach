@@ -72,6 +72,7 @@ export default function SettingsPage() {
   const [notifInterviewReminder, setNotifInterviewReminder] = useState(true);
   const [notifRoadmapProgress, setNotifRoadmapProgress] = useState(false);
   const [notifSaved, setNotifSaved] = useState(false);
+  const [authMethod, setAuthMethod] = useState('Google / Firebase');
 
   useEffect(() => {
     const cfg = getSavedAIConfig();
@@ -84,6 +85,28 @@ export default function SettingsPage() {
     setNotifWeeklyReport(notifPrefs.weeklyReport ?? true);
     setNotifInterviewReminder(notifPrefs.interviewReminder ?? true);
     setNotifRoadmapProgress(notifPrefs.roadmapProgress ?? false);
+
+    import('@/lib/firebase')
+      .then(({ auth }) => {
+        const detectAuthMethod = () => {
+          if (auth?.currentUser) {
+            const isGoogle = auth.currentUser.providerData?.some((p) => p.providerId === 'google.com');
+            setAuthMethod(isGoogle ? 'Google Account (OAuth)' : 'Firebase Auth');
+          } else {
+            const token = localStorage.getItem('auth_token') || '';
+            if (token.startsWith('eyJ') && token.length > 500) {
+              setAuthMethod('Google Account (Firebase)');
+            } else {
+              setAuthMethod('Email & Password / Local Auth');
+            }
+          }
+        };
+        detectAuthMethod();
+        auth?.onAuthStateChanged?.(detectAuthMethod);
+      })
+      .catch(() => {
+        setAuthMethod('Email & Password / Local Auth');
+      });
   }, []);
 
   const handleTestKey = async () => {
@@ -443,15 +466,15 @@ export default function SettingsPage() {
                 </div>
 
                 <div className="flex items-center space-x-4 p-4 bg-slate-950/60 rounded-xl border border-slate-800">
-                  <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-lg font-extrabold text-white shrink-0">
+                  <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-lg font-extrabold text-white shrink-0 overflow-hidden shadow-inner">
                     {user?.full_name
                       ? user.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
                       : user?.email?.[0]?.toUpperCase() || 'U'}
                   </div>
                   <div className="overflow-hidden">
-                    <p className="font-bold text-white text-sm">{user?.full_name || 'Candidate'}</p>
+                    <p className="font-bold text-white text-base">{user?.full_name || 'Candidate'}</p>
                     <p className="text-xs text-slate-400 truncate">{user?.email}</p>
-                    <span className="inline-flex mt-1 px-2 py-0.5 text-[10px] font-semibold bg-indigo-500/15 text-indigo-300 border border-indigo-500/20 rounded-full">
+                    <span className="inline-flex mt-1.5 px-2.5 py-0.5 text-[10px] font-semibold bg-indigo-500/15 text-indigo-300 border border-indigo-500/20 rounded-full">
                       {user?.is_superuser ? 'Admin Account' : 'Candidate Account'}
                     </span>
                   </div>
@@ -464,15 +487,26 @@ export default function SettingsPage() {
                   </div>
                   <div className="flex justify-between items-center py-2.5 border-b border-slate-800">
                     <span className="text-slate-400 text-xs">Email Address</span>
-                    <span className="text-slate-200 text-xs font-medium">{user?.email || '—'}</span>
+                    <span className="text-slate-200 text-xs font-medium flex items-center gap-2">
+                      <span>{user?.email || '—'}</span>
+                      {user?.email && (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 font-medium">
+                          <CheckCircle2 className="w-2.5 h-2.5" /> Verified
+                        </span>
+                      )}
+                    </span>
                   </div>
                   <div className="flex justify-between items-center py-2.5 border-b border-slate-800">
                     <span className="text-slate-400 text-xs">Account Status</span>
-                    <span className="text-emerald-400 text-xs font-medium">Active</span>
+                    <span className="text-emerald-400 text-xs font-medium flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /> Active
+                    </span>
                   </div>
                   <div className="flex justify-between items-center py-2.5">
-                    <span className="text-slate-400 text-xs">Authentication</span>
-                    <span className="text-slate-200 text-xs font-medium">JWT / Local Auth</span>
+                    <span className="text-slate-400 text-xs">Authentication Method</span>
+                    <span className="text-indigo-300 text-xs font-semibold px-2.5 py-1 rounded-lg bg-indigo-500/10 border border-indigo-500/20">
+                      {authMethod}
+                    </span>
                   </div>
                 </div>
 

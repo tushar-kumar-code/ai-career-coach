@@ -23,7 +23,8 @@ import {
   Target,
   ArrowRight,
   Zap,
-  X
+  X,
+  Keyboard
 } from 'lucide-react';
 import { 
   startInterviewSession, 
@@ -87,7 +88,27 @@ export default function InterviewPage() {
     }
   }
 
-  
+  const [startingQuickScreen, setStartingQuickScreen] = useState(false);
+
+  const handleQuickStart = async () => {
+    setStartingQuickScreen(true);
+    try {
+      const session = await startInterviewSession({
+        mode: 'Technical',
+        difficulty: 'Beginner',
+        question_count: 5,
+      });
+      setCurrentSession(session);
+      setUserAnswer('');
+      setCurrentEvaluation(null);
+      setViewState('room');
+    } catch (err) {
+      console.error('Failed to start quick technical screen:', err);
+    } finally {
+      setStartingQuickScreen(false);
+    }
+  };
+
   const handlePracticeWeakTopic = async (topic: string) => {
     setStartingSession(true);
     try {
@@ -229,11 +250,71 @@ export default function InterviewPage() {
       {/* VIEW 1: SETUP WORKSPACE */}
       {viewState === 'setup' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <form onSubmit={handleStartInterview} className="lg:col-span-2 p-6 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-6">
-            <h2 className="text-lg font-bold text-white flex items-center space-x-2">
-              <Sparkles className="w-5 h-5 text-indigo-400" />
-              <span>Configure Mock Interview Session</span>
-            </h2>
+          <div className="lg:col-span-2 space-y-6">
+            {/* Quick 5-Minute Technical Screen - Prominent Beginner-friendly card */}
+            <div className="p-6 rounded-2xl bg-gradient-to-r from-indigo-950/80 via-slate-900 to-violet-950/80 border border-indigo-500/40 relative overflow-hidden shadow-xl shadow-indigo-950/40">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none -mr-16 -mt-16" />
+              <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-5">
+                <div className="space-y-2 max-w-xl">
+                  <div className="flex items-center space-x-2">
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                      ⚡ Quick Start · Beginner Friendly
+                    </span>
+                  </div>
+                  <h2 className="text-xl font-extrabold text-white tracking-tight">
+                    Quick 5-Minute Technical Screen
+                  </h2>
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    Jump straight into 5 standard technical screening questions. AI evaluates your coding reasoning, foundational concepts, and problem-solving with instant feedback.
+                  </p>
+                  <div className="flex flex-wrap items-center gap-3 pt-1 text-[11px] text-slate-400">
+                    <span className="flex items-center space-x-1">
+                      <Target className="w-3.5 h-3.5 text-indigo-400" />
+                      <span>5 Questions (Beginner Adaptive)</span>
+                    </span>
+                    <span className="text-slate-600">•</span>
+                    <span className="flex items-center space-x-1">
+                      <Clock className="w-3.5 h-3.5 text-violet-400" />
+                      <span>~5 Minutes</span>
+                    </span>
+                    <span className="text-slate-600">•</span>
+                    <span className="flex items-center space-x-1">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Zero Setup Needed</span>
+                    </span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  id="btn-quick-technical-screen"
+                  onClick={handleQuickStart}
+                  disabled={startingQuickScreen || evaluating}
+                  className="shrink-0 px-6 py-3.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold text-sm shadow-lg shadow-indigo-500/30 flex items-center justify-center space-x-2 transition-all disabled:opacity-50 group"
+                >
+                  {startingQuickScreen ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Preparing Screen...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Play className="w-4 h-4 fill-white group-hover:scale-110 transition-transform" />
+                      <span>Start Quick Screen</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            <form onSubmit={handleStartInterview} className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-6">
+              <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+                <h2 className="text-base font-bold text-white flex items-center space-x-2">
+                  <Sparkles className="w-4 h-4 text-indigo-400" />
+                  <span>Configure Mock Interview Session</span>
+                </h2>
+                <span className="text-[11px] text-slate-500">All modes & customization</span>
+              </div>
 
             {/* Mode Cards */}
             <div>
@@ -314,6 +395,7 @@ export default function InterviewPage() {
               </button>
             </div>
           </form>
+          </div>
 
           {/* Past History Column */}
           <div className="space-y-6">
@@ -388,20 +470,50 @@ export default function InterviewPage() {
 
           {/* Answer Input */}
           <form onSubmit={handleSubmitAnswer} className="space-y-4">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-semibold text-slate-300">Your Structured Response:</label>
-                <button
-                  type="button"
-                  onClick={() => setIsVoiceActive(!isVoiceActive)}
-                  className={`text-xs font-semibold flex items-center space-x-1 px-2.5 py-1 rounded-lg border ${isVoiceActive ? 'bg-pink-500/20 text-pink-400 border-pink-500/30' : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-slate-200'}`}
-                >
-                  {isVoiceActive ? <Mic className="w-3.5 h-3.5" /> : <MicOff className="w-3.5 h-3.5" />}
-                  <span>{isVoiceActive ? 'Voice Input Listening...' : 'Speech Architecture (Ready)'}</span>
-                </button>
+            <div className="space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-1">
+                <div className="flex items-center space-x-2">
+                  <label className="text-xs font-semibold text-slate-300">Your Structured Response:</label>
+                  <span className="text-[11px] text-slate-500 hidden sm:inline">(Type or speak)</span>
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  {/* Obvious Type your answer fallback alongside voice */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsVoiceActive(false);
+                      const el = document.getElementById('interview-answer-input');
+                      if (el) el.focus();
+                    }}
+                    className={`text-xs font-semibold flex items-center space-x-1.5 px-3.5 py-2.5 rounded-xl border transition-all min-h-[44px] ${
+                      !isVoiceActive
+                        ? 'bg-slate-800 text-indigo-300 border-indigo-500/40 ring-1 ring-indigo-500/30'
+                        : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-slate-200'
+                    }`}
+                  >
+                    <Keyboard className="w-4 h-4 text-indigo-400" />
+                    <span>Type Your Answer</span>
+                  </button>
+
+                  {/* Voice input option */}
+                  <button
+                    type="button"
+                    onClick={() => setIsVoiceActive(!isVoiceActive)}
+                    className={`text-xs font-semibold flex items-center space-x-1.5 px-3.5 py-2.5 rounded-xl border transition-all min-h-[44px] ${
+                      isVoiceActive
+                        ? 'bg-pink-500/20 text-pink-300 border-pink-500/40 ring-1 ring-pink-500/40 animate-pulse'
+                        : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-slate-200'
+                    }`}
+                  >
+                    {isVoiceActive ? <Mic className="w-4 h-4 text-pink-400" /> : <MicOff className="w-4 h-4" />}
+                    <span>{isVoiceActive ? 'Voice Listening…' : 'Use Voice Input'}</span>
+                  </button>
+                </div>
               </div>
 
               <textarea
+                id="interview-answer-input"
                 rows={6}
                 value={userAnswer}
                 onChange={(e) => setUserAnswer(e.target.value)}
@@ -415,7 +527,7 @@ export default function InterviewPage() {
                 <button
                   type="submit"
                   disabled={evaluating || !userAnswer.trim()}
-                  className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-500/25 flex items-center space-x-2 transition-all"
+                  className="px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-500/25 flex items-center space-x-2 transition-all min-h-[44px]"
                 >
                   <Sparkles className="w-4 h-4" />
                   <span>{evaluating ? 'Evaluating with AI...' : 'Submit & Evaluate Answer'}</span>

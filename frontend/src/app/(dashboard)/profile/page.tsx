@@ -8,6 +8,8 @@ import {
 import Link from 'next/link';
 import { getDigitalTwinProfile } from '@/lib/digital-twin-api';
 import { getSkillProfile, getAssessmentResult } from '@/lib/api-client';
+import CareerHubTabs from '@/components/common/CareerHubTabs';
+import SkillActionBadge from '@/components/common/SkillActionBadge';
 import {
   CareerDigitalTwinData,
   SkillProfileData,
@@ -62,6 +64,9 @@ export default function DigitalTwinProfilePage() {
 
   return (
     <div className="space-y-8 max-w-6xl mx-auto pb-12">
+      {/* Shared Career Hub Navigation: Placement | Progress | Profile */}
+      <CareerHubTabs activeTab="profile" />
+
       {/* Header */}
       <div className="p-6 rounded-2xl bg-gradient-to-r from-indigo-950/80 via-slate-900 to-purple-950/80 border border-indigo-500/20">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -285,13 +290,14 @@ export default function DigitalTwinProfilePage() {
 
       {/* Critical Missing Skills Bar */}
       {criticalSkills.length > 0 && (
-        <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800">
-          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Critical Skills to Acquire for {targetRole}</h3>
+        <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Critical Skills to Acquire for {targetRole}</h3>
+            <span className="text-[11px] text-indigo-400 font-medium">Add to Roadmap or Practice directly</span>
+          </div>
           <div className="flex flex-wrap gap-2">
             {criticalSkills.map((sk, i) => (
-              <span key={i} className="px-3 py-1 rounded-lg bg-red-500/10 border border-red-500/20 text-red-300 text-xs font-semibold">
-                {sk}
-              </span>
+              <SkillActionBadge key={i} skillName={sk} />
             ))}
           </div>
         </div>

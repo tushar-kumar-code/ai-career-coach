@@ -8,6 +8,18 @@ class UserRegisterRequest(BaseModel):
     full_name: Optional[str] = Field(default=None, description="User display name")
 
 
+class SendRegisterOTPRequest(BaseModel):
+    email: EmailStr = Field(..., description="User email address to receive verification OTP")
+    full_name: Optional[str] = Field(default=None, description="User display name")
+
+
+class VerifyRegisterRequest(BaseModel):
+    email: EmailStr = Field(..., description="User email address")
+    otp: str = Field(..., min_length=6, max_length=6, description="6-digit verification code from email")
+    password: str = Field(..., min_length=6, description="Account password (min 6 chars)")
+    full_name: Optional[str] = Field(default=None, description="User display name")
+
+
 class UserLoginRequest(BaseModel):
     email: EmailStr = Field(..., description="User email address")
     password: str = Field(..., description="User password")
@@ -20,7 +32,7 @@ class ResetPasswordRequest(BaseModel):
 
 class SendOTPRequest(BaseModel):
     email: EmailStr = Field(..., description="User registered email address")
-    purpose: Optional[str] = Field(default="login", description="Purpose of OTP: 'login' or 'reset'")
+    purpose: Optional[str] = Field(default="login", description="Purpose of OTP: 'login', 'reset', or 'register'")
 
 
 class VerifyOTPLoginRequest(BaseModel):

@@ -1,6 +1,7 @@
 import datetime
+import time
 import logging
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Tuple
 import bcrypt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -12,6 +13,10 @@ from app.core.database import get_db
 
 logger = logging.getLogger(__name__)
 security_scheme = HTTPBearer(auto_error=False)
+
+# In-memory TTL caches to eliminate repetitive DB overhead and token crypto verification
+_VERIFIED_USER_CACHE: Dict[str, float] = {}  # user_id -> timestamp (valid 5 min)
+_TOKEN_AUTH_CACHE: Dict[str, Tuple[str, Optional[str], Optional[str], float]] = {}  # token -> (uid, email, name, exp)
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -45,6 +50,15 @@ def create_access_token(data: Dict[str, Any], expires_delta: Optional[datetime.t
     return jwt.encode(to_encode, secret, algorithm=settings.JWT_ALGORITHM)
 
 
+def get_cached_user_info(user_id: str) -> Tuple[Optional[str], Optional[str]]:
+    """Returns (email, full_name) for user_id if present in active token cache."""
+    now = time.time()
+    for token, (uid, email, name, exp) in list(_TOKEN_AUTH_CACHE.items()):
+        if uid == user_id and exp > now:
+            return email, name
+    return None, None
+
+
 async def ensure_user_and_profile_exist(
     db: AsyncSession,
     user_id: str,
@@ -52,24 +66,85 @@ async def ensure_user_and_profile_exist(
     full_name: Optional[str] = None
 ) -> None:
     """Ensures a corresponding User and UserProfile exist in the database for the authenticated UID."""
+    now = time.time()
+    # Skip DB queries if user was already verified within the last 5 minutes
+    if user_id in _VERIFIED_USER_CACHE and (now - _VERIFIED_USER_CACHE[user_id]) < 300:
+        return
+
     try:
         from app.models.user import User
         from app.models.profile import UserProfile
-        from sqlalchemy import select
+        from sqlalchemy import select, update
+
+        clean_email = email.strip().lower() if (email and email.strip()) else None
 
         stmt = select(User).where(User.id == user_id)
         res = await db.execute(stmt)
         user = res.scalar_one_or_none()
 
         if not user:
-            user = User(
-                id=user_id,
-                email=email or f"{user_id}@firebase.local",
-                full_name=full_name or "Career Candidate",
-                is_active=True
-            )
-            db.add(user)
+            # 1. If user not found by ID, check if account already exists with this email (e.g. registered before Firebase login)
+            if clean_email:
+                stmt_email = select(User).where(User.email == clean_email)
+                res_email = await db.execute(stmt_email)
+                existing_user = res_email.scalar_one_or_none()
 
+                if existing_user:
+                    old_id = existing_user.id
+                    # Link account to this authenticated user_id
+                    existing_user.id = user_id
+                    if full_name and (not existing_user.full_name or existing_user.full_name in ("Career Candidate", "Career Discovery User")):
+                        existing_user.full_name = full_name
+
+                    # Migrate profile references
+                    stmt_p_new = select(UserProfile).where(UserProfile.user_id == user_id)
+                    p_new = (await db.execute(stmt_p_new)).scalar_one_or_none()
+
+                    stmt_p_old = select(UserProfile).where(UserProfile.user_id == old_id)
+                    p_old = (await db.execute(stmt_p_old)).scalar_one_or_none()
+
+                    if p_old and not p_new:
+                        p_old.user_id = user_id
+                    elif p_old and p_new:
+                        await db.delete(p_old)
+
+                    # Update references in related tables from old_id to new user_id
+                    from app.models.digital_twin import DigitalTwin, TwinActivity, TwinGoal
+                    from app.models.job import Job, JobApplication
+                    from app.models.interview import InterviewSession
+                    from app.models.resume import Resume
+                    from app.models.roadmap import Roadmap
+                    from app.models.skill import UserSkill
+                    from app.models.weekly_report import WeeklyReport
+
+                    for model in [DigitalTwin, TwinActivity, TwinGoal, Job, JobApplication, InterviewSession, Resume, Roadmap, UserSkill, WeeklyReport]:
+                        try:
+                            await db.execute(
+                                update(model).where(model.user_id == old_id).values(user_id=user_id)
+                            )
+                        except Exception:
+                            pass
+
+                    user = existing_user
+
+            # 2. If still not found, create new User
+            if not user:
+                default_name = full_name or (clean_email.split("@")[0].capitalize() if clean_email else "Career Candidate")
+                user = User(
+                    id=user_id,
+                    email=clean_email or f"{user_id}@firebase.local",
+                    full_name=default_name,
+                    is_active=True
+                )
+                db.add(user)
+        else:
+            # User exists — update email or full_name if previous was placeholder
+            if clean_email and (not user.email or user.email.endswith("@firebase.local") or user.email == "user@aicareercoach.ai"):
+                user.email = clean_email
+            if full_name and (not user.full_name or user.full_name in ("Career Candidate", "Career Discovery User")):
+                user.full_name = full_name
+
+        # Ensure UserProfile exists
         stmt_prof = select(UserProfile).where(UserProfile.user_id == user_id)
         res_prof = await db.execute(stmt_prof)
         profile = res_prof.scalar_one_or_none()
@@ -85,6 +160,7 @@ async def ensure_user_and_profile_exist(
             db.add(profile)
 
         await db.commit()
+        _VERIFIED_USER_CACHE[user_id] = now
     except Exception as e:
         logger.warning(f"Notice during automatic user sync for {user_id}: {e}")
         try:
@@ -98,11 +174,12 @@ async def get_current_user_id(
     db: AsyncSession = Depends(get_db)
 ) -> str:
     """
-    Extracts and validates user ID from Bearer token.
-    1. Verifies Firebase ID Token using Firebase Admin SDK.
-    2. Falls back to HMAC JWT validation for backwards compatibility / local tests.
-    3. Falls back to 'demo-user-12345' in development if no token provided.
-    4. Automatically ensures User and UserProfile records exist in SQLite.
+    Extracts and validates user ID from Bearer token with in-memory caching.
+    1. Checks in-memory token cache for instant sub-millisecond validation.
+    2. Verifies Firebase ID Token using Firebase Admin SDK.
+    3. Falls back to HMAC JWT validation for backwards compatibility / local tests.
+    4. Falls back to 'demo-user-12345' in development if no token provided.
+    5. Automatically ensures User and UserProfile records exist in SQLite.
     """
     is_production = settings.ENVIRONMENT.lower() == "production"
 
@@ -119,6 +196,15 @@ async def get_current_user_id(
         return demo_id
 
     token = credentials.credentials
+
+    # Fast path: check in-memory token cache
+    now = time.time()
+    cached = _TOKEN_AUTH_CACHE.get(token)
+    if cached and cached[3] > now:
+        cached_uid, cached_email, cached_name, _ = cached
+        await ensure_user_and_profile_exist(db, cached_uid, cached_email, cached_name)
+        return cached_uid
+
     user_id: Optional[str] = None
     email: Optional[str] = None
     full_name: Optional[str] = None
@@ -159,6 +245,8 @@ async def get_current_user_id(
         )
 
     uid_str = str(user_id)
+    # Cache token for 5 minutes
+    _TOKEN_AUTH_CACHE[token] = (uid_str, email, full_name, now + 300)
     await ensure_user_and_profile_exist(db, uid_str, email, full_name)
     return uid_str
 

@@ -67,14 +67,14 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#FAF8F3] dark:bg-[#0F172A] text-[#273444] dark:text-[#F1F5F9] flex flex-col justify-center items-center p-4 sm:p-6 relative selection:bg-[#B89B72] selection:text-white">
+    <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0F172A] text-[#0F172A] dark:text-[#F1F5F9] flex flex-col justify-center items-center p-4 sm:p-6 relative selection:bg-blue-600 selection:text-white">
       {/* Main Container */}
       <div className="relative w-full max-w-md">
         {/* Brand Header */}
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center space-x-3 group mb-4">
-            <div className="w-12 h-12 rounded-2xl bg-[#17324D] dark:bg-[#102A43] border border-[#B89B72]/40 flex items-center justify-center shadow-sm group-hover:scale-105 transition">
-              <Sparkles className="w-6 h-6 text-[#B89B72]" />
+            <div className="w-12 h-12 rounded-2xl bg-[#17324D] dark:bg-[#102A43] border border-[#2563EB]/40 flex items-center justify-center shadow-sm group-hover:scale-105 transition">
+              <Sparkles className="w-6 h-6 text-[#2563EB]" />
             </div>
             <span className="font-extrabold text-2xl text-[#17324D] dark:text-[#F1F5F9] tracking-tight">AI Career Coach</span>
           </Link>
@@ -87,9 +87,9 @@ export default function ForgotPasswordPage() {
         </div>
 
         {/* Card */}
-        <div className="p-6 sm:p-8 rounded-3xl bg-white dark:bg-[#172235] border border-[#E7E2D8] dark:border-[#334155] shadow-sm space-y-6">
-          <div className="flex items-center space-x-2 text-[#17324D] dark:text-[#D9C19A] bg-[#FAF8F3] dark:bg-[#102A43] border border-[#E7E2D8] dark:border-[#334155] p-3 rounded-xl">
-            <KeyRound className="w-4 h-4 shrink-0 text-[#B89B72]" />
+        <div className="p-6 sm:p-8 rounded-3xl bg-white dark:bg-[#172235] border border-[#E2E8F0] dark:border-[#334155] shadow-sm space-y-6">
+          <div className="flex items-center space-x-2 text-[#17324D] dark:text-[#38BDF8] bg-[#F8FAFC] dark:bg-[#102A43] border border-[#E2E8F0] dark:border-[#334155] p-3 rounded-xl">
+            <KeyRound className="w-4 h-4 shrink-0 text-[#2563EB]" />
             <p className="text-xs text-[#64748B] dark:text-[#A8B3C2]">
               Enter your registered email address to set a new password.
             </p>
@@ -113,7 +113,7 @@ export default function ForgotPasswordPage() {
 
           <form onSubmit={handleResetPassword} className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-[#273444] dark:text-[#F1F5F9] mb-1.5">
+              <label className="block text-xs font-semibold text-[#0F172A] dark:text-[#F1F5F9] mb-1.5">
                 Registered Email Address
               </label>
               <div className="relative">
@@ -124,13 +124,13 @@ export default function ForgotPasswordPage() {
                   onChange={(e) => setResetEmail(e.target.value)}
                   placeholder="student@university.edu"
                   required
-                  className="w-full bg-[#FAF8F3] dark:bg-[#102A43] border border-[#E7E2D8] dark:border-[#334155] rounded-xl pl-10 pr-4 py-2.5 text-sm text-[#273444] dark:text-[#F1F5F9] placeholder-[#64748B] focus:outline-none focus:ring-2 focus:ring-[#B89B72] transition"
+                  className="w-full bg-[#F8FAFC] dark:bg-[#102A43] border border-[#E2E8F0] dark:border-[#334155] rounded-xl pl-10 pr-4 py-2.5 text-sm text-[#0F172A] dark:text-[#F1F5F9] placeholder-[#64748B] focus:outline-none focus:ring-2 focus:ring-[#2563EB] transition"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-[#273444] dark:text-[#F1F5F9] mb-1.5">
+              <label className="block text-xs font-semibold text-[#0F172A] dark:text-[#F1F5F9] mb-1.5">
                 New Password (min 6 characters)
               </label>
               <div className="relative">
@@ -142,12 +142,12 @@ export default function ForgotPasswordPage() {
                   placeholder="••••••••"
                   required
                   minLength={6}
-                  className="w-full bg-[#FAF8F3] dark:bg-[#102A43] border border-[#E7E2D8] dark:border-[#334155] rounded-xl pl-10 pr-10 py-2.5 text-sm text-[#273444] dark:text-[#F1F5F9] placeholder-[#64748B] focus:outline-none focus:ring-2 focus:ring-[#B89B72] transition"
+                  className="w-full bg-[#F8FAFC] dark:bg-[#102A43] border border-[#E2E8F0] dark:border-[#334155] rounded-xl pl-10 pr-10 py-2.5 text-sm text-[#0F172A] dark:text-[#F1F5F9] placeholder-[#64748B] focus:outline-none focus:ring-2 focus:ring-[#2563EB] transition"
                 />
                 <button
                   type="button"
                   onClick={() => setShowNewPassword(!showNewPassword)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#64748B] hover:text-[#273444] dark:hover:text-[#F1F5F9]"
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#64748B] hover:text-[#0F172A] dark:hover:text-[#F1F5F9]"
                 >
                   {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -155,7 +155,7 @@ export default function ForgotPasswordPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-[#273444] dark:text-[#F1F5F9] mb-1.5">
+              <label className="block text-xs font-semibold text-[#0F172A] dark:text-[#F1F5F9] mb-1.5">
                 Confirm New Password
               </label>
               <div className="relative">
@@ -167,7 +167,7 @@ export default function ForgotPasswordPage() {
                   placeholder="••••••••"
                   required
                   minLength={6}
-                  className="w-full bg-[#FAF8F3] dark:bg-[#102A43] border border-[#E7E2D8] dark:border-[#334155] rounded-xl pl-10 pr-4 py-2.5 text-sm text-[#273444] dark:text-[#F1F5F9] placeholder-[#64748B] focus:outline-none focus:ring-2 focus:ring-[#B89B72] transition"
+                  className="w-full bg-[#F8FAFC] dark:bg-[#102A43] border border-[#E2E8F0] dark:border-[#334155] rounded-xl pl-10 pr-4 py-2.5 text-sm text-[#0F172A] dark:text-[#F1F5F9] placeholder-[#64748B] focus:outline-none focus:ring-2 focus:ring-[#2563EB] transition"
                 />
               </div>
             </div>
@@ -179,7 +179,7 @@ export default function ForgotPasswordPage() {
             >
               {isResetting ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin text-[#B89B72]" />
+                  <Loader2 className="w-4 h-4 animate-spin text-[#2563EB]" />
                   <span>Updating Password...</span>
                 </>
               ) : (
@@ -192,7 +192,7 @@ export default function ForgotPasswordPage() {
           </form>
 
           {/* Back to Login Button */}
-          <div className="text-center pt-2 border-t border-[#E7E2D8] dark:border-[#334155]">
+          <div className="text-center pt-2 border-t border-[#E2E8F0] dark:border-[#334155]">
             <Link
               href="/login"
               className="inline-flex items-center space-x-1.5 text-xs text-[#64748B] dark:text-[#A8B3C2] hover:text-[#17324D] dark:hover:text-white transition"

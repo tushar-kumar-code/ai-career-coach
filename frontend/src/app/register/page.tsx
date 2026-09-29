@@ -5,16 +5,12 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import {
-  Sparkles,
-  Lock,
-  Mail,
-  User,
+  GraduationCap,
   Eye,
   EyeOff,
-  ArrowRight,
   Loader2,
   AlertCircle,
-  ShieldCheck,
+  Brain,
 } from 'lucide-react';
 
 export default function RegisterPage() {
@@ -23,6 +19,7 @@ export default function RegisterPage() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false);
@@ -78,37 +75,158 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#FAF8F3] dark:bg-[#0F172A] text-[#273444] dark:text-[#F1F5F9] flex flex-col justify-center items-center p-4 sm:p-6 relative selection:bg-[#B89B72] selection:text-white">
-      {/* Main Container */}
-      <div className="relative w-full max-w-md">
-        {/* Brand Header */}
-        <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center space-x-3 group mb-4">
-            <div className="w-12 h-12 rounded-2xl bg-[#17324D] dark:bg-[#102A43] border border-[#B89B72]/40 flex items-center justify-center shadow-sm group-hover:scale-105 transition">
-              <Sparkles className="w-6 h-6 text-[#B89B72]" />
-            </div>
-            <span className="font-extrabold text-2xl text-[#17324D] dark:text-[#F1F5F9] tracking-tight">AI Career Coach</span>
-          </Link>
-          <h1 className="text-xl sm:text-2xl font-bold text-[#17324D] dark:text-[#F1F5F9] tracking-tight">
-            Create your Candidate Account
-          </h1>
-          <p className="text-xs sm:text-sm text-[#64748B] dark:text-[#A8B3C2] mt-1">
-            Start building your career digital twin, tailored roadmap & mock tests
-          </p>
-        </div>
+    <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0F172A] text-[#0F172A] dark:text-[#F1F5F9] flex flex-col justify-between selection:bg-blue-600 selection:text-white">
+      {/* Top Header Bar */}
+      <header className="w-full px-6 sm:px-10 py-5 flex items-center justify-between border-b border-[#E2E8F0] dark:border-[#334155] bg-transparent">
+        <Link href="/" className="flex items-center space-x-2.5 group">
+          <div className="w-9 h-9 rounded-xl bg-[#17324D] dark:bg-[#102A43] flex items-center justify-center text-white shadow-sm group-hover:scale-105 transition">
+            <Brain className="w-5 h-5 text-[#2563EB]" />
+          </div>
+          <span className="font-bold text-lg text-[#17324D] dark:text-[#F1F5F9] tracking-tight">Career</span>
+        </Link>
+        <span className="text-xs sm:text-sm font-medium text-[#64748B] dark:text-[#A8B3C2]">
+          Your Career, Your Future
+        </span>
+      </header>
 
-        {/* Card */}
-        <div className="p-6 sm:p-8 rounded-3xl bg-white dark:bg-[#172235] border border-[#E7E2D8] dark:border-[#334155] shadow-sm space-y-6">
-          {/* Google Sign In Button */}
+      {/* Center Auth Card */}
+      <div className="flex-1 flex items-center justify-center p-4 sm:p-6 my-4">
+        <div className="w-full max-w-[420px] bg-white dark:bg-[#172235] rounded-3xl border border-[#E2E8F0] dark:border-[#334155] p-7 sm:p-9 shadow-sm">
+          
+          {/* Top Floating Badge */}
+          <div className="flex justify-center mb-5">
+            <div className="w-14 h-14 rounded-2xl bg-[#F8FAFC] dark:bg-[#102A43] border border-[#E2E8F0] dark:border-[#334155] flex items-center justify-center shadow-xs">
+              <GraduationCap className="w-7 h-7 text-[#17324D] dark:text-[#38BDF8]" />
+            </div>
+          </div>
+
+          {/* Title & Subtitle */}
+          <div className="text-center mb-7">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-[#17324D] dark:text-[#F1F5F9] tracking-tight">
+              Create your account
+            </h1>
+            <p className="text-xs sm:text-sm text-[#64748B] dark:text-[#A8B3C2] mt-1.5">
+              Start your journey towards your dream career.
+            </p>
+          </div>
+
+          {/* Error Banner */}
+          {error && (
+            <div className="mb-5 p-3.5 rounded-xl bg-rose-500/10 border border-[#C75C5C]/30 text-[#C75C5C] text-xs flex items-start gap-2.5 animate-in fade-in">
+              <AlertCircle className="w-4 h-4 text-[#C75C5C] shrink-0 mt-0.5" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          {/* Registration Form */}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-xs font-semibold text-[#0F172A] dark:text-[#F1F5F9] mb-1.5">
+                Full name
+              </label>
+              <input
+                type="text"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="e.g. Alex Johnson"
+                className="w-full bg-white dark:bg-[#102A43] border border-[#E2E8F0] dark:border-[#334155] rounded-xl px-4 py-3 text-sm text-[#0F172A] dark:text-[#F1F5F9] placeholder-[#94A3B8] focus:outline-none focus:border-[#17324D] dark:focus:border-[#2563EB] transition"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-[#0F172A] dark:text-[#F1F5F9] mb-1.5">
+                Email address
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                required
+                className="w-full bg-white dark:bg-[#102A43] border border-[#E2E8F0] dark:border-[#334155] rounded-xl px-4 py-3 text-sm text-[#0F172A] dark:text-[#F1F5F9] placeholder-[#94A3B8] focus:outline-none focus:border-[#17324D] dark:focus:border-[#2563EB] transition"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-[#0F172A] dark:text-[#F1F5F9] mb-1.5">
+                Password
+              </label>
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Create a password (min. 6 chars)"
+                  required
+                  className="w-full bg-white dark:bg-[#102A43] border border-[#E2E8F0] dark:border-[#334155] rounded-xl pl-4 pr-11 py-3 text-sm text-[#0F172A] dark:text-[#F1F5F9] placeholder-[#94A3B8] focus:outline-none focus:border-[#17324D] dark:focus:border-[#2563EB] transition"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#94A3B8] hover:text-[#0F172A] dark:hover:text-[#F1F5F9] p-1"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-[#0F172A] dark:text-[#F1F5F9] mb-1.5">
+                Confirm password
+              </label>
+              <div className="relative">
+                <input
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Confirm your password"
+                  required
+                  className="w-full bg-white dark:bg-[#102A43] border border-[#E2E8F0] dark:border-[#334155] rounded-xl pl-4 pr-11 py-3 text-sm text-[#0F172A] dark:text-[#F1F5F9] placeholder-[#94A3B8] focus:outline-none focus:border-[#17324D] dark:focus:border-[#2563EB] transition"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#94A3B8] hover:text-[#0F172A] dark:hover:text-[#F1F5F9] p-1"
+                >
+                  {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            {/* Primary Create Account Button */}
+            <button
+              type="submit"
+              disabled={isSubmitting || isGoogleSubmitting}
+              className="w-full py-3.5 px-4 rounded-xl font-bold text-sm bg-[#17324D] hover:bg-[#102A43] text-white transition shadow-sm flex items-center justify-center space-x-2 disabled:opacity-50 mt-2 cursor-pointer"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin text-[#2563EB]" />
+                  <span>Creating Account...</span>
+                </>
+              ) : (
+                <span>Create account</span>
+              )}
+            </button>
+          </form>
+
+          {/* OR Divider */}
+          <div className="flex items-center space-x-3 my-5 text-[#94A3B8] dark:text-[#64748B] text-xs font-medium uppercase">
+            <div className="flex-1 h-px bg-[#E2E8F0] dark:bg-[#334155]" />
+            <span className="px-1 text-[11px] tracking-wider">OR</span>
+            <div className="flex-1 h-px bg-[#E2E8F0] dark:bg-[#334155]" />
+          </div>
+
+          {/* Continue with Google */}
           <button
             type="button"
             onClick={handleGoogleRegister}
             disabled={isGoogleSubmitting || isSubmitting}
-            className="w-full py-2.5 px-4 rounded-xl font-semibold text-xs bg-white dark:bg-[#102A43] hover:bg-[#FAF8F3] dark:hover:bg-[#172235] border border-[#E7E2D8] dark:border-[#334155] text-[#273444] dark:text-[#F1F5F9] transition flex items-center justify-center space-x-2.5 shadow-sm disabled:opacity-50"
+            className="w-full py-3 px-4 rounded-xl font-medium text-xs sm:text-sm bg-white dark:bg-[#102A43] hover:bg-[#F8FAFC] dark:hover:bg-[#172235] border border-[#E2E8F0] dark:border-[#334155] text-[#0F172A] dark:text-[#F1F5F9] transition flex items-center justify-center space-x-2.5 shadow-xs disabled:opacity-50 cursor-pointer"
           >
             {isGoogleSubmitting ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin text-[#B89B72]" />
+                <Loader2 className="w-4 h-4 animate-spin text-[#2563EB]" />
                 <span>Connecting with Google...</span>
               </>
             ) : (
@@ -136,134 +254,25 @@ export default function RegisterPage() {
             )}
           </button>
 
-          <div className="flex items-center space-x-3 text-[#64748B] dark:text-[#A8B3C2] text-xs uppercase font-semibold">
-            <div className="flex-1 h-px bg-[#E7E2D8] dark:bg-[#334155]" />
-            <span>Or Register with Email</span>
-            <div className="flex-1 h-px bg-[#E7E2D8] dark:bg-[#334155]" />
-          </div>
-
-          {/* Error Alert */}
-          {error && (
-            <div className="p-3.5 rounded-xl bg-rose-500/10 border border-[#C75C5C]/30 text-[#C75C5C] text-xs flex items-start gap-2.5 animate-in fade-in">
-              <AlertCircle className="w-4 h-4 text-[#C75C5C] shrink-0 mt-0.5" />
-              <span>{error}</span>
-            </div>
-          )}
-
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-[#273444] dark:text-[#F1F5F9] mb-1.5">
-                Full Name
-              </label>
-              <div className="relative">
-                <User className="w-4 h-4 text-[#64748B] dark:text-[#A8B3C2] absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  placeholder="e.g. Alex Sharma"
-                  className="w-full bg-[#FAF8F3] dark:bg-[#102A43] border border-[#E7E2D8] dark:border-[#334155] rounded-xl pl-10 pr-4 py-2.5 text-sm text-[#273444] dark:text-[#F1F5F9] placeholder-[#64748B] focus:outline-none focus:ring-2 focus:ring-[#B89B72] transition"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-[#273444] dark:text-[#F1F5F9] mb-1.5">
-                Email Address <span className="text-[#C75C5C]">*</span>
-              </label>
-              <div className="relative">
-                <Mail className="w-4 h-4 text-[#64748B] dark:text-[#A8B3C2] absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="student@university.edu"
-                  required
-                  className="w-full bg-[#FAF8F3] dark:bg-[#102A43] border border-[#E7E2D8] dark:border-[#334155] rounded-xl pl-10 pr-4 py-2.5 text-sm text-[#273444] dark:text-[#F1F5F9] placeholder-[#64748B] focus:outline-none focus:ring-2 focus:ring-[#B89B72] transition"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-[#273444] dark:text-[#F1F5F9] mb-1.5">
-                Password <span className="text-[#C75C5C]">*</span>
-              </label>
-              <div className="relative">
-                <Lock className="w-4 h-4 text-[#64748B] dark:text-[#A8B3C2] absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="At least 6 characters"
-                  required
-                  minLength={6}
-                  className="w-full bg-[#FAF8F3] dark:bg-[#102A43] border border-[#E7E2D8] dark:border-[#334155] rounded-xl pl-10 pr-10 py-2.5 text-sm text-[#273444] dark:text-[#F1F5F9] placeholder-[#64748B] focus:outline-none focus:ring-2 focus:ring-[#B89B72] transition"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#64748B] hover:text-[#273444] dark:hover:text-[#F1F5F9]"
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-[#273444] dark:text-[#F1F5F9] mb-1.5">
-                Confirm Password <span className="text-[#C75C5C]">*</span>
-              </label>
-              <div className="relative">
-                <Lock className="w-4 h-4 text-[#64748B] dark:text-[#A8B3C2] absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="Repeat your password"
-                  required
-                  className="w-full bg-[#FAF8F3] dark:bg-[#102A43] border border-[#E7E2D8] dark:border-[#334155] rounded-xl pl-10 pr-4 py-2.5 text-sm text-[#273444] dark:text-[#F1F5F9] placeholder-[#64748B] focus:outline-none focus:ring-2 focus:ring-[#B89B72] transition"
-                />
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full py-3 px-4 rounded-xl font-bold text-sm bg-[#17324D] hover:bg-[#102A43] text-white transition shadow-sm flex items-center justify-center space-x-2 disabled:opacity-50 mt-2"
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin text-[#B89B72]" />
-                  <span>Creating Account...</span>
-                </>
-              ) : (
-                <>
-                  <span>Create Account</span>
-                  <ArrowRight className="w-4 h-4" />
-                </>
-              )}
-            </button>
-          </form>
-
-          {/* Footer Link */}
-          <div className="text-center pt-2 border-t border-[#E7E2D8] dark:border-[#334155] text-xs text-[#64748B] dark:text-[#A8B3C2]">
+          {/* Footer Switch */}
+          <div className="text-center pt-4 mt-4 border-t border-[#E2E8F0] dark:border-[#334155] text-xs text-[#64748B] dark:text-[#A8B3C2]">
             Already have an account?{' '}
             <Link
               href="/login"
-              className="text-[#17324D] dark:text-[#D9C19A] font-semibold hover:underline"
+              className="text-[#17324D] dark:text-[#38BDF8] font-bold hover:underline"
             >
-              Sign In
+              Log in
             </Link>
           </div>
         </div>
-
-        {/* Security badge */}
-        <div className="mt-6 flex items-center justify-center space-x-2 text-[11px] text-[#64748B] dark:text-[#A8B3C2]">
-          <ShieldCheck className="w-4 h-4 text-[#2E7D5B]" />
-          <span>Firebase Encrypted Authentication & Secure Token Verification</span>
-        </div>
       </div>
+
+      {/* Bottom Page Footer */}
+      <footer className="w-full text-center py-5 text-xs text-[#64748B] dark:text-[#A8B3C2]">
+        By creating an account, you agree to our{' '}
+        <Link href="/" className="hover:underline text-[#0F172A] dark:text-[#F1F5F9]">Terms of Service</Link> and{' '}
+        <Link href="/" className="hover:underline text-[#0F172A] dark:text-[#F1F5F9]">Privacy Policy</Link>.
+      </footer>
     </div>
   );
 }

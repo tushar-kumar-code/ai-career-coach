@@ -57,6 +57,17 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = ""
     ANTHROPIC_API_KEY: str = ""
 
+    # Real Email & SMTP Configuration for Real Inbox OTP Verification
+    SMTP_HOST: str = ""  # e.g. "smtp.gmail.com"
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""  # e.g. "your-email@gmail.com"
+    SMTP_PASSWORD: str = ""  # e.g. 16-character Google App Password
+    SMTP_FROM_EMAIL: str = ""  # e.g. "no-reply@aicareercoach.ai" or your sender email
+    SMTP_FROM_NAME: str = "AI Career Coach"
+    SMTP_TLS: bool = True
+    SMTP_SSL: bool = False
+    EMAIL_VERIFICATION_REQUIRED: bool = True
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

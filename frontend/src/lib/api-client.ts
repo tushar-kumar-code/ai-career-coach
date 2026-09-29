@@ -53,6 +53,9 @@ export async function getFreshAuthToken(): Promise<string | null> {
   if (typeof window === 'undefined') return null;
   try {
     const { auth } = await import('./firebase');
+    if (!auth.currentUser && typeof auth.authStateReady === 'function') {
+      await auth.authStateReady();
+    }
     if (auth?.currentUser) {
       const freshToken = await auth.currentUser.getIdToken();
       if (freshToken) {
@@ -657,6 +660,12 @@ export async function demoLoginUser(): Promise<AuthResponseData> {
 
 export async function getMe(): Promise<UserAuthData> {
   return request<UserAuthData>('/auth/me', { cache: 'no-store' });
+}
+
+export async function notifyLoginEvent(): Promise<void> {
+  try {
+    await request('/auth/login-notify', { method: 'POST' });
+  } catch {}
 }
 
 export async function resetPassword(email: string, newPassword: string): Promise<{ success: boolean; message: string }> {

@@ -68,12 +68,40 @@ def get_firebase_app() -> Optional[firebase_admin.App]:
 
 def verify_firebase_id_token(token: str) -> Dict[str, Any]:
     """
-    Verifies a Firebase ID token using Firebase Admin SDK.
+    Verifies a Firebase ID token.
+    1. Attempts verification using Firebase Admin SDK (if service account credentials exist).
+    2. Falls back to Google's official public certificate verification via google.oauth2.id_token,
+       which validates Google-signed Firebase tokens using Google's public x509 certs matching
+       FIREBASE_PROJECT_ID without needing a private service account JSON file.
     Raises Exception if token is invalid or expired.
     Returns decoded token dictionary containing 'uid', 'email', 'name', etc.
     """
-    get_firebase_app()
-    decoded = auth.verify_id_token(token, check_revoked=False)
+    # 1. Try Firebase Admin SDK
+    try:
+        app = get_firebase_app()
+        if app:
+            decoded = auth.verify_id_token(token, check_revoked=False)
+            return decoded
+    except Exception as admin_err:
+        logger.debug(f"Firebase Admin SDK verify notice (trying public cert verifier): {admin_err}")
+
+    # 2. Public Google OAuth2 / Firebase Certificate Verifier
+    project_id = (settings.FIREBASE_PROJECT_ID or "").strip()
+    if not project_id:
+        raise ValueError("FIREBASE_PROJECT_ID is not configured in backend environment")
+
+    from google.oauth2 import id_token as google_id_token
+    from google.auth.transport import requests as google_requests
+
+    req = google_requests.Request()
+    decoded = google_id_token.verify_firebase_token(token, req, audience=project_id)
+    if not decoded:
+        raise ValueError("Invalid Firebase ID token payload")
+
+    # Normalize uid for caller consistency
+    if "uid" not in decoded and "sub" in decoded:
+        decoded["uid"] = decoded["sub"]
+
     return decoded
 
 

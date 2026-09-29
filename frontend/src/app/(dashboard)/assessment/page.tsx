@@ -181,7 +181,7 @@ export default function AssessmentPage() {
 
         // Check if user already has completed result
         const existingResult = await getAssessmentResult();
-        if (existingResult && existingResult.analysis && existingResult.selected_target_career) {
+        if (existingResult && (existingResult.analysis || existingResult.selected_target_career)) {
           setResult(existingResult);
           setSelectedTarget(existingResult.selected_target_career || null);
           setAssessmentMode('result');
@@ -403,109 +403,113 @@ export default function AssessmentPage() {
             <span>Career Assessment & Goal Setup</span>
           </div>
           <h1 className="text-3xl md:text-4xl font-extrabold text-white leading-tight">
-            Aap Career Kis Tarah Shuru Karna Chahte Hain?
+            Choose Your Starting Path
           </h1>
           <p className="text-slate-400 text-sm leading-relaxed max-w-xl mx-auto">
-            Chahe aapko pehle se pata ho ki aapko kya banna hai, ya aap AI se guidance chahte hain — apna pasandida rasta chuniye:
+            Choose whether you already know your goal or would like AI guidance to discover your best fit. Both paths create your personalized learning roadmap.
           </p>
         </div>
 
         {/* Dual Pathway Choice Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
           {/* PATH A: Direct Career Track */}
-          <div className="group relative p-7 rounded-3xl border border-[#E7E2D8] dark:border-[#334155] bg-white dark:bg-[#172235] hover:border-[#B89B72]/60 transition-all duration-300 shadow-sm flex flex-col justify-between">
+          <div className="group relative p-7 rounded-3xl border border-slate-800 bg-slate-900/60 hover:border-indigo-500/50 transition-all duration-300 shadow-xl flex flex-col justify-between">
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <div className="w-14 h-14 rounded-2xl bg-[#FAF8F3] dark:bg-[#102A43] border border-[#E7E2D8] dark:border-[#334155] flex items-center justify-center text-2xl group-hover:scale-105 transition-transform">
+                <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-2xl group-hover:scale-105 transition-transform">
                   🎯
                 </div>
-                <span className="px-3 py-1 rounded-full text-[11px] font-bold bg-[#B89B72]/15 text-[#17324D] dark:text-[#D9C19A] border border-[#B89B72]/30">
-                  Fast Track & Skill Gap
+                <span className="px-3 py-1 rounded-full text-[11px] font-bold bg-indigo-500/10 text-indigo-300 border border-indigo-500/30">
+                  Fast Track · No Test Needed
                 </span>
               </div>
 
               <div>
-                <h3 className="text-xl font-bold text-[#17324D] dark:text-[#F1F5F9] mb-2 group-hover:text-[#B89B72] transition-colors">
-                  Mujhe Mera Career Pata Hai
+                <h3 className="text-xl font-bold text-white mb-2 group-hover:text-indigo-300 transition-colors">
+                  I Know My Target Career
                 </h3>
-                <p className="text-xs text-[#64748B] dark:text-[#A8B3C2] leading-relaxed">
-                  Agar aapko pata hai ki aapko kis field mein jana hai (jaise <strong>Frontend, Backend, AI/ML, Data Analyst</strong> etc.), toh direct role chuniye aur apni skills batayein.
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Already know what role you want to pursue (e.g., <strong>Frontend, Backend, AI/ML, Data Analyst</strong>)? Pick your role directly and map your skills in seconds.
                 </p>
               </div>
 
-              <div className="space-y-2 pt-2 border-t border-[#E7E2D8] dark:border-[#334155]">
-                <div className="flex items-center space-x-2 text-xs text-[#64748B] dark:text-[#A8B3C2]">
-                  <CheckCircle2 className="w-4 h-4 text-[#2E7D5B] shrink-0" />
-                  <span>Direct role selection bina lambe test ke</span>
+              <div className="space-y-2 pt-2 border-t border-slate-800">
+                <div className="flex items-center space-x-2 text-xs text-slate-300">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>Direct role selection without a lengthy test</span>
                 </div>
-                <div className="flex items-center space-x-2 text-xs text-[#64748B] dark:text-[#A8B3C2]">
-                  <CheckCircle2 className="w-4 h-4 text-[#2E7D5B] shrink-0" />
-                  <span><strong>&quot;Scratch / Kuch nahi aata&quot;</strong> option (0 se roadmap)</span>
+                <div className="flex items-center space-x-2 text-xs text-slate-300">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>Beginner-friendly <strong>&quot;Start from scratch (0 knowledge)&quot;</strong> option</span>
                 </div>
-                <div className="flex items-center space-x-2 text-xs text-[#64748B] dark:text-[#A8B3C2]">
-                  <CheckCircle2 className="w-4 h-4 text-[#2E7D5B] shrink-0" />
-                  <span>Instant Skill Gap Analysis & Custom Roadmap</span>
+                <div className="flex items-center space-x-2 text-xs text-slate-300">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>Instant Skill Gap Audit & Custom Learning Roadmap</span>
                 </div>
               </div>
             </div>
 
             <button
+              type="button"
+              id="btn-select-direct-track"
               onClick={() => {
                 setDirectResultData(null);
                 setAssessmentMode('direct');
               }}
-              className="mt-6 w-full py-3.5 rounded-xl bg-[#17324D] hover:bg-[#102A43] text-white font-bold text-sm flex items-center justify-center space-x-2 shadow-sm transition-all"
+              className="mt-6 w-full py-3.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm flex items-center justify-center space-x-2 shadow-lg shadow-indigo-600/20 transition-all min-h-[44px]"
             >
-              <span>Direct Career Set Karein</span>
+              <span>Choose Target Role Directly</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>
 
           {/* PATH B: Career Discovery AI Quiz */}
-          <div className="group relative p-7 rounded-3xl border border-[#E7E2D8] dark:border-[#334155] bg-white dark:bg-[#172235] hover:border-[#B89B72]/60 transition-all duration-300 shadow-sm flex flex-col justify-between">
+          <div className="group relative p-7 rounded-3xl border border-slate-800 bg-slate-900/60 hover:border-violet-500/50 transition-all duration-300 shadow-xl flex flex-col justify-between">
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <div className="w-14 h-14 rounded-2xl bg-[#FAF8F3] dark:bg-[#102A43] border border-[#E7E2D8] dark:border-[#334155] flex items-center justify-center text-2xl group-hover:scale-105 transition-transform">
+                <div className="w-14 h-14 rounded-2xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center text-2xl group-hover:scale-105 transition-transform">
                   🧭
                 </div>
-                <span className="px-3 py-1 rounded-full text-[11px] font-bold bg-[#B89B72]/15 text-[#17324D] dark:text-[#D9C19A] border border-[#B89B72]/30">
-                  AI Guided Quiz
+                <span className="px-3 py-1 rounded-full text-[11px] font-bold bg-violet-500/10 text-violet-300 border border-violet-500/30">
+                  AI Guided · Recommended
                 </span>
               </div>
 
               <div>
-                <h3 className="text-xl font-bold text-[#17324D] dark:text-[#F1F5F9] mb-2 group-hover:text-[#B89B72] transition-colors">
-                  Mujhe Career Discover Karna Hai
+                <h3 className="text-xl font-bold text-white mb-2 group-hover:text-violet-300 transition-colors">
+                  Help Me Discover My Career
                 </h3>
-                <p className="text-xs text-[#64748B] dark:text-[#A8B3C2] leading-relaxed">
-                  Agar aap confuse hain ki aapke dimaag, logical instincts aur interests ke hisaab se kaunsa career best fit rahega, toh hamara <strong>AI Career Discovery Quiz</strong> lijiye.
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Not sure which tech path fits your strengths, problem-solving style, and interests? Take our quick <strong>5-question AI discovery quiz</strong> to uncover your best matches.
                 </p>
               </div>
 
-              <div className="space-y-2 pt-2 border-t border-[#E7E2D8] dark:border-[#334155]">
-                <div className="flex items-center space-x-2 text-xs text-[#64748B] dark:text-[#A8B3C2]">
-                  <CheckCircle2 className="w-4 h-4 text-[#2E7D5B] shrink-0" />
-                  <span>5 intuitive questions tailored to your level</span>
+              <div className="space-y-2 pt-2 border-t border-slate-800">
+                <div className="flex items-center space-x-2 text-xs text-slate-300">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>5 intuitive questions tailored to your experience level</span>
                 </div>
-                <div className="flex items-center space-x-2 text-xs text-[#64748B] dark:text-[#A8B3C2]">
-                  <CheckCircle2 className="w-4 h-4 text-[#2E7D5B] shrink-0" />
-                  <span>Gemini AI Career Archetype calculation</span>
+                <div className="flex items-center space-x-2 text-xs text-slate-300">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>Evaluates 12 career dimensions & archetype</span>
                 </div>
-                <div className="flex items-center space-x-2 text-xs text-[#64748B] dark:text-[#A8B3C2]">
-                  <CheckCircle2 className="w-4 h-4 text-[#2E7D5B] shrink-0" />
-                  <span>Top 3 matched career recommendations with % match</span>
+                <div className="flex items-center space-x-2 text-xs text-slate-300">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>Top 3 matched recommendations with fit percentages</span>
                 </div>
               </div>
             </div>
 
             <button
+              type="button"
+              id="btn-select-quiz-track"
               onClick={() => {
                 setShowLevelSelect(true);
                 setAssessmentMode('quiz');
               }}
-              className="mt-6 w-full py-3.5 rounded-xl bg-[#17324D] hover:bg-[#102A43] text-white font-bold text-sm flex items-center justify-center space-x-2 shadow-sm transition-all"
+              className="mt-6 w-full py-3.5 px-4 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-bold text-sm flex items-center justify-center space-x-2 shadow-lg shadow-violet-600/20 transition-all min-h-[44px]"
             >
-              <span>Career Discovery Quiz Start Karein</span>
+              <span>Start 5-Question Discovery Quiz</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>
@@ -515,8 +519,9 @@ export default function AssessmentPage() {
         {result && (
           <div className="text-center pt-2">
             <button
+              type="button"
               onClick={() => setAssessmentMode('result')}
-              className="text-xs text-indigo-400 hover:text-indigo-300 font-semibold underline underline-offset-4"
+              className="text-xs text-indigo-400 hover:text-indigo-300 font-semibold underline underline-offset-4 min-h-[44px] inline-flex items-center"
             >
               ← Back to previous assessment profile
             </button>
@@ -535,12 +540,13 @@ export default function AssessmentPage() {
         {/* Top Navigation */}
         <div className="flex items-center justify-between">
           <button
+            type="button"
             onClick={() => setAssessmentMode('select')}
-            className="px-3.5 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white text-xs font-semibold flex items-center space-x-1.5 transition-all"
+            className="px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white text-xs font-semibold flex items-center space-x-1.5 transition-all min-h-[44px]"
           >
-            <span>← Dono Raste Dekhein (Pathways)</span>
+            <span>← Back to Pathway Selection</span>
           </button>
-          <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 text-xs font-semibold">
+          <div className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 text-xs font-semibold">
             <Target className="w-3.5 h-3.5" />
             <span>Direct Goal Track</span>
           </div>
@@ -636,20 +642,34 @@ export default function AssessmentPage() {
             {/* Next Action CTAs */}
             <div className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-4">
               <h3 className="text-sm font-bold text-white uppercase tracking-wider">
-                🚀 Agla Kadam: Roadmap & AI Coaching
+                🚀 Agla Kadam: Dashboard, Roadmap & AI Coaching
               </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                <Link
+                  href="/dashboard"
+                  className="p-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs flex flex-col justify-between space-y-2 shadow-md transition-all"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-base">📊</span>
+                    <ArrowRight className="w-4 h-4 text-white" />
+                  </div>
+                  <div>
+                    <div className="font-extrabold text-sm">Open Dashboard</div>
+                    <div className="text-[11px] text-teal-100 font-normal">All features unlocked</div>
+                  </div>
+                </Link>
+
                 <Link
                   href="/roadmap"
                   className="p-4 rounded-xl bg-[#17324D] hover:bg-[#102A43] text-white font-bold text-xs flex flex-col justify-between space-y-2 shadow-sm transition-all"
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-base">🗺️</span>
-                    <ArrowRight className="w-4 h-4 text-[#B89B72]" />
+                    <ArrowRight className="w-4 h-4 text-[#2563EB]" />
                   </div>
                   <div>
                     <div className="font-extrabold text-sm">Generate Full Roadmap</div>
-                    <div className="text-[11px] text-[#D9C19A] font-normal">Week-by-week personalized learning plan</div>
+                    <div className="text-[11px] text-[#38BDF8] font-normal">Week-by-week personalized learning plan</div>
                   </div>
                 </Link>
 
@@ -702,8 +722,7 @@ export default function AssessmentPage() {
                 🎯 Direct Career Goal & Skill Gap Setup
               </h1>
               <p className="text-xs text-slate-300 leading-relaxed max-w-2xl">
-                Bataiye aap kis field mein apna career banana chahte hain aur aapko abhi kya kya aata hai. 
-                Agar aapko abhi <strong>kuch nahi aata (scratch)</strong>, toh bhi koi chinta nahi — roadmap aapke liye 0 se start karega!
+                Select your target career role and your current experience level. If you are starting from <strong>complete scratch (0 prior knowledge)</strong>, your roadmap will guide you from the foundational basics step-by-step.
               </p>
             </div>
 
@@ -718,7 +737,10 @@ export default function AssessmentPage() {
             <div className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-4">
               <div className="flex items-center space-x-2">
                 <span className="w-6 h-6 rounded-full bg-indigo-500/20 text-indigo-400 text-xs font-extrabold flex items-center justify-center border border-indigo-500/30">1</span>
-                <h2 className="text-base font-bold text-white">Aapka Target Career Role Kya Hai?</h2>
+                <div>
+                  <h2 className="text-base font-bold text-white">Select Your Target Career Role</h2>
+                  <p className="text-[11px] text-slate-400">Choose from top industry roles or enter a custom title below</p>
+                </div>
               </div>
 
               {/* Popular Role Chips */}
@@ -779,7 +801,10 @@ export default function AssessmentPage() {
             <div className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-4">
               <div className="flex items-center space-x-2">
                 <span className="w-6 h-6 rounded-full bg-indigo-500/20 text-indigo-400 text-xs font-extrabold flex items-center justify-center border border-indigo-500/30">2</span>
-                <h2 className="text-base font-bold text-white">Aapka Current Level Kya Hai? (Aapko kitna aata hai?)</h2>
+                <div>
+                  <h2 className="text-base font-bold text-white">What is your current knowledge level?</h2>
+                  <p className="text-[11px] text-slate-400">Your roadmap adjusts its starting point to this level</p>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -790,7 +815,7 @@ export default function AssessmentPage() {
                     setDirectExperienceLevel('scratch');
                     setKnownSkillsList([]);
                   }}
-                  className={`p-4 rounded-xl border text-left transition-all ${
+                  className={`p-4 rounded-xl border text-left transition-all min-h-[44px] ${
                     directExperienceLevel === 'scratch'
                       ? 'bg-emerald-600/25 border-emerald-400 text-white shadow-md shadow-emerald-500/20 ring-1 ring-emerald-400'
                       : 'bg-slate-950/60 border-slate-800 text-slate-300 hover:border-slate-700'
@@ -802,9 +827,9 @@ export default function AssessmentPage() {
                       0 Knowledge
                     </span>
                   </div>
-                  <div className="font-extrabold text-sm text-white">Ekdom Scratch Se</div>
+                  <div className="font-extrabold text-sm text-white">Start From Scratch</div>
                   <div className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                    Mujhe abhi kuch nahi aata. Bilkul Day 1 basic fundamentals se start karna hai.
+                    I am a complete beginner. Build my roadmap from Day 1 foundational fundamentals.
                   </div>
                 </button>
 
@@ -812,7 +837,7 @@ export default function AssessmentPage() {
                 <button
                   type="button"
                   onClick={() => setDirectExperienceLevel('beginner')}
-                  className={`p-4 rounded-xl border text-left transition-all ${
+                  className={`p-4 rounded-xl border text-left transition-all min-h-[44px] ${
                     directExperienceLevel === 'beginner'
                       ? 'bg-indigo-600/25 border-indigo-400 text-white shadow-md shadow-indigo-500/20 ring-1 ring-indigo-400'
                       : 'bg-slate-950/60 border-slate-800 text-slate-300 hover:border-slate-700'
@@ -824,9 +849,9 @@ export default function AssessmentPage() {
                       Basics
                     </span>
                   </div>
-                  <div className="font-extrabold text-sm text-white">Thoda Bahut Basics Aata Hai</div>
+                  <div className="font-extrabold text-sm text-white">Know Basic Concepts</div>
                   <div className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                    Maine syntax ya basic concepts padhe hain. Thodi cheezein aati hain.
+                    I know basic syntax, coursework, or fundamental concepts. Skip introductory definitions.
                   </div>
                 </button>
 
@@ -834,7 +859,7 @@ export default function AssessmentPage() {
                 <button
                   type="button"
                   onClick={() => setDirectExperienceLevel('intermediate')}
-                  className={`p-4 rounded-xl border text-left transition-all ${
+                  className={`p-4 rounded-xl border text-left transition-all min-h-[44px] ${
                     directExperienceLevel === 'intermediate'
                       ? 'bg-purple-600/25 border-purple-400 text-white shadow-md shadow-purple-500/20 ring-1 ring-purple-400'
                       : 'bg-slate-950/60 border-slate-800 text-slate-300 hover:border-slate-700'
@@ -846,9 +871,9 @@ export default function AssessmentPage() {
                       Hands-on
                     </span>
                   </div>
-                  <div className="font-extrabold text-sm text-white">Projects & Practical Experience</div>
+                  <div className="font-extrabold text-sm text-white">Practical Project Experience</div>
                   <div className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                    Mujhe hands-on coding aati hai. Gaps identify karke job ready hona hai.
+                    I have built some projects or worked with tools. Help me bridge advanced industry gaps.
                   </div>
                 </button>
               </div>
@@ -859,11 +884,18 @@ export default function AssessmentPage() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
                   <span className="w-6 h-6 rounded-full bg-indigo-500/20 text-indigo-400 text-xs font-extrabold flex items-center justify-center border border-indigo-500/30">3</span>
-                  <h2 className="text-base font-bold text-white">
-                    {directExperienceLevel === 'scratch' 
-                      ? 'Skill Baseline'
-                      : 'Aapko Inme Se Kya Kya Aata Hai? (Select Known Skills)'}
-                  </h2>
+                  <div>
+                    <h2 className="text-base font-bold text-white">
+                      {directExperienceLevel === 'scratch' 
+                        ? 'Skill Baseline'
+                        : 'Select Any Skills You Already Know (Optional)'}
+                    </h2>
+                    <p className="text-[11px] text-slate-400">
+                      {directExperienceLevel === 'scratch'
+                        ? 'Starting with zero prerequisites'
+                        : 'Selected skills will be marked verified or in-progress'}
+                    </p>
+                  </div>
                 </div>
                 {directExperienceLevel !== 'scratch' && (
                   <span className="text-xs text-indigo-400 font-semibold">
@@ -1170,7 +1202,13 @@ export default function AssessmentPage() {
               Generate your week-by-week learning roadmap tailored to your exact skill gaps, or upload your resume to test ATS score for {selectedTarget || 'your target career'}.
             </p>
           </div>
-          <div className="flex items-center space-x-3 shrink-0">
+          <div className="flex items-center space-x-3 shrink-0 flex-wrap gap-2">
+            <Link
+              href="/dashboard"
+              className="px-5 py-3 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-sm flex items-center justify-center space-x-2 transition-all shadow-lg shadow-teal-600/30"
+            >
+              <span>Go to Dashboard 📊</span>
+            </Link>
             <Link
               href="/roadmap"
               className="px-5 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm flex items-center justify-center space-x-2 transition-all shadow-lg shadow-indigo-600/30"

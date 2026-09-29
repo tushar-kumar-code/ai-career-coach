@@ -45,6 +45,7 @@ import {
   JobApplicationData, 
   ApplicationHistoryItem 
 } from '@/lib/types';
+import SkillActionBadge from '@/components/common/SkillActionBadge';
 
 export default function JobsPage() {
   const [activeTab, setActiveTab] = useState<'search' | 'tracker'>('search');
@@ -333,9 +334,7 @@ export default function JobsPage() {
                               </span>
                             ))}
                             {item.missing_skills.map((sk) => (
-                              <span key={sk} className="px-2.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-400 font-medium">
-                                ⚠ {sk}
-                              </span>
+                              <SkillActionBadge key={sk} skillName={sk} />
                             ))}
                           </div>
                         </div>

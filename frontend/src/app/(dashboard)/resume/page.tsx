@@ -17,36 +17,58 @@ import {
   TrendingUp, 
   RefreshCw 
 } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
 import { uploadResumeFile, getResumeAnalysis } from '@/lib/api-client';
 import { ResumeAnalysisData } from '@/lib/types';
+import SkillActionBadge from '@/components/common/SkillActionBadge';
 
 export default function ResumePage() {
+  const { user, isLoading: authLoading } = useAuth();
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<ResumeAnalysisData | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
-  // Load existing analysis if available
+  // Load existing analysis scoped to current authenticated user
   useEffect(() => {
-    async function loadAnalysis() {
-      if (typeof window !== 'undefined') {
-        const cached = localStorage.getItem('cached_resume_analysis');
-        if (cached) {
-          try {
-            setAnalysis(JSON.parse(cached));
-            setLoading(false);
-          } catch (e) {
-            // ignore
-          }
+    // Clean up legacy unscoped global key to prevent data leakage across users
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('cached_resume_analysis');
+    }
+
+    if (authLoading) return;
+
+    if (!user?.id) {
+      setAnalysis(null);
+      setLoading(false);
+      return;
+    }
+
+    const userCacheKey = `cached_resume_analysis_${user.id}`;
+
+    // Read scoped cache for this user
+    if (typeof window !== 'undefined') {
+      const cached = localStorage.getItem(userCacheKey);
+      if (cached) {
+        try {
+          setAnalysis(JSON.parse(cached));
+          setLoading(false);
+        } catch (e) {
+          // ignore parsing error
         }
       }
+    }
 
+    async function loadAnalysis() {
       setError(null);
       try {
         const data = await getResumeAnalysis();
         if (data) {
           setAnalysis(data);
+          if (typeof window !== 'undefined' && user?.id) {
+            localStorage.setItem(userCacheKey, JSON.stringify(data));
+          }
         }
       } catch (err: any) {
         console.error('Failed to load resume analysis:', err);
@@ -54,8 +76,9 @@ export default function ResumePage() {
         setLoading(false);
       }
     }
+
     loadAnalysis();
-  }, []);
+  }, [user?.id, authLoading]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -71,6 +94,9 @@ export default function ResumePage() {
     try {
       const resultData = await uploadResumeFile(fileToUpload);
       setAnalysis(resultData);
+      if (typeof window !== 'undefined' && user?.id) {
+        localStorage.setItem(`cached_resume_analysis_${user.id}`, JSON.stringify(resultData));
+      }
     } catch (err: any) {
       console.error('Upload error:', err);
       setError(err.message || 'Failed to upload and analyze document');
@@ -296,18 +322,10 @@ export default function ResumePage() {
                       Skill Intelligence →
                     </Link>
                   </div>
-                  <div className="flex flex-wrap gap-1.5 pt-1.5">
+                  <div className="flex flex-wrap gap-2 pt-2">
                     {analysis.target_match.missing_skills.length > 0 ? (
                       analysis.target_match.missing_skills.map((gap, idx) => (
-                        <Link
-                          key={idx}
-                          href="/skills"
-                          className="px-2.5 py-1 rounded bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 hover:border-amber-500/40 text-xs text-amber-300 font-semibold transition-all flex items-center space-x-1 cursor-pointer"
-                          title={`View ${gap} in Skill Intelligence`}
-                        >
-                          <span>{gap}</span>
-                          <span className="text-[10px] text-amber-400/60">→</span>
-                        </Link>
+                        <SkillActionBadge key={idx} skillName={gap} />
                       ))
                     ) : (
                       <span className="text-xs text-slate-400">All target skills detected!</span>

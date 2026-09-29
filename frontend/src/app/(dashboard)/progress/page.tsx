@@ -13,6 +13,8 @@ import {
   getWeeklyReport,
   getAchievements,
 } from '@/lib/digital-twin-api';
+import CareerHubTabs from '@/components/common/CareerHubTabs';
+import SkillActionBadge from '@/components/common/SkillActionBadge';
 import type {
   CareerDigitalTwinData,
   ReadinessSnapshotData,
@@ -168,7 +170,10 @@ export default function ProgressPage() {
   const criticalSkills = twin?.critical_missing_skills ?? [];
 
   return (
-    <div className="space-y-8 max-w-6xl mx-auto">
+    <div className="space-y-8 max-w-6xl mx-auto pb-12">
+      {/* Shared Career Hub Navigation: Placement | Progress | Profile */}
+      <CareerHubTabs activeTab="progress" />
+
       {/* Header */}
       <div className="p-6 rounded-2xl bg-gradient-to-r from-indigo-900/40 to-purple-900/40 border border-indigo-500/20">
         <div className="flex items-center space-x-3 mb-2">
@@ -437,13 +442,14 @@ export default function ProgressPage() {
 
       {/* Critical Missing Skills */}
       {criticalSkills.length > 0 && (
-        <div className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800">
-          <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3">Critical Missing Skills for Target Role</h3>
+        <div className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Critical Missing Skills for Target Role</h3>
+            <span className="text-[11px] text-indigo-400 font-medium">Add to Roadmap or Practice directly</span>
+          </div>
           <div className="flex flex-wrap gap-2">
             {criticalSkills.map((skill, i) => (
-              <span key={i} className="px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-300 text-xs font-semibold">
-                {skill}
-              </span>
+              <SkillActionBadge key={i} skillName={skill} />
             ))}
           </div>
         </div>

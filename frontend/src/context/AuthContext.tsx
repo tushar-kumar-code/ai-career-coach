@@ -2,23 +2,16 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import {
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  signInWithPopup,
-  signOut,
-  onAuthStateChanged,
-  updateProfile,
-  User as FirebaseUser,
-} from 'firebase/auth';
-import { auth, googleProvider } from '@/lib/firebase';
 import { UserAuthData } from '@/lib/types';
 import {
+  loginUser,
+  registerUser,
+  demoLoginUser,
   getMe,
   getSavedAuthToken,
   saveAuthToken,
   clearAuthToken,
-  demoLoginUser,
+  notifyLoginEvent,
 } from '@/lib/api-client';
 
 interface AuthContextType {
@@ -44,108 +37,101 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
 
-  // Sync authenticated session with backend
-  const syncWithBackend = async (idToken: string, fbUser?: FirebaseUser | null): Promise<UserAuthData | null> => {
-    saveAuthToken(idToken);
-    setToken(idToken);
-    try {
-      const backendUser = await getMe();
-      setUser(backendUser);
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('auth_user', JSON.stringify(backendUser));
-      }
-      return backendUser;
-    } catch (err) {
-      console.warn('Backend profile sync notice:', err);
-      // Fallback user from Firebase credentials if backend is temporarily offline
-      if (fbUser) {
-        const fallbackUser: UserAuthData = {
-          id: fbUser.uid,
-          email: fbUser.email || '',
-          full_name: fbUser.displayName || (fbUser.email ? fbUser.email.split('@')[0] : 'Candidate'),
-          is_active: true,
-          has_completed_assessment: false,
-        };
-        setUser(fallbackUser);
-        return fallbackUser;
-      }
-      return null;
-    }
-  };
-
+  // Restore session from localStorage on initial load
   useEffect(() => {
-    let isMounted = true;
-
-    // Load cached session for instantaneous UI responsiveness
-    if (typeof window !== 'undefined') {
-      const cachedToken = getSavedAuthToken();
-      const cachedUserStr = localStorage.getItem('auth_user');
-      if (cachedToken) setToken(cachedToken);
-      if (cachedUserStr) {
-        try {
-          setUser(JSON.parse(cachedUserStr));
-        } catch {}
+    const restoreSession = async () => {
+      if (typeof window === 'undefined') {
+        setIsLoading(false);
+        return;
       }
-    }
 
-    const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
-      if (!isMounted) return;
+      const savedToken = getSavedAuthToken();
+      const cachedUserStr = localStorage.getItem('auth_user');
 
-      if (fbUser) {
+      if (savedToken) {
+        setToken(savedToken);
+        // Load cached user immediately for instant UI responsiveness
+        if (cachedUserStr) {
+          try {
+            const parsed = JSON.parse(cachedUserStr);
+            if (parsed && parsed.email && parsed.email !== 'user@aicareercoach.ai') {
+              setUser(parsed);
+            } else {
+              localStorage.removeItem('auth_user');
+            }
+          } catch {}
+        }
+
+        // Validate token with backend in the background
         try {
-          const idToken = await fbUser.getIdToken();
-          if (isMounted) {
-            await syncWithBackend(idToken, fbUser);
+          const me = await getMe();
+          if (me.email === 'user@aicareercoach.ai') {
+            const { auth } = await import('@/lib/firebase');
+            if (auth?.currentUser?.email) {
+              me.email = auth.currentUser.email;
+              me.full_name = auth.currentUser.displayName || auth.currentUser.email.split('@')[0];
+            }
           }
-        } catch (err) {
-          console.error('Error fetching Firebase ID token:', err);
+          setUser(me);
+          localStorage.setItem('auth_user', JSON.stringify(me));
+        } catch {
+          // Token is invalid/expired — clear it
+          clearAuthToken();
+          setUser(null);
+          setToken(null);
         }
       } else {
-        // If not logged in via Firebase, check if there is an active backend/demo session
-        const savedToken = getSavedAuthToken();
-        if (savedToken) {
-          try {
-            const me = await getMe();
-            if (isMounted) {
-              setUser(me);
-              setToken(savedToken);
-            }
-          } catch {
-            clearAuthToken();
-            if (isMounted) {
-              setUser(null);
-              setToken(null);
-            }
-          }
-        } else {
-          if (isMounted) {
-            setUser(null);
-            setToken(null);
-          }
-        }
+        setUser(null);
+        setToken(null);
       }
 
-      if (isMounted) {
-        setIsLoading(false);
-      }
-    });
-
-    return () => {
-      isMounted = false;
-      unsubscribe();
+      setIsLoading(false);
     };
+
+    restoreSession();
   }, []);
 
   const login = async (email: string, password: string) => {
     setIsLoading(true);
     try {
-      const cred = await signInWithEmailAndPassword(auth, email, password);
-      const idToken = await cred.user.getIdToken();
-      const syncedUser = await syncWithBackend(idToken, cred.user);
-      if (syncedUser && !syncedUser.has_completed_assessment) {
-        router.push('/assessment');
-      } else {
+      // 1. Authenticate with backend
+      const res = await loginUser(email, password);
+      let activeToken = res.access_token;
+
+      // 2. Also authenticate / sync with Firebase Auth if configured
+      try {
+        const { auth, isFirebaseConfigured } = await import('@/lib/firebase');
+        if (isFirebaseConfigured && auth) {
+          const { signInWithEmailAndPassword, createUserWithEmailAndPassword } = await import('firebase/auth');
+          try {
+            const cred = await signInWithEmailAndPassword(auth, email, password);
+            const fbToken = await cred.user.getIdToken();
+            activeToken = fbToken;
+          } catch (fbSignInErr: any) {
+            // If user exists in backend but not yet created in Firebase Auth, create in Firebase seamlessly
+            const code = fbSignInErr.code || '';
+            if (code === 'auth/user-not-found' || code === 'auth/invalid-credential') {
+              try {
+                const newCred = await createUserWithEmailAndPassword(auth, email, password);
+                const fbToken = await newCred.user.getIdToken();
+                activeToken = fbToken;
+              } catch {}
+            }
+          }
+        }
+      } catch {}
+
+      saveAuthToken(activeToken);
+      setToken(activeToken);
+      setUser(res.user);
+
+      // Trigger background login success notification
+      notifyLoginEvent();
+
+      if (res.user.has_completed_assessment) {
         router.push('/dashboard');
+      } else {
+        router.push('/assessment');
       }
     } finally {
       setIsLoading(false);
@@ -155,33 +141,103 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const register = async (email: string, password: string, fullName?: string) => {
     setIsLoading(true);
     try {
-      const cred = await createUserWithEmailAndPassword(auth, email, password);
-      if (fullName && fullName.trim()) {
-        try {
-          await updateProfile(cred.user, { displayName: fullName.trim() });
-        } catch (e) {
-          console.warn('Profile name update notice:', e);
+      // 1. Sync registration with Firebase Auth if configured
+      let firebaseToken: string | null = null;
+      try {
+        const { auth, isFirebaseConfigured } = await import('@/lib/firebase');
+        if (isFirebaseConfigured && auth) {
+          const { createUserWithEmailAndPassword, updateProfile } = await import('firebase/auth');
+          try {
+            const cred = await createUserWithEmailAndPassword(auth, email, password);
+            if (fullName && cred.user) {
+              await updateProfile(cred.user, { displayName: fullName });
+            }
+            firebaseToken = await cred.user.getIdToken();
+          } catch (fbErr: any) {
+            console.warn('Firebase user creation note:', fbErr.message);
+          }
         }
-      }
-      const idToken = await cred.user.getIdToken();
-      await syncWithBackend(idToken, cred.user);
+      } catch {}
+
+      // 2. Register in backend database
+      const res = await registerUser(email, password, fullName);
+      const activeToken = firebaseToken || res.access_token;
+      saveAuthToken(activeToken);
+      setToken(activeToken);
+      setUser(res.user);
       router.push('/assessment');
     } finally {
       setIsLoading(false);
     }
   };
 
+  // Google OAuth — uses Firebase only if credentials are configured
   const loginWithGoogle = async () => {
     setIsLoading(true);
     try {
+      const { auth, googleProvider, isFirebaseConfigured } = await import('@/lib/firebase');
+      if (!isFirebaseConfigured) {
+        throw new Error(
+          'Google sign-in is not configured yet: Firebase Web App credentials are missing. Please configure NEXT_PUBLIC_FIREBASE_API_KEY in frontend/.env.local or use Email/Password / Quick Demo Access.'
+        );
+      }
+      const { signInWithPopup } = await import('firebase/auth');
       const cred = await signInWithPopup(auth, googleProvider);
       const idToken = await cred.user.getIdToken();
-      const syncedUser = await syncWithBackend(idToken, cred.user);
-      if (syncedUser && !syncedUser.has_completed_assessment) {
+
+      // Save Firebase token and use it as the auth bearer
+      saveAuthToken(idToken);
+      setToken(idToken);
+
+      // Trigger background login success notification email
+      notifyLoginEvent();
+
+      // Try to get user from backend using Firebase JWT
+      try {
+        const me = await getMe();
+        if (!me.email || me.email === 'user@aicareercoach.ai') {
+          me.email = cred.user.email || me.email;
+          me.full_name = cred.user.displayName || cred.user.email?.split('@')[0] || me.full_name;
+        }
+        setUser(me);
+        localStorage.setItem('auth_user', JSON.stringify(me));
+        if (me.has_completed_assessment) {
+          router.push('/dashboard');
+        } else {
+          router.push('/assessment');
+        }
+      } catch {
+        // Backend doesn't know this user yet — create a minimal fallback profile
+        const fallbackUser: UserAuthData = {
+          id: cred.user.uid,
+          email: cred.user.email || '',
+          full_name: cred.user.displayName || cred.user.email?.split('@')[0] || 'Candidate',
+          is_active: true,
+          has_completed_assessment: false,
+        };
+        setUser(fallbackUser);
+        localStorage.setItem('auth_user', JSON.stringify(fallbackUser));
         router.push('/assessment');
-      } else {
-        router.push('/dashboard');
       }
+    } catch (err: any) {
+      setIsLoading(false);
+      const code = (err.code || '').toLowerCase();
+      const message = (err.message || '');
+      if (code === 'auth/popup-closed-by-user' || message.includes('popup-closed-by-user')) {
+        throw new Error('Sign-in popup was closed. Please try again.');
+      }
+      if (
+        code.includes('api-key') ||
+        code.includes('invalid-api-key') ||
+        code.includes('configuration-not-found') ||
+        message.includes('auth/api-key-not-valid') ||
+        message.includes('auth/invalid-api-key')
+      ) {
+        throw new Error(
+          'Google sign-in is not configured: Invalid or missing Firebase API key. Please check your NEXT_PUBLIC_FIREBASE_API_KEY in frontend/.env.local or use Email/Password / Quick Demo Access.'
+        );
+      }
+      throw new Error(err.message || 'Google sign-in failed. Please use email/password instead.');
     } finally {
       setIsLoading(false);
     }
@@ -192,15 +248,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const res = await demoLoginUser();
       setToken(res.access_token);
-      saveAuthToken(res.access_token);
       setUser(res.user);
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('auth_user', JSON.stringify(res.user));
-      }
-      if (!res.user.has_completed_assessment) {
-        router.push('/assessment');
-      } else {
+      if (res.user.has_completed_assessment) {
         router.push('/dashboard');
+      } else {
+        router.push('/assessment');
       }
     } finally {
       setIsLoading(false);
@@ -208,12 +260,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = async () => {
+    // Try Firebase sign-out if it was used (non-critical)
     try {
-      await signOut(auth);
-    } catch (e) {
-      console.warn('Sign out notice:', e);
-    }
+      const { auth } = await import('@/lib/firebase');
+      const { signOut } = await import('firebase/auth');
+      if (auth.currentUser) {
+        await signOut(auth);
+      }
+    } catch {}
+
     clearAuthToken();
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('cached_resume_analysis');
+    }
     setUser(null);
     setToken(null);
     router.push('/login');
@@ -232,16 +291,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshUser = async () => {
     try {
-      if (auth.currentUser) {
-        const freshToken = await auth.currentUser.getIdToken(true);
-        return (await syncWithBackend(freshToken, auth.currentUser)) || undefined;
-      }
-      const currentUser = await getMe();
-      setUser(currentUser);
+      const me = await getMe();
+      setUser(me);
       if (typeof window !== 'undefined') {
-        localStorage.setItem('auth_user', JSON.stringify(currentUser));
+        localStorage.setItem('auth_user', JSON.stringify(me));
       }
-      return currentUser;
+      return me;
     } catch {
       return undefined;
     }

@@ -179,6 +179,12 @@ function PracticeContent() {
   const hasStar = (ev: InterviewEvaluationData) =>
     ev.star_analysis && ev.star_analysis.situation_status && ev.star_analysis.situation_status !== 'Not Applicable';
 
+  const isBehavioralOrHR = (category?: string) => {
+    if (!category) return false;
+    const cat = category.toLowerCase();
+    return cat.includes('behavioral') || cat.includes('hr') || cat.includes('situational');
+  };
+
   return (
     <div className="space-y-8 max-w-4xl mx-auto pb-12">
       {/* Page Header */}
@@ -337,8 +343,8 @@ function PracticeContent() {
                   <span>Tip: {session.current_question.context_tip}</span>
                 </p>
               )}
-              {/* STAR tip for Behavioral */}
-              {session.current_question.category === 'Behavioral' && !evaluation && (
+              {/* STAR tip for Behavioral / HR */}
+              {isBehavioralOrHR(session.current_question.category) && !evaluation && (
                 <div className="mt-3 p-3 rounded-lg bg-violet-950/40 border border-violet-500/20 text-[11px] text-violet-300">
                   <strong>STAR Structure:</strong> Start with the <em>Situation</em>, your <em>Task</em>, what <em>Actions</em> YOU took, and the <em>Result</em>.
                 </div>
@@ -393,74 +399,147 @@ function PracticeContent() {
                   </div>
                 </div>
 
-                {/* ===== STAR Coaching Section ===== */}
-                {hasStar(evaluation) && evaluation.star_analysis && (
-                  <div className="p-5 rounded-xl bg-violet-950/30 border border-violet-500/25 space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-bold text-white flex items-center space-x-2">
-                        <Star className="w-4 h-4 text-violet-400" />
-                        <span>STAR Method Breakdown</span>
-                      </h3>
-                      <div className="flex items-center space-x-1.5">
-                        <span className="text-[10px] text-slate-400">Score:</span>
-                        <span className="text-xs font-extrabold text-violet-300">{evaluation.star_analysis.star_score ?? 0}%</span>
-                        {evaluation.star_analysis.star_complete && (
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 font-bold">Complete ✓</span>
+                {/* ===== Behavioral / HR: STAR Coaching ===== */}
+                {isBehavioralOrHR(session.current_question.category) ? (
+                  <>
+                    {hasStar(evaluation) && evaluation.star_analysis && (
+                      <div className="p-5 rounded-xl bg-violet-950/30 border border-violet-500/25 space-y-4">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-sm font-bold text-white flex items-center space-x-2">
+                            <Star className="w-4 h-4 text-violet-400" />
+                            <span>STAR Method Breakdown</span>
+                          </h3>
+                          <div className="flex items-center space-x-1.5">
+                            <span className="text-[10px] text-slate-400">Score:</span>
+                            <span className="text-xs font-extrabold text-violet-300">{evaluation.star_analysis.star_score ?? 0}%</span>
+                            {evaluation.star_analysis.star_complete && (
+                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 font-bold">Complete ✓</span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                          {[
+                            { key: 'S', label: 'Situation', status: evaluation.star_analysis.situation_status, feedback: evaluation.star_analysis.situation_feedback },
+                            { key: 'T', label: 'Task', status: evaluation.star_analysis.task_status, feedback: evaluation.star_analysis.task_feedback },
+                            { key: 'A', label: 'Action', status: evaluation.star_analysis.action_status, feedback: evaluation.star_analysis.action_feedback },
+                            { key: 'R', label: 'Result', status: evaluation.star_analysis.result_status, feedback: evaluation.star_analysis.result_feedback },
+                          ].map(comp => (
+                            <div key={comp.key} className="space-y-1.5">
+                              <div className={`flex items-center justify-between p-2.5 rounded-lg border text-xs font-bold ${getStarStatusColor(comp.status ?? undefined)}`}>
+                                <span>{comp.key} — {comp.label}</span>
+                                <span className="text-sm">{getStarStatusIcon(comp.status ?? undefined)}</span>
+                              </div>
+                              {comp.feedback && (
+                                <p className="text-[10px] text-slate-400 leading-relaxed px-0.5">{comp.feedback}</p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+
+                        {!evaluation.star_analysis.star_complete && (
+                          <div className="p-3 rounded-lg bg-amber-950/30 border border-amber-500/20 text-[11px] text-amber-300">
+                            <strong>💡 Next time:</strong> Make sure your answer includes all 4 STAR components — especially the <strong>Result</strong>. Even a brief outcome like "the bug was resolved" or "load time improved by 30%" counts!
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Strengths & Weaknesses */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                      {evaluation.strengths.length > 0 && (
+                        <div className="space-y-1.5">
+                          <h4 className="font-bold text-emerald-400 uppercase tracking-wider text-[10px]">✓ What You Did Well</h4>
+                          {evaluation.strengths.map((s, i) => (
+                            <p key={i} className="text-slate-300 leading-relaxed">• {s}</p>
+                          ))}
+                        </div>
+                      )}
+                      {evaluation.weaknesses.length > 0 && (
+                        <div className="space-y-1.5">
+                          <h4 className="font-bold text-amber-400 uppercase tracking-wider text-[10px]">⚠ What to Improve</h4>
+                          {evaluation.weaknesses.map((w, i) => (
+                            <p key={i} className="text-slate-300 leading-relaxed">• {w}</p>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Coach Recommendation */}
+                    <div className="p-3 rounded-lg bg-indigo-950/40 border border-indigo-500/20 text-xs text-indigo-300">
+                      <strong>Coach Says:</strong> {evaluation.suggested_improvement}
+                    </div>
+                  </>
+                ) : (
+                  /* ===== Technical / Programming Questions ===== */
+                  <div className="space-y-4">
+                    {/* Key Strengths & Missing Concepts Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                      {/* Key Strengths */}
+                      <div className="p-4 rounded-xl bg-emerald-950/20 border border-emerald-500/30 space-y-2">
+                        <h4 className="font-bold text-emerald-400 flex items-center space-x-1.5 text-xs">
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>Key Strengths</span>
+                        </h4>
+                        {evaluation.strengths.length > 0 ? (
+                          <div className="space-y-1.5">
+                            {evaluation.strengths.map((s, i) => (
+                              <p key={i} className="text-slate-300 leading-relaxed">• {s}</p>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-slate-500 italic text-[11px]">No specific strengths identified for this response.</p>
+                        )}
+                      </div>
+
+                      {/* Missing Concepts */}
+                      <div className="p-4 rounded-xl bg-amber-950/20 border border-amber-500/30 space-y-2">
+                        <h4 className="font-bold text-amber-400 flex items-center space-x-1.5 text-xs">
+                          <AlertCircle className="w-3.5 h-3.5" />
+                          <span>Missing Concepts</span>
+                        </h4>
+                        {(evaluation.missing_points && evaluation.missing_points.length > 0) ? (
+                          <div className="space-y-1.5">
+                            {evaluation.missing_points.map((m, i) => (
+                              <p key={i} className="text-slate-300 leading-relaxed">• {m}</p>
+                            ))}
+                          </div>
+                        ) : evaluation.weaknesses.length > 0 ? (
+                          <div className="space-y-1.5">
+                            {evaluation.weaknesses.map((w, i) => (
+                              <p key={i} className="text-slate-300 leading-relaxed">• {w}</p>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-slate-400 text-[11px]">Solid answer! No critical concepts were missing.</p>
                         )}
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                      {[
-                        { key: 'S', label: 'Situation', status: evaluation.star_analysis.situation_status, feedback: evaluation.star_analysis.situation_feedback },
-                        { key: 'T', label: 'Task', status: evaluation.star_analysis.task_status, feedback: evaluation.star_analysis.task_feedback },
-                        { key: 'A', label: 'Action', status: evaluation.star_analysis.action_status, feedback: evaluation.star_analysis.action_feedback },
-                        { key: 'R', label: 'Result', status: evaluation.star_analysis.result_status, feedback: evaluation.star_analysis.result_feedback },
-                      ].map(comp => (
-                        <div key={comp.key} className="space-y-1.5">
-                          <div className={`flex items-center justify-between p-2.5 rounded-lg border text-xs font-bold ${getStarStatusColor(comp.status ?? undefined)}`}>
-                            <span>{comp.key} — {comp.label}</span>
-                            <span className="text-sm">{getStarStatusIcon(comp.status ?? undefined)}</span>
-                          </div>
-                          {comp.feedback && (
-                            <p className="text-[10px] text-slate-400 leading-relaxed px-0.5">{comp.feedback}</p>
-                          )}
+                    {/* Model / Suggested Answer */}
+                    <div className="p-4 rounded-xl bg-indigo-950/30 border border-indigo-500/30 space-y-2.5">
+                      <h4 className="font-bold text-indigo-300 flex items-center space-x-1.5 text-xs">
+                        <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                        <span>Model / Suggested Answer</span>
+                      </h4>
+                      {evaluation.ideal_answer_outline && evaluation.ideal_answer_outline.length > 0 ? (
+                        <div className="space-y-1.5">
+                          {evaluation.ideal_answer_outline.map((point, i) => (
+                            <p key={i} className="text-slate-300 text-xs leading-relaxed flex items-start space-x-2">
+                              <span className="text-indigo-400 font-bold shrink-0">{i + 1}.</span>
+                              <span>{point}</span>
+                            </p>
+                          ))}
                         </div>
-                      ))}
+                      ) : null}
+                      {evaluation.suggested_improvement && (
+                        <div className="mt-2 pt-2 border-t border-indigo-500/20 text-xs text-indigo-200">
+                          <strong className="text-indigo-300">Key Recommendation:</strong> {evaluation.suggested_improvement}
+                        </div>
+                      )}
                     </div>
-
-                    {!evaluation.star_analysis.star_complete && (
-                      <div className="p-3 rounded-lg bg-amber-950/30 border border-amber-500/20 text-[11px] text-amber-300">
-                        <strong>💡 Next time:</strong> Make sure your answer includes all 4 STAR components — especially the <strong>Result</strong>. Even a brief outcome like "the bug was resolved" or "load time improved by 30%" counts!
-                      </div>
-                    )}
                   </div>
                 )}
-
-                {/* Strengths & Weaknesses */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                  {evaluation.strengths.length > 0 && (
-                    <div className="space-y-1.5">
-                      <h4 className="font-bold text-emerald-400 uppercase tracking-wider text-[10px]">✓ What You Did Well</h4>
-                      {evaluation.strengths.map((s, i) => (
-                        <p key={i} className="text-slate-300 leading-relaxed">• {s}</p>
-                      ))}
-                    </div>
-                  )}
-                  {evaluation.weaknesses.length > 0 && (
-                    <div className="space-y-1.5">
-                      <h4 className="font-bold text-amber-400 uppercase tracking-wider text-[10px]">⚠ What to Improve</h4>
-                      {evaluation.weaknesses.map((w, i) => (
-                        <p key={i} className="text-slate-300 leading-relaxed">• {w}</p>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Coach Recommendation */}
-                <div className="p-3 rounded-lg bg-indigo-950/40 border border-indigo-500/20 text-xs text-indigo-300">
-                  <strong>Coach Says:</strong> {evaluation.suggested_improvement}
-                </div>
 
                 <div className="flex justify-end">
                   <button

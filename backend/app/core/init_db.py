@@ -11,9 +11,14 @@ from app.core.skill_seed import SEED_SKILL_DEFINITIONS
 
 logger = logging.getLogger(__name__)
 
+_db_already_seeded: bool = False
+
 
 async def seed_database(db: AsyncSession) -> None:
     """Populates career catalog, assessment questions, and skill definitions taxonomy if not present."""
+    global _db_already_seeded
+    if _db_already_seeded:
+        return
     # 1. Seed Career Roles
     roles_count = (await db.execute(select(func.count(CareerRole.id)))).scalar() or 0
     if roles_count == 0:
@@ -43,3 +48,5 @@ async def seed_database(db: AsyncSession) -> None:
             db.add(sdef)
         await db.commit()
         logger.info(f"Seeded {len(SEED_SKILL_DEFINITIONS)} skill definitions.")
+
+    _db_already_seeded = True

@@ -135,17 +135,17 @@ export default function Sidebar({ isMobileOpen = false, onClose }: SidebarProps)
     ? user.email[0].toUpperCase()
     : 'CC';
 
-  const visibleGroups = !hasCompletedAssessment
-    ? [
+  const visibleGroups = hasCompletedAssessment
+    ? NAV_GROUPS
+    : [
         {
           group: 'foundation',
-          title: 'Mandatory First Step',
+          title: 'Career Foundation (Required)',
           items: [
             { key: 'assessment', label: 'Discovery Assessment', href: '/assessment', icon: Compass, step: '1' },
-          ],
-        },
-      ]
-    : NAV_GROUPS;
+          ]
+        }
+      ];
 
   const renderNavLinks = () => (
     <nav className="flex-1 overflow-y-auto px-3.5 py-4 space-y-5">
@@ -171,27 +171,27 @@ export default function Sidebar({ isMobileOpen = false, onClose }: SidebarProps)
                   onClick={() => {
                     if (onClose) onClose();
                   }}
-                  className={`group flex items-center justify-between px-3 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 ${
+                  className={`group flex items-center justify-between px-3 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 min-h-[44px] ${
                     isActive
-                      ? 'bg-[#247B7B]/15 text-[#247B7B] dark:text-[#5FA8A8] border border-[#247B7B]/30 font-semibold shadow-sm'
+                      ? 'bg-blue-600/10 text-blue-600 dark:text-sky-400 border border-blue-600/30 font-semibold shadow-sm'
                       : showPulse
-                      ? 'bg-[#C78A20]/10 text-[#C78A20] border border-[#C78A20]/30 hover:bg-[#C78A20]/20'
-                      : 'text-slate-500 dark:text-slate-400 hover:text-[#17324D] dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#1E2D44]'
+                      ? 'bg-blue-500/10 text-blue-600 dark:text-sky-400 border border-blue-500/30 hover:bg-blue-500/20'
+                      : 'text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
                   }`}
                 >
                   <div className="flex items-center space-x-2.5 truncate">
                     <Icon className={`w-4 h-4 shrink-0 transition-colors ${
-                      isActive ? 'text-[#247B7B] dark:text-[#5FA8A8]' : showPulse ? 'text-[#C78A20] animate-pulse' : 'text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300'
+                      isActive ? 'text-blue-600 dark:text-sky-400' : showPulse ? 'text-blue-600 dark:text-sky-400 animate-pulse' : 'text-slate-500 group-hover:text-slate-800 dark:group-hover:text-slate-200'
                     }`} />
                     <span className="truncate">{itemLabel}</span>
                   </div>
 
                   {showPulse ? (
-                    <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-[#C78A20]/15 text-[#C78A20] border border-[#C78A20]/30 animate-pulse">
+                    <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-blue-600/15 text-blue-600 dark:text-sky-400 border border-blue-600/30 animate-pulse">
                       Step 1
                     </span>
                   ) : item.step && (
-                    <span className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold opacity-0 group-hover:opacity-100 transition-opacity">
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold opacity-0 group-hover:opacity-100 transition-opacity">
                       {item.step}
                     </span>
                   )}
@@ -203,13 +203,13 @@ export default function Sidebar({ isMobileOpen = false, onClose }: SidebarProps)
       ))}
 
       {!hasCompletedAssessment && (
-        <div className="p-3.5 rounded-xl bg-[#C78A20]/10 border border-[#C78A20]/30 text-[#C78A20] text-xs space-y-1.5">
-          <div className="flex items-center space-x-1.5 font-bold">
-            <Lock className="w-3.5 h-3.5 text-[#C78A20]" />
-            <span>Features Locked</span>
+        <div className="p-3.5 rounded-2xl bg-blue-50/80 dark:bg-slate-900/80 border border-blue-200 dark:border-blue-900/40 text-blue-900 dark:text-blue-200 text-xs space-y-2">
+          <div className="flex items-center space-x-1.5 font-bold text-blue-700 dark:text-blue-400">
+            <Lock className="w-3.5 h-3.5 animate-pulse" />
+            <span>Baaki Features Locked Hain</span>
           </div>
-          <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
-            Complete your Discovery Assessment to unlock your Dashboard, Resume ATS, Skill Matrix, Roadmap, and other features.
+          <p className="text-[11px] text-slate-700 dark:text-slate-300 leading-relaxed">
+            Dashboard, Resume ATS, Skill Matrix, Roadmap, Job Engine aur Mock Interviews dekhne ke liye pehle Discovery Assessment complete karein.
           </p>
         </div>
       )}
@@ -218,16 +218,16 @@ export default function Sidebar({ isMobileOpen = false, onClose }: SidebarProps)
 
   const renderFooter = () => (
     <div className="p-4 border-t border-slate-200 dark:border-slate-800/60 space-y-2">
-      <div className="flex items-center justify-between p-2 rounded-xl bg-slate-100 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800/60">
+      <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800/60">
         <div className="flex items-center space-x-2.5 overflow-hidden">
-          <div className="w-8 h-8 rounded-full bg-[#17324D] dark:bg-[#247B7B] flex items-center justify-center text-xs font-bold text-white shadow-sm shrink-0">
+          <div className="w-8 h-8 rounded-full bg-slate-900 dark:bg-blue-600 flex items-center justify-center text-xs font-bold text-white shadow-sm shrink-0">
             {initials}
           </div>
           <div className="overflow-hidden">
-            <p className="text-xs font-semibold text-[#17324D] dark:text-slate-200 truncate">
+            <p className="text-xs font-semibold text-slate-900 dark:text-slate-100 truncate">
               {user?.full_name || user?.email || 'Candidate'}
             </p>
-            <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">{user?.email || t('nav.authenticatedAs', 'Candidate Account')}</p>
+            <p className="text-[10px] text-slate-600 dark:text-slate-400 truncate">{user?.email || t('nav.authenticatedAs', 'Candidate Account')}</p>
           </div>
         </div>
 
@@ -237,7 +237,7 @@ export default function Sidebar({ isMobileOpen = false, onClose }: SidebarProps)
               href="/settings"
               onClick={() => { if (onClose) onClose(); }}
               title={t('nav.settings', 'Settings')}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-[#247B7B] hover:bg-[#247B7B]/10 transition"
+              className="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-800 transition"
             >
               <Settings className="w-4 h-4" />
             </Link>
@@ -245,7 +245,7 @@ export default function Sidebar({ isMobileOpen = false, onClose }: SidebarProps)
           <button
             onClick={logout}
             title={t('nav.signOut', 'Sign Out')}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-[#C75C5C] hover:bg-[#C75C5C]/10 transition"
+            className="p-1.5 rounded-lg text-slate-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 transition"
           >
             <LogOut className="w-4 h-4" />
           </button>
@@ -257,15 +257,15 @@ export default function Sidebar({ isMobileOpen = false, onClose }: SidebarProps)
   return (
     <>
       {/* 1. Desktop Fixed Sidebar */}
-      <aside className="hidden lg:flex w-64 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-[#162235] flex-col h-screen fixed left-0 top-0 z-40">
+      <aside className="hidden lg:flex w-64 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-[#1E293B] flex-col h-screen fixed left-0 top-0 z-40">
         {/* Brand Header */}
         <div className="p-6 border-b border-slate-200 dark:border-slate-800/60 flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-xl bg-[#17324D] dark:bg-[#1E2D44] border border-[#247B7B]/40 flex items-center justify-center shadow-sm">
-            <Compass className="w-5 h-5 text-[#247B7B] dark:text-[#5FA8A8]" />
+          <div className="w-10 h-10 rounded-xl bg-blue-600 dark:bg-blue-600/20 border border-blue-500/40 flex items-center justify-center shadow-sm">
+            <Compass className="w-5 h-5 text-white dark:text-sky-400" />
           </div>
           <div>
-            <h1 className="font-bold text-lg text-[#17324D] dark:text-white leading-tight">{t('app.title', 'AI Career Coach')}</h1>
-            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">{t('nav.brandSubtitle', 'Personal Twin Platform')}</p>
+            <h1 className="font-bold text-lg text-slate-900 dark:text-white leading-tight">{t('app.title', 'AI Career Coach')}</h1>
+            <p className="text-xs text-slate-600 dark:text-slate-400 font-medium">{t('nav.brandSubtitle', 'Personal Twin Platform')}</p>
           </div>
         </div>
 
@@ -285,7 +285,7 @@ export default function Sidebar({ isMobileOpen = false, onClose }: SidebarProps)
 
           {/* Slide-in Drawer */}
           <div 
-            className="fixed inset-y-0 left-0 w-72 max-w-[85vw] bg-white dark:bg-[#162235] border-r border-slate-200 dark:border-slate-800 flex flex-col z-50 shadow-2xl transition-transform duration-300 ease-out animate-in slide-in-from-left"
+            className="fixed inset-y-0 left-0 w-72 max-w-[85vw] bg-white dark:bg-[#1E293B] border-r border-slate-200 dark:border-slate-800 flex flex-col z-50 shadow-2xl transition-transform duration-300 ease-out animate-in slide-in-from-left"
             role="dialog"
             aria-modal="true"
             aria-label="Navigation Menu"
@@ -293,15 +293,16 @@ export default function Sidebar({ isMobileOpen = false, onClose }: SidebarProps)
             {/* Drawer Header */}
             <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
               <div className="flex items-center space-x-2.5">
-                <div className="w-8 h-8 rounded-lg bg-[#17324D] dark:bg-[#1E2D44] border border-[#247B7B]/40 flex items-center justify-center shadow-sm">
-                  <Compass className="w-4 h-4 text-[#247B7B] dark:text-[#5FA8A8]" />
+                <div className="w-8 h-8 rounded-lg bg-blue-600 dark:bg-blue-600/20 border border-blue-500/40 flex items-center justify-center shadow-sm">
+                  <Compass className="w-4 h-4 text-white dark:text-sky-400" />
                 </div>
-                <span className="font-bold text-base text-[#17324D] dark:text-white">AI Career Coach</span>
+                <span className="font-bold text-base text-slate-900 dark:text-white">AI Career Coach</span>
               </div>
               <button
+                type="button"
                 onClick={onClose}
                 aria-label="Close navigation menu"
-                className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-[#17324D] dark:hover:text-white transition-colors"
+                className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-[#17324D] dark:hover:text-white transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>

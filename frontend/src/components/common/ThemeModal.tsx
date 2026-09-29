@@ -66,16 +66,16 @@ export default function ThemeModal({ isOpen, onClose }: ThemeModalProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-in fade-in">
-      <div className="w-full max-w-lg bg-white dark:bg-[#162235] border border-slate-200 dark:border-[#293548] rounded-3xl shadow-2xl p-6 sm:p-7 space-y-6 text-[#243447] dark:text-[#E2E8F0]">
+      <div className="w-full max-w-lg bg-white dark:bg-[#162235] border border-slate-200 dark:border-[#293548] rounded-3xl shadow-2xl p-6 sm:p-7 space-y-6 text-slate-900 dark:text-[#E2E8F0]">
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-[#293548]">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-2xl bg-[#17324D] dark:bg-[#1E2D44] border border-[#247B7B]/30 flex items-center justify-center text-[#247B7B] dark:text-[#5FA8A8]">
+            <div className="w-10 h-10 rounded-2xl bg-slate-900 dark:bg-[#1E2D44] border border-[#247B7B]/30 flex items-center justify-center text-[#247B7B] dark:text-[#5FA8A8]">
               <Sun className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-[#17324D] dark:text-white">Theme & Platform Appearance</h3>
-              <p className="text-xs text-[#64748B] dark:text-[#94A3B8]">Unified Deep Navy & Teal Career Brand</p>
+              <h3 className="text-base font-bold text-slate-900 dark:text-white">Theme & Platform Appearance</h3>
+              <p className="text-xs text-slate-600 dark:text-[#94A3B8]">Unified High-Contrast & Modern Theme</p>
             </div>
           </div>
           <button
@@ -88,7 +88,7 @@ export default function ThemeModal({ isOpen, onClose }: ThemeModalProps) {
 
         {/* Theme Mode Selector */}
         <div className="space-y-3">
-          <label className="text-xs font-bold uppercase tracking-wider text-[#64748B] dark:text-[#94A3B8]">
+          <label className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-[#94A3B8]">
             Color Theme Mode
           </label>
           <div className="grid grid-cols-1 gap-3">
@@ -118,12 +118,12 @@ export default function ThemeModal({ isOpen, onClose }: ThemeModalProps) {
                     </div>
                     <div>
                       <div className="flex items-center space-x-2">
-                        <span className="font-bold text-sm text-[#17324D] dark:text-white">{opt.name}</span>
+                        <span className="font-bold text-sm text-slate-900 dark:text-white">{opt.name}</span>
                         <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-[#247B7B]/10 text-[#247B7B] dark:text-[#5FA8A8]">
                           {opt.badge}
                         </span>
                       </div>
-                      <p className="text-xs text-[#64748B] dark:text-[#94A3B8] mt-0.5">{opt.desc}</p>
+                      <p className="text-xs text-slate-600 dark:text-[#94A3B8] mt-0.5 font-medium">{opt.desc}</p>
                     </div>
                   </div>
 

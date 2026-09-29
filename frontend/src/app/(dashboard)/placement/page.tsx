@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { getPlacementChecklist } from '@/lib/api-client';
 import { getDigitalTwinProfile } from '@/lib/digital-twin-api';
+import CareerHubTabs from '@/components/common/CareerHubTabs';
 import {
   PlacementChecklistData,
   PlacementChecklistItem,
@@ -106,6 +107,9 @@ export default function PlacementReadinessPage() {
 
   return (
     <div className="space-y-8 max-w-6xl mx-auto pb-16">
+      {/* Shared Career Hub Navigation: Placement | Progress | Profile */}
+      <CareerHubTabs activeTab="placement" />
+
       {/* Hero Header & Placement Readiness Tier Banner */}
       <div className="p-6 md:p-8 rounded-3xl bg-gradient-to-br from-indigo-950/90 via-slate-900 to-purple-950/90 border border-indigo-500/20 shadow-2xl relative overflow-hidden">
         <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl -z-10 pointer-events-none" />

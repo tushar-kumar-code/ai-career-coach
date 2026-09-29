@@ -1,20 +1,28 @@
-import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, Auth } from 'firebase/auth';
+// 1. Firebase Core & Auth Modules import karein
+import { initializeApp, getApps, getApp } from "firebase/app";
+import { getAuth, GoogleAuthProvider } from "firebase/auth";
 
+// 2. Aapke Firebase Console ki Configuration
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || 'AIzaSyDemoPlaceholderKeyForBuildSafety',
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || 'ai-career-coach-demo.firebaseapp.com',
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'ai-career-coach-demo',
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || 'ai-career-coach-demo.appspot.com',
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || '1234567890',
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || '1:1234567890:web:abcdef123456',
+  apiKey: "AIzaSyA9OsRfONtzFN5eMcuzVOLsdYbUscykczg",
+  authDomain: "ai-career-coach-da37b.firebaseapp.com",
+  projectId: "ai-career-coach-da37b",
+  storageBucket: "ai-career-coach-da37b.firebasestorage.app",
+  messagingSenderId: "22864386471",
+  appId: "1:22864386471:web:3538e30a4a9c9588603e82",
+  measurementId: "G-YTR8ET32L4"
 };
 
-// Singleton Firebase initialization
-const app: FirebaseApp = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-const auth: Auth = getAuth(app);
+// 3. Singleton App Initialize karein (baar-baar re-initialize hone se bachane ke liye)
+const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
-const googleProvider = new GoogleAuthProvider();
+// 4. Auth & Google Provider Initialize aur Export karein
+export const auth = getAuth(app);
+export const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
 
-export { app, auth, googleProvider };
+// 5. Export flag for AuthContext
+export const isFirebaseConfigured: boolean = true;
+
+export { app };
+export default app;

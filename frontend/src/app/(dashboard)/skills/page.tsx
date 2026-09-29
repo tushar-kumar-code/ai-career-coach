@@ -24,6 +24,7 @@ import { getSkillProfile, recalculateSkills, getSkillDetails,
   focusSkillOnRoadmap
 } from '@/lib/api-client';
 import { SkillProfileData, UserSkill, SkillGap, SkillDetailData } from '@/lib/types';
+import SkillActionBadge from '@/components/common/SkillActionBadge';
 
 export default function SkillsPage() {
   const [loading, setLoading] = useState(true);
@@ -322,17 +323,12 @@ export default function SkillsPage() {
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {profile.missing_skills.map((gap, idx) => (
-              <div key={idx} className="p-4 rounded-xl bg-slate-950 border border-amber-500/20 space-y-2">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-bold text-slate-200 text-sm">{gap.skill_name}</h3>
-                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${
-                    gap.priority === 'High' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-                  }`}>
-                    {gap.priority} Priority Gap
-                  </span>
-                </div>
-                <p className="text-xs text-slate-400">{gap.priority_reason}</p>
-              </div>
+              <SkillActionBadge
+                key={idx}
+                skillName={gap.skill_name}
+                priority={gap.priority}
+                variant="row"
+              />
             ))}
           </div>
         </div>
