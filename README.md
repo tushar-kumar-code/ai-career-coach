@@ -1,28 +1,5 @@
 <div align="center">
 
-# 🚀 AI Career Coach
-
-### Your Personal AI-Powered Career & Placement Companion
-
-**A full-stack, production-grade AI platform that guides CSE students and freshers from career confusion to placement readiness — in one unified system.**
-
-<br/>
-
-[![Open Live Application](https://img.shields.io/badge/🚀_Open_Application-Live_Browser_Demo-blue?style=for-the-badge)](https://ai-career-coach-frontend.onrender.com)
-
-<br/>
-<br/>
-
-![Next.js](https://img.shields.io/badge/Next.js-14-black?style=for-the-badge&logo=next.js)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.5-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
-![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white)
-![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-009688?style=for-the-badge&logo=fastapi&logoColor=white)
-![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-2.0-cc2927?style=for-the-badge&logo=python&logoColor=white)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Supabase-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)
-
-</div>
-
 ---
 
 ## 🌟 Overview
@@ -37,15 +14,16 @@ The platform integrates 13 connected modules — from career discovery and resum
 
 ## 🔗 Quick Access
 
-> ### 🌐 [👉 Click Here to Open AI Career Coach Application in Browser](https://ai-career-coach-frontend.onrender.com)
-> **Direct Live Application:** [https://ai-career-coach-frontend.onrender.com](https://ai-career-coach-frontend.onrender.com)
+> ### 🚀 [👉 Click Here to Open AI Career Coach (Local Live Application)](http://localhost:3000)
+>
+> 🌐 **Cloud Live Web App:** 
 
-| Service | Access Link | Description |
-|---|---|---|
-| 🌐 **Live Web Application (Direct Browser Access)** | [https://ai-career-coach-frontend.onrender.com](https://ai-career-coach-frontend.onrender.com) | Click to open and use the live application directly in your browser |
-| 💻 **Local Web Application** | [http://localhost:3000](http://localhost:3000) | Instant real-time local version on your machine |
-| ⚡ **Live API & Backend (Health)** | [https://ai-career-coach-backend.onrender.com/api/v1/health](https://ai-career-coach-backend.onrender.com/api/v1/health) | Live backend REST API service |
-| 📖 **API Docs (Swagger UI)** | [https://ai-career-coach-backend.onrender.com/docs](https://ai-career-coach-backend.onrender.com/docs) | Interactive Swagger API documentation |
+| Service                                                   | Access Link                                                                                                             | Description                                                         |
+| --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| 🌐 **Live Web Application (Direct Browser Access)** | [https://ai-career-coach-frontend.onrender.com](https://ai-career-coach-frontend.onrender.com)                           | Click to open and use the live application directly in your browser |
+| 💻 **Local Web Application**                        | [http://localhost:3000](http://localhost:3000)                                                                           | Instant real-time local version on your machine                     |
+| ⚡ **Live API & Backend (Health)**                  | [https://ai-career-coach-backend.onrender.com/api/v1/health](https://ai-career-coach-backend.onrender.com/api/v1/health) | Live backend REST API service                                       |
+| 📖 **API Docs (Swagger UI)**                        | [https://ai-career-coach-backend.onrender.com/docs](https://ai-career-coach-backend.onrender.com/docs)                   | Interactive Swagger API documentation                               |
 
 ---
 
@@ -53,14 +31,14 @@ The platform integrates 13 connected modules — from career discovery and resum
 
 Most students graduate without a clear answer to these questions:
 
-| Problem | Reality |
-|---|---|
-| **Which career path is right for me?** | Thousands of options, no guidance |
-| **Which skills am I actually missing?** | No structured gap analysis available |
-| **Is my resume good enough?** | ATS systems filter resumes before a human ever sees them |
-| **How do I prepare for interviews?** | Generic content, no personalized feedback |
-| **Am I ready for placements?** | No objective readiness metric exists |
-| **What should I learn next?** | Random tutorials without a prioritized roadmap |
+| Problem                                       | Reality                                                  |
+| --------------------------------------------- | -------------------------------------------------------- |
+| **Which career path is right for me?**  | Thousands of options, no guidance                        |
+| **Which skills am I actually missing?** | No structured gap analysis available                     |
+| **Is my resume good enough?**           | ATS systems filter resumes before a human ever sees them |
+| **How do I prepare for interviews?**    | Generic content, no personalized feedback                |
+| **Am I ready for placements?**          | No objective readiness metric exists                     |
+| **What should I learn next?**           | Random tutorials without a prioritized roadmap           |
 
 ---
 
@@ -90,21 +68,21 @@ Every module feeds real data into the next — your resume skills inform your ro
 
 ## ✨ Key Features
 
-| Module | What It Does |
-|---|---|
-| 🎯 **Career Discovery** | Multi-dimension adaptive assessment evaluates interests, work style, and strengths. AI engine matches to career archetypes and recommends best-fit roles. |
-| 📄 **Resume Intelligence** | Upload PDF or DOCX resume. AI extracts content, computes ATS sub-scores across 5 dimensions, and matches your skills against your target career. |
-| 🔢 **ATS Score** | Algorithmic ATS breakdown: formatting, keywords, skills, experience, and readability. Provides specific improvement guidance per dimension. |
-| 🧠 **Skill Intelligence** | Tracks skills from multiple evidence sources — resume, assessment, interviews. Assigns confidence levels: Claimed, Supported, Verified. Calculates gap priority per skill. |
-| 🗺️ **Personalized Roadmap** | AI generates a phased, week-by-week learning roadmap based on your target career and current skill gaps. Tracks daily focus tasks and overall progress. |
-| 💼 **Job Intelligence** | Catalog-backed job search with AI-powered skill match analysis. Save jobs and track applications with a full status history pipeline. |
-| 🎤 **Interview Intelligence** | Adaptive mock interview engine with multiple modes and difficulty levels. AI evaluates each answer with STAR analysis, scoring, and detailed per-answer feedback. |
-| 💪 **Micro Practice Engine** | Short, focused practice sessions on specific skills and topics linked to your roadmap and interview history. |
-| 🤖 **Career Digital Twin** | Real-time synchronized career profile. Computes sub-scores across skill, resume, interview, and roadmap dimensions. Tracks daily progress snapshots, achievements, and weekly career reports. |
-| 📊 **Progress and Readiness** | Tracks overall placement readiness from a composite of all module signals. |
-| 🎓 **Placement Readiness** | 10-point placement checklist evaluated from live DB evidence. Each item shows current value, target goal, and a 1-click remediation action. |
-| 📋 **1-Page Career Brief** | Generates an executive career summary aggregating your profile, verified skills, ATS score, and interview readiness — for mentors, faculty, and placement cells. |
-| 💬 **Conversational Career Coach** | Context-aware AI chat assistant that knows your profile, skills, resume score, and roadmap progress. Provides personalized guidance in natural language. |
+| Module                                   | What It Does                                                                                                                                                                                  |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 🎯 **Career Discovery**            | Multi-dimension adaptive assessment evaluates interests, work style, and strengths. AI engine matches to career archetypes and recommends best-fit roles.                                     |
+| 📄 **Resume Intelligence**         | Upload PDF or DOCX resume. AI extracts content, computes ATS sub-scores across 5 dimensions, and matches your skills against your target career.                                              |
+| 🔢 **ATS Score**                   | Algorithmic ATS breakdown: formatting, keywords, skills, experience, and readability. Provides specific improvement guidance per dimension.                                                   |
+| 🧠 **Skill Intelligence**          | Tracks skills from multiple evidence sources — resume, assessment, interviews. Assigns confidence levels: Claimed, Supported, Verified. Calculates gap priority per skill.                   |
+| 🗺️ **Personalized Roadmap**      | AI generates a phased, week-by-week learning roadmap based on your target career and current skill gaps. Tracks daily focus tasks and overall progress.                                       |
+| 💼 **Job Intelligence**            | Catalog-backed job search with AI-powered skill match analysis. Save jobs and track applications with a full status history pipeline.                                                         |
+| 🎤 **Interview Intelligence**      | Adaptive mock interview engine with multiple modes and difficulty levels. AI evaluates each answer with STAR analysis, scoring, and detailed per-answer feedback.                             |
+| 💪 **Micro Practice Engine**       | Short, focused practice sessions on specific skills and topics linked to your roadmap and interview history.                                                                                  |
+| 🤖 **Career Digital Twin**         | Real-time synchronized career profile. Computes sub-scores across skill, resume, interview, and roadmap dimensions. Tracks daily progress snapshots, achievements, and weekly career reports. |
+| 📊 **Progress and Readiness**      | Tracks overall placement readiness from a composite of all module signals.                                                                                                                    |
+| 🎓 **Placement Readiness**         | 10-point placement checklist evaluated from live DB evidence. Each item shows current value, target goal, and a 1-click remediation action.                                                   |
+| 📋 **1-Page Career Brief**         | Generates an executive career summary aggregating your profile, verified skills, ATS score, and interview readiness — for mentors, faculty, and placement cells.                             |
+| 💬 **Conversational Career Coach** | Context-aware AI chat assistant that knows your profile, skills, resume score, and roadmap progress. Provides personalized guidance in natural language.                                      |
 
 ---
 
@@ -114,17 +92,17 @@ Every module feeds real data into the next — your resume skills inform your ro
 >
 > The following screens would best illustrate the platform when added:
 >
-> | Filename | Screen to Capture |
-> |---|---|
-> | `01-dashboard.png` | Main dashboard with onboarding checklist and career overview |
-> | `02-career-assessment.png` | Career discovery adaptive assessment in progress |
-> | `03-resume-analysis.png` | Resume upload with ATS score breakdown by dimension |
-> | `04-skill-intelligence.png` | Skill profile with confidence levels and gap analysis |
-> | `05-roadmap.png` | AI-generated personalized learning roadmap with phases |
-> | `06-interview-session.png` | Adaptive mock interview with AI evaluation feedback |
-> | `07-placement-checklist.png` | 10-point placement readiness checklist |
-> | `08-digital-twin.png` | Career Digital Twin profile with sub-scores |
-> | `09-chat.png` | Conversational Career Coach chat interface |
+> | Filename                       | Screen to Capture                                            |
+> | ------------------------------ | ------------------------------------------------------------ |
+> | `01-dashboard.png`           | Main dashboard with onboarding checklist and career overview |
+> | `02-career-assessment.png`   | Career discovery adaptive assessment in progress             |
+> | `03-resume-analysis.png`     | Resume upload with ATS score breakdown by dimension          |
+> | `04-skill-intelligence.png`  | Skill profile with confidence levels and gap analysis        |
+> | `05-roadmap.png`             | AI-generated personalized learning roadmap with phases       |
+> | `06-interview-session.png`   | Adaptive mock interview with AI evaluation feedback          |
+> | `07-placement-checklist.png` | 10-point placement readiness checklist                       |
+> | `08-digital-twin.png`        | Career Digital Twin profile with sub-scores                  |
+> | `09-chat.png`                | Conversational Career Coach chat interface                   |
 >
 > Place screenshots in `docs/screenshots/` and update the image paths in this section.
 
@@ -170,50 +148,50 @@ Every module feeds real data into the next — your resume skills inform your ro
 
 ### Frontend
 
-| Technology | Version | Purpose |
-|---|---|---|
-| Next.js | 14.2 | React framework with App Router |
-| TypeScript | 5.5 | Type safety across all components |
-| Tailwind CSS | 3.4 | Utility-first styling system |
-| Recharts | 2.12 | Data visualizations — progress charts, scores |
-| Lucide React | 0.428 | Icon library |
+| Technology   | Version | Purpose                                        |
+| ------------ | ------- | ---------------------------------------------- |
+| Next.js      | 14.2    | React framework with App Router                |
+| TypeScript   | 5.5     | Type safety across all components              |
+| Tailwind CSS | 3.4     | Utility-first styling system                   |
+| Recharts     | 2.12    | Data visualizations — progress charts, scores |
+| Lucide React | 0.428   | Icon library                                   |
 
 ### Backend
 
-| Technology | Version | Purpose |
-|---|---|---|
-| Python | 3.11+ | Runtime |
-| FastAPI | 0.110+ | Async REST API framework |
-| SQLAlchemy | 2.0 | Async ORM |
-| Alembic | 1.13 | Database migrations |
-| Pydantic | 2.6 | Data validation and request/response schemas |
-| python-jose | 3.3 | JWT token authentication |
-| passlib / bcrypt | 1.7 / 4.0 | Secure password hashing |
-| PyMuPDF | 1.23 | PDF resume text extraction |
-| python-docx | 1.1 | DOCX resume text extraction |
-| httpx | 0.27 | Async HTTP client |
+| Technology       | Version   | Purpose                                      |
+| ---------------- | --------- | -------------------------------------------- |
+| Python           | 3.11+     | Runtime                                      |
+| FastAPI          | 0.110+    | Async REST API framework                     |
+| SQLAlchemy       | 2.0       | Async ORM                                    |
+| Alembic          | 1.13      | Database migrations                          |
+| Pydantic         | 2.6       | Data validation and request/response schemas |
+| python-jose      | 3.3       | JWT token authentication                     |
+| passlib / bcrypt | 1.7 / 4.0 | Secure password hashing                      |
+| PyMuPDF          | 1.23      | PDF resume text extraction                   |
+| python-docx      | 1.1       | DOCX resume text extraction                  |
+| httpx            | 0.27      | Async HTTP client                            |
 
 ### Database
 
-| Technology | Purpose |
-|---|---|
+| Technology          | Purpose                               |
+| ------------------- | ------------------------------------- |
 | Supabase PostgreSQL | Production database — asyncpg driver |
-| SQLite + aiosqlite | Local development database |
+| SQLite + aiosqlite  | Local development database            |
 
 ### AI
 
-| Provider | Role |
-|---|---|
-| **Groq** | Default LLM provider — fast inference |
-| **Google Gemini** | Alternative AI provider |
-| OpenAI / Anthropic | Supported via provider abstraction |
+| Provider                | Role                                   |
+| ----------------------- | -------------------------------------- |
+| **Groq**          | Default LLM provider — fast inference |
+| **Google Gemini** | Alternative AI provider                |
+| OpenAI / Anthropic      | Supported via provider abstraction     |
 
 ### Testing
 
-| Tool | Purpose |
-|---|---|
-| pytest | Backend test runner |
-| pytest-asyncio | Async test support |
+| Tool           | Purpose             |
+| -------------- | ------------------- |
+| pytest         | Backend test runner |
+| pytest-asyncio | Async test support  |
 
 ---
 
@@ -310,12 +288,12 @@ A typical end-to-end user journey:
 
 ### Prerequisites
 
-| Tool | Version |
-|---|---|
-| Node.js | 18 or higher |
-| Python | 3.11 or higher |
-| npm | 9 or higher |
-| Git | any |
+| Tool    | Version        |
+| ------- | -------------- |
+| Node.js | 18 or higher   |
+| Python  | 3.11 or higher |
+| npm     | 9 or higher    |
+| Git     | any            |
 
 > **AI API Key required.** You need at least one AI provider API key. Groq is recommended — free tier available at [console.groq.com](https://console.groq.com).
 
@@ -372,10 +350,10 @@ python -m alembic upgrade head
 python -m uvicorn app.main:app --port 8000 --reload
 ```
 
-| Service | URL |
-|---|---|
-| API Base | `http://127.0.0.1:8000/api/v1` |
-| Swagger UI | `http://127.0.0.1:8000/docs` |
+| Service      | URL                                     |
+| ------------ | --------------------------------------- |
+| API Base     | `http://127.0.0.1:8000/api/v1`        |
+| Swagger UI   | `http://127.0.0.1:8000/docs`          |
 | Health Check | `http://127.0.0.1:8000/api/v1/health` |
 
 ---
@@ -478,24 +456,24 @@ npx tsc --noEmit
 
 ### Implemented and Working
 
-- [x] User authentication — register, login, OTP login, password reset
-- [x] Career Discovery — adaptive multi-dimension assessment with AI career archetype matching
-- [x] Resume Intelligence — PDF/DOCX upload, text extraction, full ATS analysis
-- [x] ATS Score — 5-dimension sub-score breakdown: formatting, keywords, skills, experience, readability
-- [x] Skill Intelligence — multi-source evidence tracking with Claimed / Supported / Verified confidence levels
-- [x] Personalized Roadmap — AI-generated phased learning plan with daily focus tasks and progress tracking
-- [x] Job Intelligence — catalog job search, AI skill match scoring, application tracker with status history
-- [x] Interview Intelligence — adaptive mock interview engine with STAR analysis and AI-scored per-answer feedback
-- [x] Micro Practice Engine — focused skill-specific practice sessions
-- [x] Career Digital Twin — real-time synchronized career profile with sub-scores, achievements, and weekly reports
-- [x] Placement Readiness — 10-point DB-evidence checklist with current values, targets, and remediation actions
-- [x] 1-Page Student Career Brief — executive summary for placement reviews
-- [x] Conversational Career Coach — context-aware AI chat with full user profile awareness
-- [x] Pluggable AI provider layer — Groq, Gemini, OpenAI, Anthropic supported without code changes
-- [x] Cross-module data flow — resume to skills to roadmap to interview to placement readiness
-- [x] Alembic migrations — 10 versioned schema migrations
-- [x] Auto-generated Swagger and ReDoc API documentation
-- [x] CORS middleware configured for production deployment
+- [X] User authentication — register, login, OTP login, password reset
+- [X] Career Discovery — adaptive multi-dimension assessment with AI career archetype matching
+- [X] Resume Intelligence — PDF/DOCX upload, text extraction, full ATS analysis
+- [X] ATS Score — 5-dimension sub-score breakdown: formatting, keywords, skills, experience, readability
+- [X] Skill Intelligence — multi-source evidence tracking with Claimed / Supported / Verified confidence levels
+- [X] Personalized Roadmap — AI-generated phased learning plan with daily focus tasks and progress tracking
+- [X] Job Intelligence — catalog job search, AI skill match scoring, application tracker with status history
+- [X] Interview Intelligence — adaptive mock interview engine with STAR analysis and AI-scored per-answer feedback
+- [X] Micro Practice Engine — focused skill-specific practice sessions
+- [X] Career Digital Twin — real-time synchronized career profile with sub-scores, achievements, and weekly reports
+- [X] Placement Readiness — 10-point DB-evidence checklist with current values, targets, and remediation actions
+- [X] 1-Page Student Career Brief — executive summary for placement reviews
+- [X] Conversational Career Coach — context-aware AI chat with full user profile awareness
+- [X] Pluggable AI provider layer — Groq, Gemini, OpenAI, Anthropic supported without code changes
+- [X] Cross-module data flow — resume to skills to roadmap to interview to placement readiness
+- [X] Alembic migrations — 10 versioned schema migrations
+- [X] Auto-generated Swagger and ReDoc API documentation
+- [X] CORS middleware configured for production deployment
 
 ---
 
@@ -538,9 +516,3 @@ This project does not currently have an open-source license. All rights reserved
 ---
 
 <div align="center">
-
-*Built for every student who does not know where to start.*
-
-**If this project helped you, give it a star on GitHub.**
-
-</div>
