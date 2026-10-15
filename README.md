@@ -8,9 +8,7 @@
 
 <br/>
 
-[![Current Project](https://img.shields.io/badge/🚀_Current_Project-Access_Application-blue?style=for-the-badge&logo=github)](https://github.com/tushar-kumar-code/ai-career-coach)
-[![Run Application](https://img.shields.io/badge/⚡_Run_in_Browser-GitHub_Codespaces-success?style=for-the-badge&logo=github)](https://github.com/codespaces/new?hide_repo_select=true&ref=main&repo=tushar-kumar-code%2Fai-career-coach)
-[![Latest Push](https://img.shields.io/badge/🔄_Latest_Pushed_Version-main_branch-orange?style=for-the-badge&logo=git)](https://github.com/tushar-kumar-code/ai-career-coach/commits/main)
+[![Open Live Application](https://img.shields.io/badge/🚀_Open_Application-Live_Browser_Demo-blue?style=for-the-badge)](https://ai-career-coach-frontend.onrender.com)
 
 <br/>
 <br/>
@@ -39,23 +37,15 @@ The platform integrates 13 connected modules — from career discovery and resum
 
 ## 🔗 Quick Access
 
-> ### 🚀 [👉 Click Here to Access Current Project Application (Latest Pushed Version)](https://github.com/tushar-kumar-code/ai-career-coach)
->
-> 📌 **Instant Access Links for [@tushar-kumar-code](https://github.com/tushar-kumar-code):**
-> - 📦 **Current Pushed Project Repository:** [https://github.com/tushar-kumar-code/ai-career-coach](https://github.com/tushar-kumar-code/ai-career-coach)
-> - ⚡ **Run Current Application in Browser (1-Click Cloud):** [Open in GitHub Codespaces](https://github.com/codespaces/new?hide_repo_select=true&ref=main&repo=tushar-kumar-code%2Fai-career-coach)
-> - 🔄 **Latest Pushed Commits & Updates:** [View Recent Pushes & Commits](https://github.com/tushar-kumar-code/ai-career-coach/commits/main)
-> - 💻 **Local Running Application:** [http://localhost:3000](http://localhost:3000)
+> ### 🌐 [👉 Click Here to Open AI Career Coach Application in Browser](https://ai-career-coach-frontend.onrender.com)
+> **Direct Live Application:** [https://ai-career-coach-frontend.onrender.com](https://ai-career-coach-frontend.onrender.com)
 
-| Resource | Access Link | Description |
+| Service | Access Link | Description |
 |---|---|---|
-| 🚀 **Current Project Application (Latest Push)** | [https://github.com/tushar-kumar-code/ai-career-coach](https://github.com/tushar-kumar-code/ai-career-coach) | Direct access to current pushed application repository |
-| ⚡ **Run Live in Browser (Codespaces)** | [Open in GitHub Codespaces](https://github.com/codespaces/new?hide_repo_select=true&ref=main&repo=tushar-kumar-code%2Fai-career-coach) | 1-Click cloud execution of application directly in browser |
-| 🔄 **Latest Updates & Commits History** | [https://github.com/tushar-kumar-code/ai-career-coach/commits/main](https://github.com/tushar-kumar-code/ai-career-coach/commits/main) | Real-time version history & current commit updates |
-| 💻 **Local Live Instance** | [http://localhost:3000](http://localhost:3000) | Instant real-time local version on your machine |
-| 🌐 **Cloud Deployment Guide** | [RENDER_DEPLOYMENT.md](./RENDER_DEPLOYMENT.md) | Guide to deploy live on Render free tier |
-
-> 💡 **Current Version Note**: Har baar jab aap changes push karte hain (`git push origin main`), GitHub repository [tushar-kumar-code/ai-career-coach](https://github.com/tushar-kumar-code/ai-career-coach) turant update ho jati hai. Aap directly upar diye gaye links se current version access kar sakte hain ya GitHub Codespaces me 1-click se online run kar sakte hain.
+| 🌐 **Live Web Application (Direct Browser Access)** | [https://ai-career-coach-frontend.onrender.com](https://ai-career-coach-frontend.onrender.com) | Click to open and use the live application directly in your browser |
+| 💻 **Local Web Application** | [http://localhost:3000](http://localhost:3000) | Instant real-time local version on your machine |
+| ⚡ **Live API & Backend (Health)** | [https://ai-career-coach-backend.onrender.com/api/v1/health](https://ai-career-coach-backend.onrender.com/api/v1/health) | Live backend REST API service |
+| 📖 **API Docs (Swagger UI)** | [https://ai-career-coach-backend.onrender.com/docs](https://ai-career-coach-backend.onrender.com/docs) | Interactive Swagger API documentation |
 
 ---
 
