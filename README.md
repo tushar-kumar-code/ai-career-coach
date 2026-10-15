@@ -1,5 +1,14 @@
 <div align="center">
 
+# 🚀 AI Career Coach
+
+### Your Personal AI-Powered Career & Placement Companion
+
+[![Open Login Page](https://img.shields.io/badge/🔐_Open_Login_Page-Local_App-blue?style=for-the-badge)](http://localhost:3000/login)
+[![Cloud Login Page](https://img.shields.io/badge/🌐_Open_Login_Page-Cloud_Demo-success?style=for-the-badge)](https://ai-career-coach-frontend.onrender.com/login)
+
+</div>
+
 ---
 
 ## 🌟 Overview
@@ -14,14 +23,16 @@ The platform integrates 13 connected modules — from career discovery and resum
 
 ## 🔗 Quick Access
 
-🌐 **Cloud Live Web App:**[http://localhost:3000](http://localhost:3000/)
+> ### 🔐 [👉 Click Here to Open AI Career Coach Login Page](http://localhost:3000/login)
+> 🌐 **Cloud Live Login Page:** [https://ai-career-coach-frontend.onrender.com/login](https://ai-career-coach-frontend.onrender.com/login)
 
-| Service                                                   | Access Link                                                                                                             | Description                                                         |
-| --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| 🌐 **Live Web Application (Direct Browser Access)** | [https://ai-career-coach-frontend.onrender.com](https://ai-career-coach-frontend.onrender.com)                           | Click to open and use the live application directly in your browser |
-| 💻 **Local Web Application**                        | [http://localhost:3000](http://localhost:3000)                                                                           | Instant real-time local version on your machine                     |
-| ⚡ **Live API & Backend (Health)**                  | [https://ai-career-coach-backend.onrender.com/api/v1/health](https://ai-career-coach-backend.onrender.com/api/v1/health) | Live backend REST API service                                       |
-| 📖 **API Docs (Swagger UI)**                        | [https://ai-career-coach-backend.onrender.com/docs](https://ai-career-coach-backend.onrender.com/docs)                   | Interactive Swagger API documentation                               |
+| Service | Access Link | Description |
+|---|---|---|
+| 🔐 **Direct Login Page (Local)** | [http://localhost:3000/login](http://localhost:3000/login) | Click to open Project Login Page directly on your computer |
+| 🌐 **Live Login Page (Cloud)** | [https://ai-career-coach-frontend.onrender.com/login](https://ai-career-coach-frontend.onrender.com/login) | Click to open Project Login Page in browser (Cloud Demo) |
+| 💻 **Main Home Page** | [http://localhost:3000](http://localhost:3000) | Landing page & Overview |
+| ⚡ **Live API & Backend (Health)** | [http://127.0.0.1:8000/api/v1/health](http://127.0.0.1:8000/api/v1/health) | Local backend REST API service |
+| 📖 **API Docs (Swagger UI)** | [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs) | Interactive Swagger API documentation |
 
 ---
 
