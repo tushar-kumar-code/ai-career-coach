@@ -22,6 +22,12 @@ class ResumeRepository:
         return docs[0] if docs else None
 
     @classmethod
+    async def has_analyzed_resume(cls, uid: str) -> bool:
+        """Check if user has any successfully analyzed resume in Firestore."""
+        doc = await cls.get_latest_resume(uid)
+        return bool(doc and (doc.get("ats_breakdown_json") or doc.get("overall_ats_score")))
+
+    @classmethod
     async def get_resume(cls, uid: str, resume_id: str) -> Optional[Dict[str, Any]]:
         """Fetch a specific resume record, strictly scoped to uid."""
         path = f"{cls._collection_path(uid)}/{resume_id}"

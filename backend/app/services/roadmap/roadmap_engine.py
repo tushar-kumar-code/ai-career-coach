@@ -36,7 +36,9 @@ class RoadmapEngine:
         hours_per_day: int = 1,
         days_per_week: int = 5,
         learning_style: str = "Hands-on",
-        preserve_progress: bool = True
+        preserve_progress: bool = True,
+        track_pace: Optional[str] = None,
+        target_phases_count: Optional[int] = None
     ) -> Roadmap:
         """Generates a personalized, adaptive learning roadmap derived from actual user skill gaps, level, and study schedule."""
 
@@ -72,16 +74,45 @@ class RoadmapEngine:
         if not ordered_skills:
             ordered_skills = ["Programming Fundamentals & Logic", "Developer Setup & Git Basics", "Core Language Mastery", "Portfolio Integration"]
 
-        # 2. Divide ordered skills into 5 coherent, progressive career phases
-        phase_types = [
-            ("Foundations from Scratch" if is_scratch_beginner else "Skill Foundations"),
-            "Core Programming & Applied Problem Solving",
-            "Essential Frameworks & Databases",
-            "Full-Stack Integration & Architecture",
-            "Production Projects & Job Readiness"
-        ]
+        # 2. Flexible phase count and tailored phase themes
+        if target_phases_count and 2 <= target_phases_count <= 9:
+            total_learning_phases = max(1, target_phases_count - 1)
+        elif track_pace == "Express":
+            total_learning_phases = 2  # Total 3 phases (Express track)
+        elif track_pace == "Comprehensive":
+            total_learning_phases = 5  # Total 6 phases (In-depth track)
+        elif user_level.lower() == "advanced":
+            total_learning_phases = 2  # Total 3 phases for advanced users
+        elif user_level.lower() == "intermediate":
+            total_learning_phases = 3  # Total 4 phases for intermediate users
+        else:
+            total_learning_phases = 4  # Total 5 phases standard for beginners
 
-        total_learning_phases = 4
+        if user_level.lower() == "advanced":
+            phase_types_pool = [
+                "Advanced System Architecture & Cloud Patterns",
+                "High-Scale Distributed Systems & Optimization",
+                "Microservices, Caching & Performance Engineering",
+                "Enterprise Production Projects & Architecture Capstone"
+            ]
+        elif user_level.lower() == "intermediate":
+            phase_types_pool = [
+                "Applied Logic, Design Patterns & Databases",
+                "Modern Frameworks & Service Integration",
+                "Full-Stack Integration & Architecture",
+                "Scalability, Security & Production Polish",
+                "Production Projects & Job Readiness"
+            ]
+        else:
+            phase_types_pool = [
+                ("Foundations from Scratch" if is_scratch_beginner else "Skill Foundations"),
+                "Core Programming & Applied Problem Solving",
+                "Essential Frameworks & Modern Databases",
+                "Full-Stack Integration & Architecture",
+                "Cloud Deployment & Best Practices",
+                "Production Projects & Job Readiness"
+            ]
+
         chunk_size = max(1, (len(ordered_skills) + total_learning_phases - 1) // total_learning_phases)
         phase_definitions: List[Tuple[str, List[str]]] = []
 
@@ -98,10 +129,10 @@ class RoadmapEngine:
                 else:
                     p_skills = [f"{target_career} Architecture", "Security & Performance"]
             
-            p_type = phase_types[i]
+            p_type = phase_types_pool[i % (len(phase_types_pool) - 1)]
             phase_definitions.append((p_type, p_skills))
 
-        # Phase 5 is always Job & Interview Readiness
+        # Final phase is always Job & Interview Readiness
         phase_definitions.append((
             "Production Projects & Job Readiness",
             [f"{target_career} Capstone Project", f"{target_career} Technical Interview Prep", "Resume & Portfolio Optimization"]

@@ -136,6 +136,8 @@ export default function AssessmentPage() {
 
   // Pathways: 'select' (choose track), 'direct' (direct goal & skill gap), 'quiz' (discovery quiz), 'result' (view result)
   const [assessmentMode, setAssessmentMode] = useState<'select' | 'direct' | 'quiz' | 'result'>('select');
+  const [hasCompletedPrevious, setHasCompletedPrevious] = useState(false);
+  const [isRetake, setIsRetake] = useState(false);
 
   // Direct Track State
   const [selectedRoleTitle, setSelectedRoleTitle] = useState<string>('Frontend Developer');
@@ -184,6 +186,7 @@ export default function AssessmentPage() {
         if (existingResult && (existingResult.analysis || existingResult.selected_target_career)) {
           setResult(existingResult);
           setSelectedTarget(existingResult.selected_target_career || null);
+          setHasCompletedPrevious(true);
           setAssessmentMode('result');
           markAssessmentCompleted();
         } else {
@@ -269,15 +272,23 @@ export default function AssessmentPage() {
     setUserLevel(level);
     setShowLevelSelect(false);
     setLoading(true);
+    setError(null);
     try {
-      const activeSession = await startAssessment(level);
+      const shouldRetake = isRetake || hasCompletedPrevious || Boolean(result);
+      const activeSession = shouldRetake
+        ? await startAssessmentRetake(level)
+        : await startAssessment(level);
+
       setSession(activeSession);
-      if (activeSession.is_completed) {
-        handleCompleteAssessment(activeSession.session_id);
-      }
+      setAssessmentMode('quiz');
     } catch (err: any) {
       console.error('Start error:', err);
       setError(err.message || 'Failed to start assessment');
+      if (hasCompletedPrevious && result) {
+        setAssessmentMode('result');
+      } else {
+        setAssessmentMode('select');
+      }
     } finally {
       setLoading(false);
     }
@@ -327,6 +338,8 @@ export default function AssessmentPage() {
       if (latestResult) {
         setResult(latestResult);
         setSelectedTarget(latestResult.selected_target_career || null);
+        setHasCompletedPrevious(true);
+        setIsRetake(false);
         setAssessmentMode('result');
         markAssessmentCompleted();
       }
@@ -340,30 +353,15 @@ export default function AssessmentPage() {
 
   // Restart / Switch Mode
   const handleRestart = () => {
-    setResult(null);
+    setIsRetake(true);
     setDirectResultData(null);
     setCompareMatch(null);
     setSelectedOption(null);
     setCustomAnswerText('');
     setShowCustomInput(false);
     setSession(null);
-    setAssessmentMode('select');
-  };
-
-  // Called when retake starts after level pick
-  const handleRetakeWithLevel = async (level: string) => {
-    setUserLevel(level);
-    setShowLevelSelect(false);
-    setLoading(true);
-    try {
-      const newSession = await startAssessmentRetake(level);
-      setSession(newSession);
-      setAssessmentMode('quiz');
-    } catch (err: any) {
-      setError(err.message || 'Failed to restart assessment session.');
-    } finally {
-      setLoading(false);
-    }
+    setShowLevelSelect(true);
+    setAssessmentMode('quiz');
   };
 
   // Select and persist Target Career
@@ -408,6 +406,20 @@ export default function AssessmentPage() {
           <p className="text-slate-400 text-sm leading-relaxed max-w-xl mx-auto">
             Choose whether you already know your goal or would like AI guidance to discover your best fit. Both paths create your personalized learning roadmap.
           </p>
+
+          {/* Quick Resume Upload Option Tip */}
+          <div className="max-w-xl mx-auto p-3.5 rounded-2xl bg-blue-500/10 border border-blue-500/30 text-xs text-blue-200 flex items-center justify-between gap-3 text-left">
+            <div className="flex items-center space-x-2">
+              <span className="text-base">📄</span>
+              <span><strong>Already have a Resume?</strong> Upload your CV for instant 30-sec AI analysis and instant unlocks.</span>
+            </div>
+            <Link
+              href="/resume"
+              className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shrink-0 transition"
+            >
+              Upload Resume
+            </Link>
+          </div>
         </div>
 
         {/* Dual Pathway Choice Cards */}
@@ -480,22 +492,22 @@ export default function AssessmentPage() {
                   Help Me Discover My Career
                 </h3>
                 <p className="text-xs text-slate-300 leading-relaxed">
-                  Not sure which tech path fits your strengths, problem-solving style, and interests? Take our quick <strong>5-question AI discovery quiz</strong> to uncover your best matches.
+                  Not sure which tech path fits your natural mindset and problem-solving instincts? Take our <strong>Adaptive AI Discovery Quiz</strong> — Groq AI designs questions on the spot and learns your strengths until it predicts your perfect career domain.
                 </p>
               </div>
 
               <div className="space-y-2 pt-2 border-t border-slate-800">
                 <div className="flex items-center space-x-2 text-xs text-slate-300">
                   <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>5 intuitive questions tailored to your experience level</span>
+                  <span>Dynamic AI questions adapted to your mindset in real time</span>
                 </div>
                 <div className="flex items-center space-x-2 text-xs text-slate-300">
                   <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>Evaluates 12 career dimensions & archetype</span>
+                  <span>Evaluates your natural interests, work style & cognitive instincts</span>
                 </div>
                 <div className="flex items-center space-x-2 text-xs text-slate-300">
                   <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>Top 3 matched recommendations with fit percentages</span>
+                  <span>Ends automatically as soon as AI predicts your ideal career domain</span>
                 </div>
               </div>
             </div>
@@ -504,12 +516,13 @@ export default function AssessmentPage() {
               type="button"
               id="btn-select-quiz-track"
               onClick={() => {
+                setIsRetake(hasCompletedPrevious || Boolean(result));
                 setShowLevelSelect(true);
                 setAssessmentMode('quiz');
               }}
               className="mt-6 w-full py-3.5 px-4 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-bold text-sm flex items-center justify-center space-x-2 shadow-lg shadow-violet-600/20 transition-all min-h-[44px]"
             >
-              <span>Start 5-Question Discovery Quiz</span>
+              <span>{hasCompletedPrevious || result ? 'Retake Adaptive Discovery Quiz 🔄' : 'Start Adaptive Discovery Quiz'}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>
@@ -1081,13 +1094,15 @@ export default function AssessmentPage() {
         <div className="text-center space-y-3">
           <div className="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 text-xs font-bold uppercase tracking-widest">
             <Compass className="w-3.5 h-3.5" />
-            <span>Career Discovery Assessment</span>
+            <span>{isRetake || hasCompletedPrevious ? 'Career Discovery Re-assessment' : 'Career Discovery Assessment'}</span>
           </div>
           <h1 className="text-3xl font-extrabold text-white leading-tight">
-            Aap abhi kahan hain?
+            {isRetake || hasCompletedPrevious ? 'Re-assessment ke liye apna level chunein' : 'Aap abhi kahan hain?'}
           </h1>
           <p className="text-slate-400 text-sm leading-relaxed max-w-md mx-auto">
-            Apna current experience level batao taaki hum aapke liye <strong className="text-slate-200">bilkul sahi sawal</strong> taiyaar kar sakein — easy aur relatable.
+            {isRetake || hasCompletedPrevious
+              ? 'Naya assessment shuru karne ke liye apna experience level chunein taaki fresh questions aapke level ke mutabiq load hon.'
+              : 'Apna current experience level batao taaki hum aapke liye bilkul sahi sawal taiyaar kar sakein — easy aur relatable.'}
           </p>
         </div>
 
@@ -1124,7 +1139,11 @@ export default function AssessmentPage() {
           <button
             onClick={() => {
               setShowLevelSelect(false);
-              setAssessmentMode('select');
+              if (result && hasCompletedPrevious) {
+                setAssessmentMode('result');
+              } else {
+                setAssessmentMode('select');
+              }
             }}
             className="px-5 py-4 rounded-2xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white font-bold text-sm"
           >
@@ -1132,9 +1151,9 @@ export default function AssessmentPage() {
           </button>
           <button
             onClick={() => handleLevelConfirm(userLevel)}
-            className="flex-1 py-4 rounded-2xl bg-[#17324D] hover:bg-[#102A43] text-white font-bold text-base flex items-center justify-center space-x-3 shadow-sm transition-all"
+            className="flex-1 py-4 rounded-2xl bg-[#17324D] hover:bg-[#102A43] text-white font-bold text-base flex items-center justify-center space-x-3 shadow-sm transition-all cursor-pointer"
           >
-            <span>Assessment Shuru Karein</span>
+            <span>{isRetake || hasCompletedPrevious ? 'Re-assessment Shuru Karein 🔄' : 'Assessment Shuru Karein'}</span>
             <ArrowRight className="w-5 h-5" />
           </button>
         </div>
@@ -1161,6 +1180,25 @@ export default function AssessmentPage() {
         </div>
         <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
           <div className="bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 h-full w-[80%] animate-pulse"></div>
+        </div>
+        <div className="pt-2">
+          <button
+            type="button"
+            onClick={async () => {
+              setAnalyzing(false);
+              const r = await getAssessmentResult();
+              if (r) {
+                setResult(r);
+                setSelectedTarget(r.selected_target_career || null);
+                setAssessmentMode('result');
+              } else {
+                setAssessmentMode('select');
+              }
+            }}
+            className="text-xs text-slate-500 hover:text-slate-300 underline cursor-pointer"
+          >
+            Taking too long? View latest profile or cancel
+          </button>
         </div>
       </div>
     );
@@ -1256,10 +1294,10 @@ export default function AssessmentPage() {
             </button>
             <button
               onClick={handleRestart}
-              className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 font-semibold text-xs transition-all flex items-center space-x-1.5"
+              className="px-4 py-2.5 rounded-xl bg-violet-600/20 hover:bg-violet-600/30 border border-violet-500/40 text-violet-300 font-semibold text-xs transition-all flex items-center space-x-1.5 cursor-pointer shadow-sm"
             >
-              <RotateCcw className="w-4 h-4 text-slate-400" />
-              <span>Retake Quiz / Change</span>
+              <RotateCcw className="w-4 h-4 text-violet-400" />
+              <span>Retake Quiz (Re-assessment) 🔄</span>
             </button>
           </div>
         </div>
@@ -1316,11 +1354,31 @@ export default function AssessmentPage() {
           </div>
         )}
 
-        {/* Recommended Career Roles with Match Scores */}
+        {/* CAREER DOMAINS SYNTHESIS (Resume + Discovery Assessment Fusion) */}
+        {analysis.career_domains_summary && (
+          <div className="p-6 rounded-2xl bg-gradient-to-r from-violet-950/60 via-slate-900 to-indigo-950/60 border border-violet-500/30 shadow-xl space-y-3">
+            <div className="flex items-center space-x-2">
+              <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-violet-500/20 text-violet-300 border border-violet-500/30 flex items-center space-x-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-violet-400" />
+                <span>Resume & Assessment Synthesis ✨</span>
+              </span>
+              <span className="text-xs text-slate-400">Holistic AI Career Domain Architecture</span>
+            </div>
+            <h3 className="text-lg font-bold text-white">Suggested Career Domains</h3>
+            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-4xl">
+              {analysis.career_domains_summary}
+            </p>
+          </div>
+        )}
+
+        {/* Recommended Career Roles with Match Scores & Domain Alignment */}
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-base font-bold text-white">Recommended Career Paths</h3>
-            <span className="text-xs text-slate-400">Select any role to set as your active target career</span>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <h3 className="text-base font-bold text-white">Recommended Career Roles & Domains</h3>
+              <p className="text-xs text-slate-400">Synthesized from your psychological aptitude traits & practical resume credentials</p>
+            </div>
+            <span className="text-xs text-slate-500">Select any role to activate your target career</span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -1335,11 +1393,16 @@ export default function AssessmentPage() {
                       : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'
                   }`}
                 >
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
                       <span className="px-2.5 py-0.5 rounded text-xs font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
                         {career.match_percentage}% Match
                       </span>
+                      {career.career_domain && (
+                        <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-violet-500/15 text-violet-300 border border-violet-500/30 truncate max-w-[170px]" title={career.career_domain}>
+                          🌐 {career.career_domain}
+                        </span>
+                      )}
                       {isSelected && (
                         <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-500/20 text-emerald-400 flex items-center space-x-1">
                           <CheckCircle2 className="w-3 h-3" />
@@ -1351,6 +1414,22 @@ export default function AssessmentPage() {
                     <p className="text-xs text-slate-400 leading-relaxed line-clamp-3">
                       {Array.isArray(career.why_recommended) ? career.why_recommended[0] : (career.why_recommended || 'Strong alignment with your core problem-solving instinct.')}
                     </p>
+
+                    {/* Dual Match Tags (Resume + Assessment) */}
+                    <div className="space-y-1.5 pt-1 border-t border-slate-800/80">
+                      {career.resume_match_reasons && career.resume_match_reasons.length > 0 && (
+                        <div className="flex items-start space-x-1.5 text-[11px] text-emerald-400/90">
+                          <span className="shrink-0 font-bold">📄 Resume:</span>
+                          <span className="text-slate-300 truncate">{career.resume_match_reasons[0]}</span>
+                        </div>
+                      )}
+                      {career.assessment_match_reasons && career.assessment_match_reasons.length > 0 && (
+                        <div className="flex items-start space-x-1.5 text-[11px] text-indigo-400/90">
+                          <span className="shrink-0 font-bold">🧠 Assessment:</span>
+                          <span className="text-slate-300 truncate">{career.assessment_match_reasons[0]}</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   <div className="pt-2 flex items-center space-x-2">
@@ -1395,7 +1474,14 @@ export default function AssessmentPage() {
             <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-6 space-y-6 max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between border-b border-slate-800 pb-4">
                 <div>
-                  <span className="text-xs text-indigo-400 font-bold uppercase tracking-wider">Career Role Detailed Comparison</span>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xs text-indigo-400 font-bold uppercase tracking-wider">Career Role Analysis</span>
+                    {compareMatch.career_domain && (
+                      <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-violet-500/20 text-violet-300 border border-violet-500/30">
+                        Domain: {compareMatch.career_domain}
+                      </span>
+                    )}
+                  </div>
                   <h3 className="text-2xl font-bold text-white flex items-center space-x-3 mt-1">
                     <span>{compareMatch.title}</span>
                     <span className="px-2.5 py-0.5 rounded text-xs font-extrabold bg-indigo-500/20 text-indigo-300">
@@ -1416,6 +1502,39 @@ export default function AssessmentPage() {
                   {matchedCatalogDetails.description}
                 </p>
               )}
+
+              {/* Dual Evidence Blocks (Resume Match vs Assessment Match) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-4 rounded-xl bg-emerald-950/20 border border-emerald-500/30 space-y-2">
+                  <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center space-x-1.5">
+                    <span>📄 Matched From Resume</span>
+                  </h4>
+                  <ul className="text-xs text-slate-300 space-y-1 list-disc list-inside">
+                    {compareMatch.resume_match_reasons && compareMatch.resume_match_reasons.length > 0 ? (
+                      compareMatch.resume_match_reasons.map((r, i) => (
+                        <li key={i}>{r}</li>
+                      ))
+                    ) : (
+                      <li className="text-slate-500 italic">No specific resume match noted (Upload resume for project/skill verification)</li>
+                    )}
+                  </ul>
+                </div>
+
+                <div className="p-4 rounded-xl bg-indigo-950/20 border border-indigo-500/30 space-y-2">
+                  <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-wider flex items-center space-x-1.5">
+                    <span>🧠 Matched From Discovery</span>
+                  </h4>
+                  <ul className="text-xs text-slate-300 space-y-1 list-disc list-inside">
+                    {compareMatch.assessment_match_reasons && compareMatch.assessment_match_reasons.length > 0 ? (
+                      compareMatch.assessment_match_reasons.map((a, i) => (
+                        <li key={i}>{a}</li>
+                      ))
+                    ) : (
+                      <li className="text-slate-500 italic">Strong match with problem solving archetype and work style</li>
+                    )}
+                  </ul>
+                </div>
+              </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
@@ -1455,7 +1574,7 @@ export default function AssessmentPage() {
                   }}
                   className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all shadow-md shadow-indigo-600/20"
                 >
-                  Confirm as Target Career
+                  Set as Active Target Career
                 </button>
               </div>
             </div>
@@ -1470,8 +1589,11 @@ export default function AssessmentPage() {
   // ────────────────────────────────────────────────────
   const currentQ = session?.current_question;
   const currentStep = session?.current_step || 1;
-  const totalQ = session?.total_questions || 5;
-  const progressPct = Math.min(100, Math.round(((currentStep - 1) / totalQ) * 100));
+  const minRequired = 10;
+  const totalQ = Math.max(session?.total_questions || minRequired, minRequired);
+  const progressPct = currentStep <= minRequired
+    ? Math.round(((currentStep - 1) / minRequired) * 100)
+    : Math.min(96, 90 + ((currentStep - minRequired) * 2));
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 pb-12">
@@ -1498,17 +1620,25 @@ export default function AssessmentPage() {
             </div>
           </div>
           <h1 className="text-2xl font-extrabold text-white">
-            {t('assessment.questionStep', 'Question')} {currentStep} {t('assessment.of', 'of')} {totalQ}: {currentQ?.dimension || 'General Discovery'}
+            {t('assessment.questionStep', 'Question')} {currentStep} {currentStep <= minRequired ? `of ${minRequired}` : `(Groq Deep Probe)`} • <span className="text-indigo-400 text-lg font-semibold">{currentQ?.dimension || 'AI Mindset Analysis'}</span>
           </h1>
         </div>
         <div className="sm:text-right shrink-0">
-          <span className="text-xs text-slate-400 font-semibold">{progressPct}% {t('common.active', 'Complete')}</span>
-          <div className="w-44 bg-slate-800 h-2.5 rounded-full mt-2 overflow-hidden">
+          <span className="text-xs text-indigo-400 font-semibold flex items-center justify-end space-x-1">
+            <Sparkles className="w-3 h-3 text-amber-400 animate-spin" />
+            <span>{currentStep <= minRequired ? 'Groq AI Adaptive (Min 10 Qs)' : 'Groq Extended Calibration'}</span>
+          </span>
+          <div className="w-48 bg-slate-800 h-2.5 rounded-full mt-2 overflow-hidden">
             <div
               className="bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 h-full transition-all duration-300"
-              style={{ width: `${progressPct}%` }}
+              style={{ width: `${Math.max(10, Math.min(100, progressPct))}%` }}
             ></div>
           </div>
+          <span className="text-[11px] text-slate-400 font-medium block mt-1">
+            {currentStep <= minRequired
+              ? `Step ${currentStep} of ${minRequired} minimum`
+              : `Groq AI analyzing signals (+${currentStep - minRequired} extra)`}
+          </span>
         </div>
       </div>
 

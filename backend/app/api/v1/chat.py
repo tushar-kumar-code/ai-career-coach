@@ -8,6 +8,7 @@ from app.core.database import get_db
 from app.core.security import get_current_user_id
 from app.core.ai_deps import get_ai_provider_from_headers
 from app.services.ai.base import BaseLLMProvider
+from app.services.ai.chat_context import build_candidate_chat_dossier, format_chat_system_instruction
 from app.models.profile import UserProfile
 from app.models.resume import Resume
 from app.models.roadmap import Roadmap
@@ -29,60 +30,13 @@ async def chat_with_coach(
     if not req.message.strip():
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Message cannot be empty")
 
-    # 1. Fetch User Profile Context
-    stmt_prof = select(UserProfile).where(UserProfile.user_id == user_id)
-    res_prof = await db.execute(stmt_prof)
-    profile = res_prof.scalar_one_or_none()
+    # 1. Build Comprehensive Candidate Intelligence Dossier (Resume + Assessment + Skills + Roadmap)
+    dossier = await build_candidate_chat_dossier(db, user_id, target_role_override=req.target_role)
 
-    target_career = req.target_role or (profile.target_career if profile and profile.target_career else "Software Developer")
-    user_skills = list((profile.skills_matrix or {}).keys()) if profile and profile.skills_matrix else []
+    # 2. Build Deeply Contextual System Instruction for Groq / AI Provider
+    system_instruction = format_chat_system_instruction(dossier, language=x_language_preference)
 
-    # 2. Fetch User Resume Context
-    stmt_res = select(Resume).where(Resume.user_id == user_id).order_by(Resume.created_at.desc())
-    res_res = await db.execute(stmt_res)
-    resume = res_res.scalars().first()
-    ats_score = resume.overall_ats_score if resume else None
-
-    # 3. Fetch User Roadmap Context
-    stmt_rm = select(Roadmap).where(Roadmap.user_id == user_id).order_by(Roadmap.created_at.desc())
-    res_rm = await db.execute(stmt_rm)
-    roadmap = res_rm.scalars().first()
-    roadmap_progress = getattr(roadmap, "overall_progress_percent", getattr(roadmap, "progress_percentage", 0)) if roadmap else 0
-
-    lang_rule = ""
-    if x_language_preference == "hi":
-        lang_rule = "\n3. **Language Preference**: The candidate selected Hindi. Provide responses in clear, friendly Hindi with English technical terms."
-
-    # Build Contextual System Prompt with strict formatting rules for readability and accuracy
-    system_instruction = f"""You are an elite, deeply technical, and encouraging AI Career Coach for university students and developers.
-Candidate Context:
-- Target Career Role: {target_career}
-- Candidate Verified Skills: {', '.join(user_skills[:10]) if user_skills else 'Beginner / In Progress'}
-- Resume ATS Score: {f'{ats_score}%' if ats_score is not None else 'Not yet uploaded'}
-- Roadmap Completion: {roadmap_progress}%
-
-CRITICAL RESPONSE & READABILITY RULES:
-1. **Language Adaptation**:
-   - If the user asks in **Hinglish** (Hindi in Roman script, e.g. "Mujhe Data Analyst banna hai roadmap batao"), respond in natural, friendly, and motivating **Hinglish** with standard technical terms in English.
-   - If the user asks in **English**, respond in articulate, professional **English**.
-   - If the user asks in pure Hindi script, respond in Hindi.
-
-2. **Factual Accuracy & Depth**:
-   - Give 100% accurate, industry-standard recommendations, roadmaps, and technical explanations.
-   - Mention real-world frameworks, tools, timeframes, and best practices (e.g. SQL, Pandas, Tableau/PowerBI for Data Analysts; React, Node.js for Full Stack).
-   - If explaining code or design, provide correct, production-grade snippets or architectures.
-
-3. **Visual Clarity & Fast Scanning (No Walls of Text)**:
-   - Organize answers with clean Markdown headers and emojis (`### 🎯 Quick Summary`, `### 📌 Step-by-Step Roadmap`, `### 🛠️ Core Skills & Tools`, `### 💡 Pro Tip`).
-   - Use concise bullet points (`- `) and numbered steps (`1. `, `2. `).
-   - Use Markdown tables where appropriate (e.g., comparing tools or week-by-week roadmaps).
-   - Highlight keywords and tools in **bold**.
-   - Wrap code snippets in standard fenced code blocks (```python, ```sql, etc.).
-   - Conclude with 1 crisp next action step or follow-up question.
-{lang_rule}
-"""
-
-    # Prepare chat message history
+    # 3. Prepare chat message history
     messages_payload = []
     if req.history:
         for item in req.history[-8:]:  # keep last 8 messages for context
@@ -127,16 +81,23 @@ CRITICAL RESPONSE & READABILITY RULES:
                 detail="AI API Key is missing or invalid. Please click 'Set API Key' in the header to enter your free Groq or Gemini key."
             )
 
-        # Smart built-in fallback response so user is never stranded
+        # Smart built-in fallback response referencing candidate profile
+        name = dossier.get("name") or "there"
+        target_role = dossier.get("target_career") or "Software Developer"
+        skills = [s["name"] for s in (dossier.get("verified_skills") or [])[:3]]
+        skills_str = ", ".join(skills) if skills else "core software engineering fundamentals"
+        missing = (dossier.get("resume_data") or {}).get("missing_skills") or []
+        missing_str = f" Focus on bridging gaps in: **{', '.join(missing[:3])}**." if missing else ""
+
         fallback_reply = (
-            f"### 🎯 Strategic Guidance for **{target_career}**\n\n"
-            f"Here is a structured overview to level up your profile and interview readiness:\n\n"
+            f"### 🎯 Strategic Guidance for **{target_role}**\n\n"
+            f"Hello **{name}**! Here is tailored guidance based on your analyzed profile:\n\n"
             f"### 📌 Priority Action Items\n"
-            f"1. **Core Technical Competencies**: Strengthen key domain fundamentals including {', '.join(user_skills[:4]) if user_skills else 'Data Structures, Algorithms, System Architecture, and API Design'}.\n"
-            f"2. **Production-Grade Projects**: Build full-stack or end-to-end applications demonstrating clean code, caching, and database design.\n"
-            f"3. **Mock Interview Drills**: Practice behavioral STAR-method and live technical questions in the **Mock Interview** tab.\n\n"
-            f"### 💡 Pro Tip\n"
-            f"> Keep your resume ATS-optimized by tailoring keyword density to target job descriptions!\n\n"
+            f"1. **Core Competencies**: Keep building on your verified skills in {skills_str}.{missing_str}\n"
+            f"2. **Production Projects**: Strengthen your resume projects by highlighting measurable results and clean architecture.\n"
+            f"3. **Mock Practice**: Drill targeted technical questions in the **Mock Interview** tab.\n\n"
+            f"### 💡 Next Step\n"
+            f"> What specific part of your {target_role} journey would you like to drill down into right now?\n\n"
             f"*Note: Live LLM was temporarily busy. You can retry or verify your API key in AI settings.*"
         )
 

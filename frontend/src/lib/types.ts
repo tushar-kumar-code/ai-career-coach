@@ -53,10 +53,13 @@ export interface CareerMatch {
   title: string;
   match_percentage: number;
   confidence_percentage: number;
+  career_domain?: string;
   why_recommended: string[];
   supporting_strengths: string[];
   potential_challenges: string[];
   learning_gaps: string[];
+  resume_match_reasons?: string[];
+  assessment_match_reasons?: string[];
 }
 
 export interface CareerDiscoveryAIAnalysis {
@@ -68,6 +71,7 @@ export interface CareerDiscoveryAIAnalysis {
   recommended_careers: CareerMatch[];
   alternative_careers: string[];
   skills_identified?: string[];
+  career_domains_summary?: string;
 }
 
 export interface AssessmentResultData {
@@ -76,6 +80,29 @@ export interface AssessmentResultData {
   archetype: string;
   analysis: CareerDiscoveryAIAnalysis;
   completed_at?: string;
+}
+
+export interface DomainCluster {
+  domain_name: string;
+  highest_match: number;
+  roles: CareerMatch[];
+  key_resume_skills: string[];
+  key_assessment_traits: string[];
+}
+
+export interface SuggestedDomainsData {
+  has_resume: boolean;
+  has_assessment: boolean;
+  primary_archetype: string;
+  career_domains_summary: string;
+  domain_clusters: DomainCluster[];
+  recommended_careers: CareerMatch[];
+  resume_profile_preview?: {
+    skills_count: number;
+    top_skills: string[];
+    projects_count: number;
+    experience_count: number;
+  };
 }
 
 export interface CareerRoleCatalogItem {
@@ -114,6 +141,23 @@ export interface DirectCareerGoalResult {
 // Resume Intelligence Types
 // ----------------------------------------------------
 
+export interface ScoringFactorItem {
+  factor_name: string;
+  weight: number;
+  factor_score: number;
+  weighted_contribution: number;
+  description: string;
+  strengths: string[];
+  missing_evidence: string[];
+  status: string;
+}
+
+export interface EligibilityItem {
+  criterion: string;
+  status: 'MET' | 'NOT_MET' | 'UNKNOWN' | string;
+  details: string;
+}
+
 export interface ATSBreakdown {
   overall_ats_score: number;
   formatting_score: number;
@@ -121,6 +165,15 @@ export interface ATSBreakdown {
   skills_score: number;
   experience_score: number;
   readability_score: number;
+  scoring_mode?: 'target_role' | 'job_description' | 'general' | string;
+  mode_label?: string;
+  target_context?: string | null;
+  factors?: ScoringFactorItem[];
+  eligibility_criteria?: EligibilityItem[];
+  preferred_skills_matching?: string[];
+  preferred_skills_missing?: string[];
+  missing_data_notes?: string[];
+  is_fresher_mode?: boolean;
 }
 
 export interface TargetCareerMatch {
@@ -130,21 +183,62 @@ export interface TargetCareerMatch {
   missing_skills: string[];
   experience_alignment: string;
   recommendation: string;
+  match_source?: 'catalog' | 'job_description' | 'none' | string;
+  preferred_skills_matching?: string[];
+  preferred_skills_missing?: string[];
 }
 
 export interface ParsedContactInfo {
   name: string;
   email: string;
   phone: string;
+  location?: string;
+  headline?: string;
+  summary?: string;
   linkedin: string;
   github: string;
   portfolio: string;
 }
 
+export interface ResumeExperienceItem {
+  role: string;
+  company: string;
+  location?: string;
+  start_date?: string;
+  end_date?: string;
+  is_current?: boolean;
+  description?: string;
+  key_achievements?: string[];
+}
+
+export interface ResumeProjectItem {
+  title: string;
+  role?: string;
+  technologies?: string[];
+  description?: string;
+  link?: string;
+}
+
+export interface ResumeEducationItem {
+  degree: string;
+  institution: string;
+  field_of_study?: string;
+  start_year?: string;
+  end_year?: string;
+  grade?: string;
+}
+
+export interface ResumeCertificationItem {
+  name: string;
+  issuer?: string;
+  issue_date?: string;
+  credential_id_or_url?: string;
+}
+
 export interface ExtractedSkill {
   name: string;
   category: string;
-  proficiency_estimated: number;
+  proficiency_estimated?: number | null;
   source: string;
   confidence_level: string;
 }
@@ -165,6 +259,13 @@ export interface ResumeAnalysisData {
   extracted_skills: ExtractedSkill[];
   formatting_risk_flags: string[];
   improvement_suggestions: BulletImprovement[];
+  formatted_text?: string;
+  raw_text?: string;
+  about_user?: ParsedContactInfo;
+  experience?: ResumeExperienceItem[];
+  projects?: ResumeProjectItem[];
+  education?: ResumeEducationItem[];
+  certifications?: ResumeCertificationItem[];
 }
 
 // ----------------------------------------------------
@@ -300,6 +401,15 @@ export interface RoadmapPhase {
   project?: RoadmapProject;
   milestones?: RoadmapMilestone[];
   milestone?: RoadmapMilestone;
+  // Level Progression & Gatekeeper Test Fields
+  level_name?: string;
+  level_theme?: string;
+  level_icon?: string;
+  is_unlocked?: boolean;
+  test_passed?: boolean;
+  test_score?: number;
+  stars?: number;
+  xp_reward?: number;
 }
 
 export interface RoadmapData {
@@ -319,6 +429,68 @@ export interface RoadmapData {
   completed_task_ids: string[];
   completed_milestone_ids: string[];
   completed_project_ids: string[];
+  passed_level_ids?: string[];
+  current_unlocked_level?: number;
+  total_xp?: number;
+  adventurer_level?: number;
+}
+
+// ----------------------------------------------------
+// AI Level Test Progression Types
+// ----------------------------------------------------
+
+export interface LevelTestQuestion {
+  id: string;
+  question: string;
+  topic: string;
+  options: string[];
+  correct_answer: string;
+  explanation: string;
+  code_snippet?: string;
+  difficulty?: string;
+  question_type?: string;
+}
+
+export interface LevelTestResponse {
+  phase_id: string;
+  phase_number: number;
+  phase_title: string;
+  level_name: string;
+  target_career: string;
+  passing_score_percent: number;
+  xp_reward?: number;
+  questions: LevelTestQuestion[];
+}
+
+export interface QuestionResultDetail {
+  question_id: string;
+  question: string;
+  topic: string;
+  user_answer: string;
+  correct_answer: string;
+  is_correct: boolean;
+  explanation: string;
+  code_snippet?: string;
+}
+
+export interface LevelTestSubmitResponse {
+  phase_id: string;
+  phase_number: number;
+  level_name: string;
+  score_percent: number;
+  passed: boolean;
+  passing_score_percent: number;
+  correct_count: number;
+  total_questions: number;
+  stars_awarded: number;
+  xp_earned: number;
+  mastery_level: string;
+  next_level_unlocked: boolean;
+  unlocked_phase_id?: string;
+  unlocked_level_name?: string;
+  feedback: string;
+  missed_topics: string[];
+  results_detail: QuestionResultDetail[];
 }
 
 export interface DailyTasksData {
@@ -830,6 +1002,8 @@ export interface UserAuthData {
   is_active: boolean;
   is_superuser?: boolean;
   has_completed_assessment?: boolean;
+  has_uploaded_resume?: boolean;
+  is_analyzed?: boolean;
 }
 
 export interface AssessmentStatusData {

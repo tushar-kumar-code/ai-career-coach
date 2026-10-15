@@ -141,6 +141,8 @@ export const HINDI_QUESTION_MAP: Record<number, { dimension: string; question_te
 
 export function getLocalizedQuestion(question: Question | undefined, lang: Language): Question | undefined {
   if (!question) return undefined;
+  // If question was dynamically generated on the spot by AI, keep the AI question text intact
+  if (question.question_type === 'adaptive_ai') return question;
   if (lang !== 'hi') return question;
 
   const orderIndex = question.order_index;

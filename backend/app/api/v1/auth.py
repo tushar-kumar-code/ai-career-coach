@@ -47,19 +47,65 @@ def _generate_otp_code() -> str:
     return f"{random.randint(100000, 999999)}"
 
 
-async def _check_user_assessment_completed(db: AsyncSession, user_id: str) -> bool:
-    """Check if user has an authentic completed career assessment."""
+async def _check_user_is_analyzed(db: AsyncSession, user_id: str) -> tuple[bool, bool, bool]:
+    """
+    Check if candidate profile has been analyzed through either:
+    1. Completed Discovery Assessment
+    2. Successfully analyzed uploaded Resume
+    Returns: (is_analyzed, has_completed_assessment, has_uploaded_resume)
+    """
+    from app.models.resume import Resume
+    from app.services.firestore.assessment_repo import AssessmentRepository
+    from app.services.firestore.resume_repo import ResumeRepository
+
+    has_assessment = False
+    has_resume = False
+
+    # 1. Assessment check in SQLite
     try:
-        stmt = select(AssessmentResponse.id).where(
+        stmt_a = select(AssessmentResponse.id).where(
             AssessmentResponse.user_id == user_id,
             AssessmentResponse.status == "COMPLETED",
             AssessmentResponse.ai_analysis_json.isnot(None)
         ).limit(1)
-        res = await db.execute(stmt)
-        return res.scalar_one_or_none() is not None
+        res_a = await db.execute(stmt_a)
+        has_assessment = res_a.scalar_one_or_none() is not None
     except Exception as e:
-        logger.warning(f"Error checking assessment status for {user_id}: {e}")
-        return False
+        logger.warning(f"Assessment status check error for {user_id}: {e}")
+
+    # 1b. Assessment check in Firestore fallback
+    if not has_assessment:
+        try:
+            has_assessment = await AssessmentRepository.has_completed_assessment(user_id)
+        except Exception:
+            pass
+
+    # 2. Resume check in SQLite
+    try:
+        stmt_r = select(Resume.id).where(
+            Resume.user_id == user_id,
+            Resume.overall_ats_score > 0
+        ).limit(1)
+        res_r = await db.execute(stmt_r)
+        has_resume = res_r.scalar_one_or_none() is not None
+    except Exception as e:
+        logger.warning(f"Resume status check error for {user_id}: {e}")
+
+    # 2b. Resume check in Firestore fallback
+    if not has_resume:
+        try:
+            has_resume = await ResumeRepository.has_analyzed_resume(user_id)
+        except Exception:
+            pass
+
+    is_analyzed = bool(has_assessment or has_resume)
+    return is_analyzed, has_assessment, has_resume
+
+
+async def _check_user_assessment_completed(db: AsyncSession, user_id: str) -> bool:
+    """Check if user has an authentic completed career assessment or analyzed resume."""
+    is_analyzed, _, _ = await _check_user_is_analyzed(db, user_id)
+    return is_analyzed
 
 
 # ==============================================================================
@@ -195,7 +241,9 @@ async def verify_register(req: VerifyRegisterRequest, db: AsyncSession = Depends
                 full_name=user.full_name,
                 is_active=user.is_active,
                 is_superuser=user.is_superuser,
-                has_completed_assessment=False
+                has_completed_assessment=False,
+                has_uploaded_resume=False,
+                is_analyzed=False
             )
         ),
         message="Account created and verified successfully!"
@@ -258,7 +306,9 @@ async def register(req: UserRegisterRequest, db: AsyncSession = Depends(get_db))
                 full_name=user.full_name,
                 is_active=user.is_active,
                 is_superuser=user.is_superuser,
-                has_completed_assessment=False
+                has_completed_assessment=False,
+                has_uploaded_resume=False,
+                is_analyzed=False
             )
         ),
         message="Registration successful"
@@ -295,7 +345,7 @@ async def login(req: UserLoginRequest, db: AsyncSession = Depends(get_db)):
             detail="This account has been disabled."
         )
 
-    has_completed_assessment = await _check_user_assessment_completed(db, user.id)
+    is_analyzed, has_assessment, has_resume = await _check_user_is_analyzed(db, user.id)
     token = create_access_token(data={"sub": user.id, "email": user.email, "name": user.full_name})
 
     try:
@@ -320,7 +370,9 @@ async def login(req: UserLoginRequest, db: AsyncSession = Depends(get_db)):
                 full_name=user.full_name,
                 is_active=user.is_active,
                 is_superuser=user.is_superuser,
-                has_completed_assessment=has_completed_assessment
+                has_completed_assessment=is_analyzed,
+                has_uploaded_resume=has_resume,
+                is_analyzed=is_analyzed
             )
         ),
         message="Login successful"
@@ -437,7 +489,7 @@ async def verify_otp_login(req: VerifyOTPLoginRequest, db: AsyncSession = Depend
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User account not found.")
 
     token = create_access_token(data={"sub": user.id, "email": user.email, "name": user.full_name})
-    has_completed_assessment = await _check_user_assessment_completed(db, user.id)
+    is_analyzed, has_assessment, has_resume = await _check_user_is_analyzed(db, user.id)
 
     try:
         from app.services.email_service import send_login_success_email
@@ -461,7 +513,9 @@ async def verify_otp_login(req: VerifyOTPLoginRequest, db: AsyncSession = Depend
                 full_name=user.full_name,
                 is_active=user.is_active,
                 is_superuser=user.is_superuser,
-                has_completed_assessment=has_completed_assessment
+                has_completed_assessment=is_analyzed,
+                has_uploaded_resume=has_resume,
+                is_analyzed=is_analyzed
             )
         ),
         message="Verification successful! Signed in."
@@ -548,7 +602,6 @@ async def demo_login(db: AsyncSession = Depends(get_db)):
         await db.refresh(demo_user)
 
     token = create_access_token(data={"sub": demo_user.id, "email": demo_user.email, "name": demo_user.full_name})
-    has_completed_assessment = await _check_user_assessment_completed(db, demo_user.id)
 
     return APIResponse(
         success=True,
@@ -561,7 +614,9 @@ async def demo_login(db: AsyncSession = Depends(get_db)):
                 full_name=demo_user.full_name,
                 is_active=demo_user.is_active,
                 is_superuser=demo_user.is_superuser,
-                has_completed_assessment=has_completed_assessment
+                has_completed_assessment=True,
+                has_uploaded_resume=True,
+                is_analyzed=True
             )
         ),
         message="Logged in as Demo User"
@@ -582,8 +637,15 @@ async def get_me(user_id: str = Depends(get_current_user_id), db: AsyncSession =
 
     # 1. Check Firestore first if configured
     try:
+        from app.services.firestore.resume_repo import ResumeRepository
         fs_user = await UserRepository.get_user(user_id)
         has_completed_fs = await AssessmentRepository.has_completed_assessment(user_id)
+        has_resume_fs = await ResumeRepository.has_analyzed_resume(user_id)
+        is_analyzed_fs = bool(
+            has_completed_fs or
+            has_resume_fs or
+            (fs_user and (fs_user.get("has_completed_assessment") or fs_user.get("has_analyzed_resume") or fs_user.get("is_analyzed")))
+        )
         if fs_user and fs_user.get("email"):
             return APIResponse(
                 success=True,
@@ -593,7 +655,9 @@ async def get_me(user_id: str = Depends(get_current_user_id), db: AsyncSession =
                     full_name=fs_user.get("full_name") or fs_user.get("displayName") or "Candidate",
                     is_active=fs_user.get("is_active", True),
                     is_superuser=fs_user.get("is_superuser", False),
-                    has_completed_assessment=has_completed_fs or fs_user.get("has_completed_assessment", False)
+                    has_completed_assessment=is_analyzed_fs,
+                    has_uploaded_resume=has_resume_fs,
+                    is_analyzed=is_analyzed_fs
                 ),
                 message="User profile fetched"
             )
@@ -635,12 +699,7 @@ async def get_me(user_id: str = Depends(get_current_user_id), db: AsyncSession =
             except Exception:
                 pass
 
-    has_completed_assessment = await _check_user_assessment_completed(db, user_id)
-    if not has_completed_assessment:
-        try:
-            has_completed_assessment = await AssessmentRepository.has_completed_assessment(user_id)
-        except Exception:
-            pass
+    is_analyzed, has_assessment, has_resume = await _check_user_is_analyzed(db, user_id)
 
     if not user:
         # Fallback to cached token data, never dummy email
@@ -653,7 +712,9 @@ async def get_me(user_id: str = Depends(get_current_user_id), db: AsyncSession =
                 email=real_email,
                 full_name=real_name,
                 is_active=True,
-                has_completed_assessment=has_completed_assessment
+                has_completed_assessment=is_analyzed,
+                has_uploaded_resume=has_resume,
+                is_analyzed=is_analyzed
             ),
             message="User profile fetched"
         )
@@ -666,7 +727,9 @@ async def get_me(user_id: str = Depends(get_current_user_id), db: AsyncSession =
             full_name=user.full_name,
             is_active=user.is_active,
             is_superuser=user.is_superuser,
-            has_completed_assessment=has_completed_assessment
+            has_completed_assessment=is_analyzed,
+            has_uploaded_resume=has_resume,
+            is_analyzed=is_analyzed
         ),
         message="User profile fetched"
     )

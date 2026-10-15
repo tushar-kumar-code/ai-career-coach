@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { AuthProvider } from '@/context/AuthContext';
 import { ThemeProvider } from '@/context/ThemeContext';
 import { LanguageProvider } from '@/context/LanguageContext';
+import { TerminalRouteTracker } from '@/components/common/terminal-route-tracker';
 
 export const metadata: Metadata = {
   title: 'AI Career Coach | Personal Career Guidance Platform',
@@ -20,6 +21,7 @@ export default function RootLayout({
         <ThemeProvider>
           <LanguageProvider>
             <AuthProvider>
+              <TerminalRouteTracker />
               {children}
             </AuthProvider>
           </LanguageProvider>

@@ -14,6 +14,7 @@ class Resume(Base, TimestampMixin):
     filename = Column(String, nullable=False)
     file_path = Column(String, nullable=True)
     raw_text = Column(Text, nullable=True)
+    formatted_text = Column(Text, nullable=True)
     
     # Real Calculated ATS Sub-scores
     overall_ats_score = Column(Integer, default=0, nullable=False)

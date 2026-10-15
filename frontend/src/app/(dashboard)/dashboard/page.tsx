@@ -40,6 +40,7 @@ import {
   RoadmapData,
   InterviewSessionData,
 } from '@/lib/types';
+import CandidateProfileCard from '@/components/resume/CandidateProfileCard';
 
 export default function DashboardPage() {
   const { t } = useLanguage();
@@ -630,6 +631,48 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* Candidate Profile (Extracted Part-Wise from Resume) */}
+      {resumeData ? (
+        <section className="space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center space-x-2">
+              <Sparkles className="w-5 h-5 text-indigo-400" />
+              <h2 className="text-lg font-bold text-white tracking-tight">
+                Candidate Profile (Extracted from Resume)
+              </h2>
+            </div>
+            <Link 
+              href="/resume" 
+              className="text-xs font-semibold text-indigo-400 hover:text-indigo-300 flex items-center space-x-1"
+            >
+              <span>Manage Resume & Full Scan</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+          <CandidateProfileCard resumeData={resumeData} />
+        </section>
+      ) : (
+        <div className="p-6 rounded-2xl bg-gradient-to-r from-indigo-950/40 via-slate-900/60 to-purple-950/40 border border-indigo-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center space-x-2 text-indigo-400 text-xs font-bold uppercase tracking-wider">
+              <FileText className="w-4 h-4" />
+              <span>Candidate Profile Generation</span>
+            </div>
+            <h3 className="text-base font-bold text-white">Create Your Candidate Profile from Your Resume</h3>
+            <p className="text-xs text-slate-400 max-w-xl leading-relaxed">
+              Upload your resume in PDF or Word (.doc / .docx) format. Groq AI verifies your document and extracts your complete profile part-wise: About Candidate, Skills, Experience, and Projects.
+            </p>
+          </div>
+          <Link
+            href="/resume"
+            className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center space-x-2 shrink-0 shadow-lg shadow-indigo-600/30 transition-all"
+          >
+            <FileText className="w-4 h-4" />
+            <span>Upload Resume (.pdf, .doc)</span>
+          </Link>
+        </div>
+      )}
+
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
         <div className="lg:col-span-2 space-y-6">
@@ -715,30 +758,76 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Right Column: Career Recommendations */}
+        {/* Right Column: Career Recommendations (Resume + Assessment Dual Synthesis) */}
         <div className="space-y-6">
-          <div className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800">
-            <h2 className="text-base font-bold text-white mb-1">Career Discovery Roles</h2>
-            <p className="text-xs text-slate-400 mb-4">From your 12-dimension assessment</p>
+          <div className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-4">
+            <div>
+              <div className="flex items-center space-x-1.5 text-violet-400 text-xs font-bold uppercase tracking-wider mb-1">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Resume + Assessment AI Synthesis</span>
+              </div>
+              <h2 className="text-base font-bold text-white">Suggested Career Domains</h2>
+              <p className="text-xs text-slate-400">Synthesized from your cognitive instincts & verified resume skills</p>
+            </div>
 
-            {assessmentData?.analysis?.recommended_careers ? (
-              <div className="space-y-4">
-                {assessmentData.analysis.recommended_careers.slice(0, 3).map((match) => (
-                  <div key={match.slug} className="p-4 rounded-xl bg-slate-950 border border-slate-800">
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="font-semibold text-slate-200 text-sm">{match.title}</h3>
-                      <span className="px-2 py-0.5 rounded text-xs font-bold bg-indigo-500/20 text-indigo-400">
-                        {match.match_percentage}% Match
+            {assessmentData?.analysis?.recommended_careers && assessmentData.analysis.recommended_careers.length > 0 ? (
+              <div className="space-y-3.5">
+                {assessmentData.analysis.recommended_careers.slice(0, 4).map((match) => (
+                  <div key={match.slug} className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        {match.career_domain && (
+                          <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold bg-violet-500/15 text-violet-300 border border-violet-500/30 mb-1">
+                            {match.career_domain}
+                          </span>
+                        )}
+                        <h3 className="font-semibold text-slate-200 text-sm leading-tight">{match.title}</h3>
+                      </div>
+                      <span className="px-2 py-0.5 rounded text-xs font-bold bg-indigo-500/20 text-indigo-400 shrink-0">
+                        {match.match_percentage}%
                       </span>
                     </div>
+
                     <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                      <div className="bg-indigo-500 h-full" style={{ width: `${match.match_percentage}%` }}></div>
+                      <div className="bg-gradient-to-r from-indigo-500 to-violet-500 h-full" style={{ width: `${match.match_percentage}%` }}></div>
                     </div>
+
+                    {(match.resume_match_reasons?.length || match.assessment_match_reasons?.length) ? (
+                      <div className="text-[10px] space-y-0.5 pt-1 text-slate-400 border-t border-slate-900">
+                        {match.resume_match_reasons && match.resume_match_reasons[0] && (
+                          <p className="truncate text-emerald-400/90 font-medium">
+                            📄 {match.resume_match_reasons[0]}
+                          </p>
+                        )}
+                        {match.assessment_match_reasons && match.assessment_match_reasons[0] && (
+                          <p className="truncate text-indigo-400/90 font-medium">
+                            🧠 {match.assessment_match_reasons[0]}
+                          </p>
+                        )}
+                      </div>
+                    ) : null}
                   </div>
                 ))}
+
+                <Link
+                  href="/assessment"
+                  className="w-full py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-semibold text-xs transition-all flex items-center justify-center space-x-1.5"
+                >
+                  <span>Explore All Career Domains</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
               </div>
             ) : (
-              <div className="text-xs text-slate-500 italic">No discovery recommendations yet. Complete step 1 assessment to unlock.</div>
+              <div className="space-y-3">
+                <div className="text-xs text-slate-500 italic">No recommendations yet. Complete Step 1 assessment and upload your resume to unlock.</div>
+                <Link
+                  href="/assessment"
+                  className="w-full py-2 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center justify-center space-x-1"
+                >
+                  <span>Start Assessment</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+              </div>
             )}
           </div>
         </div>

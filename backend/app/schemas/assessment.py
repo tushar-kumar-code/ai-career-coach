@@ -70,10 +70,13 @@ class CareerMatchSchema(BaseModel):
     title: str
     match_percentage: int = Field(ge=0, le=100, description="Match score percentage between 0 and 100")
     confidence_percentage: int = Field(ge=0, le=100, description="Confidence score percentage")
+    career_domain: Optional[str] = Field(default=None, description="Broad technology or industry career domain")
     why_recommended: List[str]
     supporting_strengths: List[str]
     potential_challenges: List[str]
     learning_gaps: List[str]
+    resume_match_reasons: Optional[List[str]] = Field(default_factory=list, description="Specific skills, projects or experiences from user's resume that match this domain")
+    assessment_match_reasons: Optional[List[str]] = Field(default_factory=list, description="Specific psychological traits or strengths from discovery assessment that match this domain")
 
 
 class CareerDiscoveryAIAnalysis(BaseModel):
@@ -84,3 +87,4 @@ class CareerDiscoveryAIAnalysis(BaseModel):
     motivation_profile: str
     recommended_careers: List[CareerMatchSchema]
     alternative_careers: List[str]
+    career_domains_summary: Optional[str] = Field(default=None, description="Synthesis summary of career domains based on both resume and assessment")

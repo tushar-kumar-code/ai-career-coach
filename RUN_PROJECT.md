@@ -90,52 +90,90 @@ This will automatically launch two separate terminal windows—one for backend a
 
 ## 🐙 GitHub Push Guide (Terminal Ke Through Code Push Kaise Karein)
 
-Aapka remote repository already configured hai:
-`https://github.com/tushar-kumar-code/ai-career-coach.git` (Branch: `main`)
+Ran command: `git remote -v; git config user.name; git config user.email`
+Ran command: `git status`
 
-### ⚡ Abhi Current Changes Push Karne Ke Liye:
+Apne project ko khud se **`tushar-kumar-code`** GitHub ID par push karne ke liye yeh standard aur aasan **Step-by-Step guide** follow karein:
 
-Aapke saare changes locally commit ho chuke hain! Bas terminal (PowerShell) open karein aur ye run karein:
+---
+
+### Step 1: Terminal / Command Prompt Kholein
+
+Apne project directory me terminal kholiye:
 
 ```powershell
 cd c:\Users\user\tushar\ai-career-coach
-git push origin main
 ```
 
 ---
 
-### 📝 Har Baar Naye Changes Push Karne Ka Complete Process:
+### Step 2: Dekhein kya-kya changes huye hain (Git Status)
 
-Jab bhi aap code me koi change karein ya naya feature add karein, terminal me ye 4 steps follow karein:
-
-#### 1. Status Check Karein:
+Yeh command run karke check karein ki kaunsi files modify hui hain:
 
 ```powershell
-cd c:\Users\user\tushar\ai-career-coach
 git status
 ```
 
-*(Isse aapko pata chalega kaun kaun si files modify ya create hui hain)*
+*(Yahan red color me modified files dikhengi)*
 
-#### 2. Saare Changes Stage Karein:
+---
+
+### Step 3: Files ko Stage karein (Git Add)
+
+Saari modified aur new files ko commit ke liye select karein:
 
 ```powershell
 git add .
 ```
 
-#### 3. Commit Message Likhein:
+---
+
+### Step 4: Changes ko Save/Commit karein (Git Commit)
+
+Commit ke sath ek chhota message likhein ki aapne kya kaam kiya hai:
 
 ```powershell
-git commit -m "Aapka commit message yaha likhein"
+git commit -m "your commit message yahan likhein"
 ```
 
-#### 4. GitHub Par Push Karein:
+*(Udaharan: `git commit -m "updated UI and fixed mobile login"`)*
+
+---
+
+### Step 5: GitHub par Push karein (Git Push)
+
+Apne repository ke `main` branch me changes bhejne ke liye run karein:
 
 ```powershell
 git push origin main
 ```
 
 ---
+
+### 🔑 Agar Terminal aapse "Username" ya "Password" maangta hai:
+
+GitHub ab account password accept nahi karta, uski jagah **Personal Access Token (PAT)** use hota hai:
+
+1. **GitHub kholiye**: [github.com/settings/tokens](https://github.com/settings/tokens)
+2. **Generate new token (classic)** par click karein.
+3. Note me naam dein (jaise: `laptop-token`) aur Expiration choose karein.
+4. **`repo`** (Full control of private repositories) wale checkbox par tick lagayein.
+5. Bottom me **Generate token** par click karein.
+6. Token ko copy kar lein (yeh `ghp_...` se shuru hota hai).
+7. Jab terminal me:
+   - **Username** maange: `tushar-kumar-code` likhein.
+   - **Password** maange: apna copy kiya hua **Token (`ghp_...`)** paste karein (terminal me typing ya paste dikhta nahi hai security ke liye, paste karke seedhe Enter press karein).
+
+---
+
+### ⚡ Quick Shortcut (Ek Baar me Add, Commit & Push):
+
+Agli baar jab bhi aapko fast push karna ho, aap ek hi line me yeh run kar sakte hain:
+
+```powershell
+git add . ; git commit -m "update project" ; git push origin main
+```
 
 ### 🔐 Agar GitHub Authentication / Password Maange:
 

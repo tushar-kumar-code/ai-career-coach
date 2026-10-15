@@ -55,14 +55,18 @@ export default function LoginPage() {
   const [resetStatus, setResetStatus] = useState<{ success: boolean; message: string } | null>(null);
   const [isResetting, setIsResetting] = useState(false);
 
-  const { login, demoLogin, loginWithGoogle, isAuthenticated, isLoading } = useAuth();
+  const { login, demoLogin, loginWithGoogle, isAuthenticated, isLoading, isAnalyzed } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
     if (isAuthenticated && !isLoading) {
-      router.push('/dashboard');
+      if (isAnalyzed) {
+        router.push('/dashboard');
+      } else {
+        router.push('/resume');
+      }
     }
-  }, [isAuthenticated, isLoading, router]);
+  }, [isAuthenticated, isLoading, isAnalyzed, router]);
 
   // Handle Google OAuth Sign-In
   const handleGoogleLogin = async () => {

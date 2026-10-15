@@ -18,6 +18,8 @@ import {
   DailyTasksData,
   RoadmapProgressData,
   RoadmapPhase,
+  LevelTestResponse,
+  LevelTestSubmitResponse,
   JobData,
   JobMatchAnalysis,
   SavedJobData,
@@ -36,8 +38,10 @@ import {
   AIConfigStatusData,
   UserAuthData,
   AuthResponseData,
-  AssessmentStatusData
+  AssessmentStatusData,
+  SuggestedDomainsData
 } from './types';
+import { terminalLogger } from './terminal-logger';
 
 const RAW_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api/v1';
 const BASE_URL = RAW_URL.endsWith('/api/v1') 
@@ -105,6 +109,14 @@ export function clearSavedAIConfig() {
 }
 
 async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
+  const method = (options?.method || 'GET').toUpperCase();
+  const startTime = Date.now();
+  const isHealth = endpoint.includes('/health');
+
+  if (!isHealth) {
+    terminalLogger.api(`Starting ${method} ${endpoint}`);
+  }
+
   const aiConfig = getSavedAIConfig();
   const token = await getFreshAuthToken();
 
@@ -128,13 +140,23 @@ async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
     }
   }
 
-  const response = await fetch(`${BASE_URL}${endpoint}`, {
-    headers: {
-      ...customHeaders,
-      ...options?.headers,
-    },
-    ...options,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${BASE_URL}${endpoint}`, {
+      headers: {
+        ...customHeaders,
+        ...options?.headers,
+      },
+      ...options,
+    });
+  } catch (err: any) {
+    const duration = Date.now() - startTime;
+    terminalLogger.error(`Network Error ${method} ${endpoint} after ${duration}ms: ${err?.message || 'Connection failed'}`);
+    if (err?.message === 'Failed to fetch' || err?.name === 'TypeError') {
+      throw new Error(`Backend server is not reachable at ${BASE_URL}. Please ensure your backend is running.`);
+    }
+    throw err;
+  }
 
   let result: any = null;
   try {
@@ -143,14 +165,23 @@ async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
     result = null;
   }
 
+  const duration = Date.now() - startTime;
+
   if (!response.ok || (result && result.success === false)) {
     const errorMsg =
       result?.detail ||
       result?.message ||
       result?.error ||
       `Server error (${response.status})`;
-    throw new Error(typeof errorMsg === 'string' ? errorMsg : JSON.stringify(errorMsg));
+    const errorStr = typeof errorMsg === 'string' ? errorMsg : JSON.stringify(errorMsg);
+    terminalLogger.error(`Failed ${method} ${endpoint} (${response.status} in ${duration}ms): ${errorStr}`);
+    throw new Error(errorStr);
   }
+
+  if (!isHealth) {
+    terminalLogger.api(`Success ${method} ${endpoint} (200 OK in ${duration}ms)`);
+  }
+
   return (result?.data !== undefined ? result.data : result) as T;
 }
 
@@ -215,6 +246,14 @@ export async function getAssessmentResult(): Promise<AssessmentResultData | null
   }
 }
 
+export async function getSuggestedDomains(): Promise<SuggestedDomainsData | null> {
+  try {
+    return await request<SuggestedDomainsData>('/assessment/suggested-domains', { cache: 'no-store' });
+  } catch (err) {
+    return null;
+  }
+}
+
 export async function getAssessmentStatus(): Promise<AssessmentStatusData> {
   try {
     return await request<AssessmentStatusData>('/assessment/status', { cache: 'no-store' });
@@ -251,9 +290,12 @@ export async function submitDirectCareerGoal(payload: DirectCareerGoalPayload): 
 }
 
 // Resume APIs
-export async function uploadResumeFile(file: File): Promise<ResumeAnalysisData> {
+export async function uploadResumeFile(file: File, jobDescription?: string): Promise<ResumeAnalysisData> {
   const formData = new FormData();
   formData.append('file', file);
+  if (jobDescription && jobDescription.trim().length >= 20) {
+    formData.append('job_description', jobDescription.trim());
+  }
 
   const token = await getFreshAuthToken();
   const aiConfig = getSavedAIConfig();
@@ -282,9 +324,21 @@ export async function uploadResumeFile(file: File): Promise<ResumeAnalysisData> 
     body: formData,
   });
 
-  const result: APIResponse<ResumeAnalysisData> = await response.json();
-  if (!response.ok || !result.success) {
-    throw new Error(result.message || result.error || 'Failed to upload and analyze resume');
+  let result: any = null;
+  try {
+    result = await response.json();
+  } catch (e) {
+    result = null;
+  }
+
+  if (!response.ok || (result && result.success === false)) {
+    const errorMsg =
+      result?.detail ||
+      result?.message ||
+      result?.error ||
+      'Sorry hum aapke baare me nahi jaan payen hai toh please assesment dijiye.';
+    const errorStr = typeof errorMsg === 'string' ? errorMsg : JSON.stringify(errorMsg);
+    throw new Error(errorStr);
   }
 
   if (typeof window !== 'undefined' && result.data) {
@@ -296,6 +350,21 @@ export async function uploadResumeFile(file: File): Promise<ResumeAnalysisData> 
   }
 
   return result.data as ResumeAnalysisData;
+}
+
+export async function matchJobDescription(jobDescription: string): Promise<ResumeAnalysisData> {
+  const result = await request<ResumeAnalysisData>('/resume/match-jd', {
+    method: 'POST',
+    body: JSON.stringify({ job_description: jobDescription }),
+  });
+  if (result && typeof window !== 'undefined') {
+    try {
+      localStorage.setItem('cached_resume_analysis', JSON.stringify(result));
+    } catch (e) {
+      // ignore
+    }
+  }
+  return result;
 }
 
 export async function getResumeAnalysis(): Promise<ResumeAnalysisData | null> {
@@ -400,10 +469,40 @@ export async function updateRoadmapPreferences(prefs: {
   days_per_week: number;
   preferred_learning_style: string;
   user_level: string;
+  track_pace?: string;
+  target_phases_count?: number;
 }): Promise<RoadmapData> {
   return request<RoadmapData>('/roadmap/preferences', {
     method: 'PUT',
     body: JSON.stringify(prefs),
+  });
+}
+
+export async function addCustomRoadmapPhase(data: {
+  title: string;
+  description?: string;
+  topics?: string[];
+  estimated_minutes?: number;
+}): Promise<RoadmapData> {
+  return request<RoadmapData>('/roadmap/phases/custom', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function generateLevelTest(phaseId: string): Promise<LevelTestResponse> {
+  return request<LevelTestResponse>(`/roadmap/phases/${phaseId}/generate-test`, {
+    method: 'POST',
+  });
+}
+
+export async function submitLevelTest(
+  phaseId: string,
+  answers: Record<string, string>
+): Promise<LevelTestSubmitResponse> {
+  return request<LevelTestSubmitResponse>(`/roadmap/phases/${phaseId}/submit-test`, {
+    method: 'POST',
+    body: JSON.stringify({ answers }),
   });
 }
 

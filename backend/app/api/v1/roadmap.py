@@ -16,6 +16,7 @@ from app.schemas.health import APIResponse
 from app.schemas.roadmap import (
     RoadmapGenerateRequest,
     RoadmapPreferencesRequest,
+    CustomPhaseRequest,
     RoadmapResponse,
     RoadmapPhaseSchema,
     TodayFocusResponse,
@@ -24,7 +25,10 @@ from app.schemas.roadmap import (
     TaskLearningContentResponse,
     PracticeSuggestion,
     FocusSkillRequest,
-    FocusSkillResponse
+    FocusSkillResponse,
+    LevelTestResponse,
+    LevelTestSubmitRequest,
+    LevelTestSubmitResponse
 )
 
 import logging
@@ -32,13 +36,17 @@ from app.schemas.interview import PracticeSuggestionItem
 from app.services.skill.ingestion_engine import SkillIngestionEngine
 from app.services.skill.gap_engine import SkillGapEngine
 from app.services.roadmap.roadmap_engine import RoadmapEngine
+from app.services.roadmap.progress_sync import ProfileProgressSyncService
 from app.services.firestore.roadmap_repo import RoadmapRepository
+from app.services.roadmap.level_test_engine import LevelTestEngine
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 ingestion_engine = SkillIngestionEngine()
 gap_engine = SkillGapEngine()
 roadmap_engine = RoadmapEngine()
+progress_sync_service = ProfileProgressSyncService()
+level_test_engine = LevelTestEngine()
 
 
 @router.post(
@@ -68,7 +76,9 @@ async def generate_roadmap(
         hours_per_day=payload.hours_per_day,
         days_per_week=payload.days_per_week,
         learning_style=payload.preferred_learning_style,
-        preserve_progress=True
+        preserve_progress=True,
+        track_pace=payload.track_pace,
+        target_phases_count=payload.target_phases_count
     )
 
     resp_data = _serialize_roadmap(roadmap)
@@ -392,6 +402,18 @@ async def complete_task(
     db.add(roadmap)
     await db.commit()
 
+    # Automatically synchronize learned skills, update UserProfile & Digital Twin
+    try:
+        await progress_sync_service.sync_task_completion_to_profile(
+            db=db,
+            user_id=user_id,
+            roadmap=roadmap,
+            task_id=task_id,
+            completed=True
+        )
+    except Exception as e:
+        logger.warning(f"Error syncing roadmap progress to profile: {e}")
+
     serialized = _serialize_roadmap(roadmap)
     try:
         await RoadmapRepository.save_roadmap(user_id, roadmap.id, serialized.model_dump())
@@ -426,6 +448,18 @@ async def uncomplete_task(
     db.add(roadmap)
     await db.commit()
 
+    # Synchronize uncompletion to user profile
+    try:
+        await progress_sync_service.sync_task_completion_to_profile(
+            db=db,
+            user_id=user_id,
+            roadmap=roadmap,
+            task_id=task_id,
+            completed=False
+        )
+    except Exception as e:
+        logger.warning(f"Error syncing uncompleted task to profile: {e}")
+
     serialized = _serialize_roadmap(roadmap)
     try:
         await RoadmapRepository.save_roadmap(user_id, roadmap.id, serialized.model_dump())
@@ -438,6 +472,132 @@ async def uncomplete_task(
         data=serialized
     )
 
+
+@router.post(
+    "/phases/{phase_id}/generate-test",
+    response_model=APIResponse[LevelTestResponse],
+    summary="Generate AI level advancement test for a roadmap phase"
+)
+async def generate_level_test(
+    phase_id: str,
+    db: AsyncSession = Depends(get_db),
+    user_id: str = Depends(get_current_user_id)
+):
+    stmt = select(Roadmap).where(Roadmap.user_id == user_id, Roadmap.is_active == True)
+    res = await db.execute(stmt)
+    roadmap = res.scalars().first()
+
+    if not roadmap:
+        raise HTTPException(status_code=404, detail="Active roadmap not found")
+
+    phases = roadmap.phases or []
+    target_phase = None
+    target_idx = -1
+    for idx, p in enumerate(phases):
+        pid = p.get("id") or p.get("phase_id") or f"phase-{idx + 1}"
+        if pid == phase_id or str(p.get("phase_number")) == str(phase_id):
+            target_phase = p
+            target_idx = idx
+            break
+
+    if not target_phase:
+        raise HTTPException(status_code=404, detail=f"Phase '{phase_id}' not found in active roadmap")
+
+    test_res = await level_test_engine.generate_test(
+        phase=target_phase,
+        target_career=roadmap.target_role,
+        user_level=roadmap.user_level
+    )
+
+    # Cache current test questions inside phase so verification is consistent
+    target_phase["current_test_questions"] = [q.model_dump() for q in test_res.questions]
+    flag_modified(roadmap, "phases")
+    await db.commit()
+
+    return APIResponse(
+        success=True,
+        message=f"AI Level Test for {test_res.level_name} generated successfully",
+        data=test_res
+    )
+
+
+@router.post(
+    "/phases/{phase_id}/submit-test",
+    response_model=APIResponse[LevelTestSubmitResponse],
+    summary="Submit answers for AI level test and unlock next level if passed"
+)
+async def submit_level_test(
+    phase_id: str,
+    payload: LevelTestSubmitRequest,
+    db: AsyncSession = Depends(get_db),
+    user_id: str = Depends(get_current_user_id)
+):
+    stmt = select(Roadmap).where(Roadmap.user_id == user_id, Roadmap.is_active == True)
+    res = await db.execute(stmt)
+    roadmap = res.scalars().first()
+
+    if not roadmap:
+        raise HTTPException(status_code=404, detail="Active roadmap not found")
+
+    phases = roadmap.phases or []
+    target_phase = None
+    target_idx = -1
+    for idx, p in enumerate(phases):
+        pid = p.get("id") or p.get("phase_id") or f"phase-{idx + 1}"
+        if pid == phase_id or str(p.get("phase_number")) == str(phase_id):
+            target_phase = p
+            target_idx = idx
+            break
+
+    if not target_phase:
+        raise HTTPException(status_code=404, detail=f"Phase '{phase_id}' not found in active roadmap")
+
+    next_phase = phases[target_idx + 1] if target_idx + 1 < len(phases) else None
+
+    # Load stored test questions or generate fresh ones if not cached
+    stored_questions_data = target_phase.get("current_test_questions") or []
+    if stored_questions_data:
+        from app.schemas.roadmap import LevelTestQuestion
+        questions = [LevelTestQuestion(**q) for q in stored_questions_data]
+    else:
+        test_gen = await level_test_engine.generate_test(
+            phase=target_phase,
+            target_career=roadmap.target_role,
+            user_level=roadmap.user_level
+        )
+        questions = test_gen.questions
+
+    eval_res = level_test_engine.evaluate_test(
+        phase=target_phase,
+        user_answers=payload.answers,
+        questions=questions,
+        next_phase=next_phase
+    )
+
+    # Persist pass/score state
+    target_phase["test_score"] = eval_res.score_percent
+    target_phase["stars"] = eval_res.stars_awarded
+    target_phase["xp_reward"] = eval_res.xp_earned
+    if eval_res.passed:
+        target_phase["test_passed"] = True
+        if next_phase:
+            next_phase["is_unlocked"] = True
+
+    flag_modified(roadmap, "phases")
+    await db.commit()
+
+    # Firestore sync
+    try:
+        serialized = _serialize_roadmap(roadmap)
+        await RoadmapRepository.save_roadmap(user_id, roadmap.id, serialized.model_dump())
+    except Exception as e:
+        logger.warning(f"Firestore update roadmap error: {e}")
+
+    return APIResponse(
+        success=True,
+        message="Level test evaluated",
+        data=eval_res
+    )
 
 
 @router.get(
@@ -560,7 +720,9 @@ async def update_preferences(
         hours_per_day=payload.hours_per_day,
         days_per_week=payload.days_per_week,
         learning_style=payload.preferred_learning_style,
-        preserve_progress=True
+        preserve_progress=True,
+        track_pace=payload.track_pace,
+        target_phases_count=payload.target_phases_count
     )
 
     try:
@@ -572,6 +734,79 @@ async def update_preferences(
         success=True,
         message="Learning preferences updated successfully",
         data=_serialize_roadmap(updated_roadmap)
+    )
+
+
+@router.post(
+    "/phases/custom",
+    response_model=APIResponse[RoadmapResponse],
+    summary="Add a custom milestone/level to active roadmap"
+)
+async def add_custom_phase(
+    payload: CustomPhaseRequest,
+    db: AsyncSession = Depends(get_db),
+    user_id: str = Depends(get_current_user_id)
+):
+    stmt = select(Roadmap).where(Roadmap.user_id == user_id, Roadmap.is_active == True)
+    res = await db.execute(stmt)
+    roadmap = res.scalars().first()
+
+    if not roadmap:
+        raise HTTPException(status_code=404, detail="Active roadmap not found")
+
+    phases = list(roadmap.phases or [])
+    new_phase_number = len(phases) + 1
+    new_phase_id = f"phase-{new_phase_number}-{uuid.uuid4().hex[:6]}"
+
+    tasks = []
+    if payload.topics:
+        for t_idx, topic in enumerate(payload.topics, start=1):
+            tasks.append({
+                "id": f"{new_phase_id}-task-{t_idx}",
+                "title": f"Master {topic}",
+                "description": f"Hands-on deep dive and implementation of {topic}.",
+                "estimated_minutes": payload.estimated_minutes or 45,
+                "task_type": "Practice",
+                "why_it_matters": "Custom career goal requirement",
+                "is_completed": False,
+                "topics_to_learn": [topic]
+            })
+    else:
+        tasks.append({
+            "id": f"{new_phase_id}-task-1",
+            "title": f"Complete {payload.title}",
+            "description": payload.description or f"Hands-on milestone for {payload.title}.",
+            "estimated_minutes": payload.estimated_minutes or 60,
+            "task_type": "Milestone",
+            "why_it_matters": "Personalized career milestone",
+            "is_completed": False,
+            "topics_to_learn": [payload.title]
+        })
+
+    custom_phase = {
+        "id": new_phase_id,
+        "phase_id": new_phase_id,
+        "phase_number": new_phase_number,
+        "name": payload.title,
+        "title": payload.title,
+        "level_name": payload.title,
+        "level_theme": payload.title,
+        "description": payload.description or "Custom user milestone tailored to specific learning goals.",
+        "is_unlocked": len(phases) == 0,
+        "test_passed": False,
+        "progress_percent": 0,
+        "tasks": tasks
+    }
+
+    phases.append(custom_phase)
+    roadmap.phases = phases
+    flag_modified(roadmap, "phases")
+    await db.commit()
+
+    return APIResponse(
+        success=True,
+        message=f"Custom level '{payload.title}' added to your roadmap",
+        data=_serialize_roadmap(roadmap)
     )
 
 
@@ -709,6 +944,50 @@ async def focus_skill(
 
 
 def _serialize_roadmap(r: Roadmap) -> RoadmapResponse:
+    raw_phases = r.phases or []
+    enriched_phases = []
+
+    # Level 1 is always unlocked.
+    # Level N is unlocked if Level N-1 test was passed (or is_unlocked is explicitly set).
+    prev_passed = True
+    passed_ids = []
+
+    for idx, p in enumerate(raw_phases):
+        p_num = p.get("phase_number", idx + 1)
+        lvl_info = level_test_engine.get_level_info(p_num)
+
+        test_passed = bool(p.get("test_passed", False))
+        if test_passed:
+            passed_ids.append(p.get("id") or p.get("phase_id") or f"phase-{p_num}")
+
+        is_unlocked = True if idx == 0 else (prev_passed or bool(p.get("is_unlocked", False)))
+
+        score = p.get("test_score")
+        if p.get("stars") is not None:
+            stars = p.get("stars", 0)
+        elif score is not None:
+            stars = 3 if score >= 95 else 2 if score >= 80 else 1 if score >= 70 else 0
+        else:
+            stars = 0
+
+        xp_val = p.get("xp_reward") or (100 if test_passed else 100)
+
+        p_copy = dict(p)
+        p_copy["level_name"] = p.get("level_name") or lvl_info["level_name"]
+        p_copy["level_theme"] = p.get("level_theme") or lvl_info["level_theme"]
+        p_copy["level_icon"] = p.get("level_icon") or lvl_info["level_icon"]
+        p_copy["is_unlocked"] = is_unlocked
+        p_copy["test_passed"] = test_passed
+        p_copy["test_score"] = score
+        p_copy["stars"] = stars
+        p_copy["xp_reward"] = xp_val
+
+        enriched_phases.append(p_copy)
+        prev_passed = test_passed
+
+    curr_unlocked = max([p.get("phase_number", 1) for p in enriched_phases if p.get("is_unlocked")] or [1])
+    total_xp = sum(p.get("xp_reward", 100) for p in enriched_phases if p.get("test_passed")) + len(r.completed_task_ids or []) * 20
+    adventurer_level = max(1, (total_xp // 250) + 1)
 
     return RoadmapResponse(
         id=r.id,
@@ -722,10 +1001,14 @@ def _serialize_roadmap(r: Roadmap) -> RoadmapResponse:
         days_per_week=r.days_per_week,
         preferred_learning_style=r.preferred_learning_style,
         total_estimated_weeks=r.total_estimated_weeks,
-        phases=r.phases or [],
+        phases=enriched_phases,
         completed_task_ids=r.completed_task_ids or [],
         completed_milestone_ids=r.completed_milestone_ids or [],
         completed_project_ids=r.completed_project_ids or [],
+        passed_level_ids=passed_ids,
+        current_unlocked_level=curr_unlocked,
+        total_xp=total_xp,
+        adventurer_level=adventurer_level,
         created_at=r.created_at.isoformat() if r.created_at else None,
         updated_at=r.updated_at.isoformat() if r.updated_at else None
     )

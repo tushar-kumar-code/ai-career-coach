@@ -24,14 +24,18 @@ export default function RegisterPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false);
 
-  const { register, loginWithGoogle, isAuthenticated, isLoading } = useAuth();
+  const { register, loginWithGoogle, isAuthenticated, isLoading, isAnalyzed } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
     if (isAuthenticated && !isLoading) {
-      router.push('/dashboard');
+      if (isAnalyzed) {
+        router.push('/dashboard');
+      } else {
+        router.push('/resume');
+      }
     }
-  }, [isAuthenticated, isLoading, router]);
+  }, [isAuthenticated, isLoading, isAnalyzed, router]);
 
   const handleGoogleRegister = async () => {
     setError(null);

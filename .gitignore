@@ -21,8 +21,10 @@ backend/.pytest_cache/
 
 # Databases & Media / Uploads
 *.db
+*.db*
 *.sqlite3
 backend/*.db
+backend/*.db*
 backend/*.sqlite3
 backend/uploads/*
 

@@ -7,6 +7,8 @@ class RoadmapGenerateRequest(BaseModel):
     hours_per_day: int = Field(default=1, ge=1, le=8, description="Available study hours per day")
     days_per_week: int = Field(default=5, ge=1, le=7, description="Available study days per week")
     preferred_learning_style: str = Field(default="Hands-on", description="Hands-on, Visual, or Reading")
+    track_pace: Optional[str] = Field(default="Standard", description="Express (3 Levels), Standard (4-5 Levels), or Comprehensive (6-7 Levels)")
+    target_phases_count: Optional[int] = Field(default=None, ge=2, le=9, description="Custom number of levels")
 
 
 class RoadmapPreferencesRequest(BaseModel):
@@ -14,6 +16,15 @@ class RoadmapPreferencesRequest(BaseModel):
     hours_per_day: int = Field(..., ge=1, le=8)
     days_per_week: int = Field(..., ge=1, le=7)
     preferred_learning_style: str = Field(...)
+    track_pace: Optional[str] = Field(default="Standard")
+    target_phases_count: Optional[int] = Field(default=None, ge=2, le=9)
+
+
+class CustomPhaseRequest(BaseModel):
+    title: str = Field(..., min_length=3, description="Custom level/milestone title")
+    description: Optional[str] = Field(default="Custom user milestone tailored to specific learning goals.")
+    topics: Optional[List[str]] = Field(default_factory=list, description="List of subtopics or skills to cover")
+    estimated_minutes: Optional[int] = Field(default=60, ge=15, le=300)
 
 
 class RoadmapTaskSchema(BaseModel):
@@ -72,6 +83,15 @@ class RoadmapPhaseSchema(BaseModel):
     tasks: List[RoadmapTaskSchema]
     project: Optional[RoadmapProjectSchema] = None
     milestone: Optional[RoadmapMilestoneSchema] = None
+    # Level progression & test fields
+    level_name: Optional[str] = None
+    level_theme: Optional[str] = None
+    level_icon: Optional[str] = None
+    is_unlocked: Optional[bool] = True
+    test_passed: Optional[bool] = False
+    test_score: Optional[int] = None
+    stars: Optional[int] = 0
+    xp_reward: Optional[int] = 100
 
 
 class RoadmapResponse(BaseModel):
@@ -90,6 +110,10 @@ class RoadmapResponse(BaseModel):
     completed_task_ids: List[str]
     completed_milestone_ids: List[str]
     completed_project_ids: List[str]
+    passed_level_ids: Optional[List[str]] = Field(default_factory=list)
+    current_unlocked_level: Optional[int] = 1
+    total_xp: Optional[int] = 0
+    adventurer_level: Optional[int] = 1
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
 
@@ -145,4 +169,66 @@ class FocusSkillResponse(BaseModel):
     skill_name: str
     roadmap_id: str
     task: Optional[RoadmapTaskSchema] = None
+
+
+# ----------------------------------------------------
+# Level Test & Progression Schemas
+# ----------------------------------------------------
+
+class LevelTestQuestion(BaseModel):
+    id: str
+    question: str
+    topic: str
+    options: List[str]
+    correct_answer: str
+    explanation: str
+    code_snippet: Optional[str] = None
+    difficulty: Optional[str] = "Intermediate"
+    question_type: Optional[str] = "conceptual"
+
+
+class LevelTestResponse(BaseModel):
+    phase_id: str
+    phase_number: int
+    phase_title: str
+    level_name: str
+    target_career: str
+    passing_score_percent: int = 70
+    xp_reward: int = 100
+    questions: List[LevelTestQuestion]
+
+
+class LevelTestSubmitRequest(BaseModel):
+    answers: Dict[str, str]  # question_id -> selected_option
+
+
+class QuestionResultDetail(BaseModel):
+    question_id: str
+    question: str
+    topic: str
+    user_answer: str
+    correct_answer: str
+    is_correct: bool
+    explanation: str
+    code_snippet: Optional[str] = None
+
+
+class LevelTestSubmitResponse(BaseModel):
+    phase_id: str
+    phase_number: int
+    level_name: str
+    score_percent: int
+    passed: bool
+    passing_score_percent: int = 70
+    correct_count: int
+    total_questions: int
+    stars_awarded: int = 0
+    xp_earned: int = 0
+    mastery_level: str = "Mastered"
+    next_level_unlocked: bool
+    unlocked_phase_id: Optional[str] = None
+    unlocked_level_name: Optional[str] = None
+    feedback: str
+    missed_topics: List[str] = Field(default_factory=list)
+    results_detail: List[QuestionResultDetail] = Field(default_factory=list)
 

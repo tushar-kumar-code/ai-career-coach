@@ -1,6 +1,6 @@
 import uuid
 import logging
-from typing import List, Optional
+from typing import List, Optional, Set, Tuple
 from fastapi import APIRouter, Depends, HTTPException, status, Header
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -14,6 +14,7 @@ from app.models.assessment import AssessmentResponse
 from app.models.question import Question
 from app.models.career_catalog import CareerRole
 from app.models.profile import UserProfile
+from app.models.resume import Resume
 from app.schemas.health import APIResponse
 from app.schemas.assessment import (
     AssessmentSessionResponse,
@@ -36,6 +37,34 @@ adaptive_engine = AdaptiveAssessmentEngine()
 ai_service = CareerDiscoveryAIService()
 
 
+async def get_user_past_questions_context(
+    db: AsyncSession,
+    user_id: str,
+    current_session_id: Optional[str] = None
+) -> Tuple[Set[str], List[str], int]:
+    """Collects question IDs and past answer summaries across all prior assessment sessions for this user."""
+    stmt = select(AssessmentResponse).where(AssessmentResponse.user_id == user_id)
+    if current_session_id:
+        stmt = stmt.where(AssessmentResponse.id != current_session_id)
+    res = await db.execute(stmt)
+    prev_sessions = res.scalars().all()
+
+    past_ids: Set[str] = set()
+    past_summaries: List[str] = []
+    for ps in prev_sessions:
+        if ps.dimension_answers and isinstance(ps.dimension_answers, dict):
+            for qid, ans in ps.dimension_answers.items():
+                past_ids.add(str(qid))
+                if isinstance(ans, dict):
+                    dim = ans.get("dimension", "")
+                    txt = ans.get("option_text", "")
+                    if dim or txt:
+                        past_summaries.append(f"[{dim}]: {txt}")
+
+    attempt_num = len(prev_sessions) + 1
+    return past_ids, past_summaries, attempt_num
+
+
 @router.post(
     "/start",
     response_model=APIResponse[AssessmentSessionResponse],
@@ -55,7 +84,7 @@ async def start_assessment(
     # Seed DB questions and career roles if empty
     await seed_database(db)
 
-    total_questions = adaptive_engine.MAX_QUESTIONS_PER_SESSION
+    total_questions = adaptive_engine.MIN_QUESTIONS
 
     if not retake:
         # Check Firestore for completed assessment
@@ -98,15 +127,37 @@ async def start_assessment(
                 )
             )
 
-    # Check for existing IN_PROGRESS assessment for user
-    stmt = select(AssessmentResponse).where(
-        AssessmentResponse.user_id == user_id,
-        AssessmentResponse.status == "IN_PROGRESS"
-    ).order_by(AssessmentResponse.created_at.desc())
-    res = await db.execute(stmt)
-    session = res.scalars().first()
+    # If retake is explicitly requested, abandon any existing incomplete IN_PROGRESS sessions
+    if retake:
+        old_in_progress_stmt = select(AssessmentResponse).where(
+            AssessmentResponse.user_id == user_id,
+            AssessmentResponse.status == "IN_PROGRESS"
+        )
+        old_in_progress_res = await db.execute(old_in_progress_stmt)
+        for old_s in old_in_progress_res.scalars().all():
+            old_s.status = "ABANDONED"
+            db.add(old_s)
+        await db.commit()
+        session = None
+    else:
+        # Check for existing IN_PROGRESS assessment for user
+        stmt = select(AssessmentResponse).where(
+            AssessmentResponse.user_id == user_id,
+            AssessmentResponse.status == "IN_PROGRESS"
+        ).order_by(AssessmentResponse.created_at.desc())
+        res = await db.execute(stmt)
+        session = res.scalars().first()
 
-    total_questions = adaptive_engine.MAX_QUESTIONS_PER_SESSION
+    # Dynamic adaptive question limits
+    min_questions = adaptive_engine.MIN_QUESTIONS
+    max_questions = adaptive_engine.MAX_SAFETY_QUESTIONS
+
+    # Gather past question context to ensure new/fresh questions on re-assessment
+    past_ids, past_summaries, attempt_num = await get_user_past_questions_context(
+        db=db,
+        user_id=user_id,
+        current_session_id=session.id if session else None
+    )
 
     if session:
         answered_ids = list(session.dimension_answers.keys())
@@ -116,11 +167,15 @@ async def start_assessment(
             current_answers=session.dimension_answers,
             language=x_language_preference,
             ai_provider=ai_provider,
-            user_level=session.user_level or user_level
+            user_level=session.user_level or user_level,
+            excluded_question_ids=past_ids,
+            past_questions_summary=past_summaries,
+            is_retake=retake or (attempt_num > 1),
+            attempt_num=attempt_num
         )
-        if not next_q and len(answered_ids) >= total_questions:
-            # Session had all questions answered; start a fresh assessment session
-            session = None
+        if not next_q and len(answered_ids) >= min_questions:
+            # Session had domain predicted by AI or completed
+            pass
 
     if not session:
         session = AssessmentResponse(
@@ -151,9 +206,13 @@ async def start_assessment(
             answered_question_ids=answered_ids,
             current_answers=session.dimension_answers,
             language=x_language_preference,
-            ai_provider=ai_provider
+            ai_provider=ai_provider,
+            user_level=user_level,
+            excluded_question_ids=past_ids,
+            past_questions_summary=past_summaries,
+            is_retake=retake or (attempt_num > 1),
+            attempt_num=attempt_num
         )
-
 
     q_schema = None
     if next_q:
@@ -171,14 +230,17 @@ async def start_assessment(
             allow_custom=True
         )
 
+    is_session_completed = session.status == "COMPLETED" or (next_q is None and len(answered_ids) >= min_questions)
+    dynamic_total = len(answered_ids) if is_session_completed else max(len(answered_ids) + 1, min_questions)
+
     session_resp = AssessmentSessionResponse(
         session_id=session.id,
         current_step=len(answered_ids) + 1,
-        total_questions=total_questions,
-        is_completed=session.status == "COMPLETED" or next_q is None,
+        total_questions=dynamic_total,
+        is_completed=is_session_completed,
         current_question=q_schema,
         answers_count=len(answered_ids),
-        user_level=session.user_level or "beginner"
+        user_level=session.user_level or user_level
     )
 
     return APIResponse(
@@ -256,16 +318,24 @@ async def submit_answer(
     except Exception as e:
         logger.warning(f"Firestore save answer warning: {e}")
 
-    total_questions = adaptive_engine.MAX_QUESTIONS_PER_SESSION
-
     answered_ids = list(updated_answers.keys())
+    past_ids, past_summaries, attempt_num = await get_user_past_questions_context(
+        db=db,
+        user_id=user_id,
+        current_session_id=session.id
+    )
+
     next_q = await adaptive_engine.get_next_question(
         db=db,
         answered_question_ids=answered_ids,
         current_answers=updated_answers,
         language=x_language_preference,
         ai_provider=ai_provider,
-        user_level=session.user_level or "beginner"
+        user_level=session.user_level or "beginner",
+        excluded_question_ids=past_ids,
+        past_questions_summary=past_summaries,
+        is_retake=(attempt_num > 1),
+        attempt_num=attempt_num
     )
 
     q_schema = None
@@ -284,11 +354,15 @@ async def submit_answer(
             allow_custom=True
         )
 
+    min_questions = adaptive_engine.MIN_QUESTIONS
+    is_done = (next_q is None and len(answered_ids) >= min_questions)
+    dynamic_total = len(answered_ids) if is_done else max(len(answered_ids) + 1, min_questions)
+
     session_resp = AssessmentSessionResponse(
         session_id=session.id,
         current_step=len(answered_ids) + 1,
-        total_questions=total_questions,
-        is_completed=next_q is None,
+        total_questions=dynamic_total,
+        is_completed=is_done,
         current_question=q_schema,
         answers_count=len(answered_ids),
         user_level=session.user_level or "beginner"
@@ -299,6 +373,66 @@ async def submit_answer(
         message="Answer recorded successfully",
         data=session_resp
     )
+
+
+async def get_user_resume_profile(db: AsyncSession, user_id: str) -> Optional[dict]:
+    """Retrieves structured candidate profile (skills, projects, experience) from UserProfile, Firestore, or Resume table."""
+    # 1. Check UserProfile.skills_matrix["candidate_profile"] in DB
+    try:
+        p_stmt = select(UserProfile).where(UserProfile.user_id == user_id)
+        p_res = await db.execute(p_stmt)
+        u_prof = p_res.scalars().first()
+        if u_prof and u_prof.skills_matrix and isinstance(u_prof.skills_matrix, dict):
+            cand_prof = u_prof.skills_matrix.get("candidate_profile")
+            if cand_prof and isinstance(cand_prof, dict) and cand_prof.get("skills"):
+                return cand_prof
+    except Exception as e:
+        logger.warning(f"Error checking UserProfile for candidate_profile: {e}")
+
+    # 2. Check Firestore UserRepository
+    try:
+        fs_user = await UserRepository.get_user(user_id)
+        if fs_user and fs_user.get("candidate_profile"):
+            return fs_user.get("candidate_profile")
+    except Exception as e:
+        logger.warning(f"Firestore get candidate_profile warning: {e}")
+
+    # 3. Check SQLite Resume table
+    try:
+        r_stmt = select(Resume).where(Resume.user_id == user_id).order_by(Resume.created_at.desc())
+        r_res = await db.execute(r_stmt)
+        resume = r_res.scalars().first()
+        if resume:
+            skills = []
+            if resume.parsed_skills and isinstance(resume.parsed_skills, list):
+                skills = [s.get("name") if isinstance(s, dict) else str(s) for s in resume.parsed_skills]
+            return {
+                "skills": skills,
+                "about_user": f"Candidate targeting {resume.target_career_name or 'Tech Role'}",
+                "projects": resume.parsed_projects or [],
+                "experience": resume.parsed_experience or [],
+                "education": resume.parsed_education or []
+            }
+    except Exception as e:
+        logger.warning(f"SQLite resume fallback warning: {e}")
+
+    # 4. Check Firestore ResumeRepository
+    try:
+        from app.services.firestore.resume_repo import ResumeRepository
+        fs_resume = await ResumeRepository.get_latest_resume(user_id)
+        if fs_resume:
+            skills = [s.get("name") if isinstance(s, dict) else str(s) for s in fs_resume.get("parsed_skills", [])]
+            return {
+                "skills": skills,
+                "about_user": fs_resume.get("target_career_name", "Tech Professional"),
+                "projects": fs_resume.get("parsed_projects", []),
+                "experience": fs_resume.get("parsed_experience", []),
+                "education": fs_resume.get("parsed_education", [])
+            }
+    except Exception as e:
+        logger.warning(f"Firestore resume repo fallback warning: {e}")
+
+    return None
 
 
 @router.post(
@@ -332,8 +466,20 @@ async def complete_assessment(
     if not dimension_answers:
         raise HTTPException(status_code=400, detail="Cannot complete assessment without answers")
 
-    # Run AI Analysis
-    ai_result = await ai_service.analyze_assessment(db, dimension_answers, language=x_language_preference)
+    # Fetch user's candidate profile from resume if available (synthesizes Resume + Assessment)
+    resume_profile = await get_user_resume_profile(db, user_id)
+    if resume_profile:
+        logger.info(f"Synthesizing career domain suggestions with Resume ({len(resume_profile.get('skills', []))} skills) and Discovery Assessment")
+    else:
+        logger.info("Running Career Discovery AI Analysis based on assessment responses")
+
+    # Run AI Analysis with both assessment answers and resume profile!
+    ai_result = await ai_service.analyze_assessment(
+        db,
+        dimension_answers,
+        resume_profile=resume_profile,
+        language=x_language_preference
+    )
     ai_dict = ai_result.model_dump()
 
     # Update session status
@@ -353,26 +499,26 @@ async def complete_assessment(
     p_res = await db.execute(p_stmt)
     user_profile = p_res.scalars().first()
 
+    existing_skills_mat = dict(user_profile.skills_matrix or {}) if user_profile and user_profile.skills_matrix else {}
+    existing_skills_mat["verified_skills"] = [s.model_dump() for s in ai_result.top_strengths]
+    existing_skills_mat["interests"] = ai_result.interest_profile
+    if resume_profile and "candidate_profile" not in existing_skills_mat:
+        existing_skills_mat["candidate_profile"] = resume_profile
+
     if not user_profile:
         user_profile = UserProfile(
             user_id=user_id,
             target_career=target_role,
             primary_archetype=ai_result.primary_archetype,
             job_readiness_score=top_score,
-            skills_matrix={
-                "verified_skills": [s.model_dump() for s in ai_result.top_strengths],
-                "interests": ai_result.interest_profile
-            },
+            skills_matrix=existing_skills_mat,
             recommended_roles=[r.model_dump() for r in ai_result.recommended_careers]
         )
     else:
         user_profile.primary_archetype = ai_result.primary_archetype
         user_profile.job_readiness_score = top_score
         user_profile.recommended_roles = [r.model_dump() for r in ai_result.recommended_careers]
-        user_profile.skills_matrix = {
-            "verified_skills": [s.model_dump() for s in ai_result.top_strengths],
-            "interests": ai_result.interest_profile
-        }
+        user_profile.skills_matrix = existing_skills_mat
 
     db.add(user_profile)
     await db.commit()
@@ -391,10 +537,7 @@ async def complete_assessment(
             "primary_archetype": ai_result.primary_archetype,
             "job_readiness_score": top_score,
             "has_completed_assessment": True,
-            "skills_matrix": {
-                "verified_skills": [s.model_dump() for s in ai_result.top_strengths],
-                "interests": ai_result.interest_profile
-            },
+            "skills_matrix": existing_skills_mat,
             "recommended_roles": [r.model_dump() for r in ai_result.recommended_careers]
         })
     except Exception as e:
@@ -474,6 +617,142 @@ async def get_assessment_result(
         success=True,
         message="Career Discovery Result retrieved",
         data=result_data
+    )
+
+
+@router.get(
+    "/suggested-domains",
+    response_model=APIResponse[dict],
+    summary="Get holistic career domain suggestions based on both Resume and Discovery Assessment"
+)
+async def get_suggested_domains(
+    db: AsyncSession = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+    x_language_preference: str = Header(default="en", alias="X-Language-Preference")
+):
+    """
+    Returns AI-synthesized career domains combining:
+    1. Psychological strengths & work preferences from Discovery Assessment
+    2. Verified skills, real projects, and work experience from Uploaded Resume
+    """
+    resume_profile = await get_user_resume_profile(db, user_id)
+    
+    # 1. Fetch latest assessment session
+    stmt = select(AssessmentResponse).where(
+        AssessmentResponse.user_id == user_id,
+        AssessmentResponse.status == "COMPLETED"
+    ).order_by(AssessmentResponse.updated_at.desc())
+    res = await db.execute(stmt)
+    session = res.scalars().first()
+
+    fs_session = None
+    if not session:
+        try:
+            fs_session = await AssessmentRepository.get_latest_completed_assessment(user_id)
+        except Exception as e:
+            logger.warning(f"Firestore get_latest_completed_assessment warning: {e}")
+
+    session_analysis = (session.ai_analysis_json if session else None) or (fs_session.get("ai_analysis_json") if fs_session else None)
+    dimension_answers = (session.dimension_answers if session else None) or (fs_session.get("dimension_answers") if fs_session else None)
+
+    has_resume = bool(resume_profile and resume_profile.get("skills"))
+    has_assessment = bool(session_analysis or dimension_answers)
+
+    if not has_resume and not has_assessment:
+        return APIResponse(
+            success=False,
+            message="No assessment or resume found. Complete the discovery assessment or upload a resume to receive tailored career domains.",
+            data={
+                "has_resume": False,
+                "has_assessment": False,
+                "suggested_domains": [],
+                "domain_clusters": [],
+                "recommended_careers": [],
+                "primary_archetype": None,
+                "career_domains_summary": "Take our adaptive assessment or upload your resume to discover your tailored career domains."
+            }
+        )
+
+    recommended_careers = (session_analysis.get("recommended_careers", []) if session_analysis else [])
+
+    # Check if synthesis with resume is needed (e.g. user has resume but recommendations lack resume_match_reasons)
+    needs_resynthesis = False
+    if has_resume and dimension_answers:
+        if not recommended_careers or not recommended_careers[0].get("resume_match_reasons"):
+            needs_resynthesis = True
+
+    if needs_resynthesis and dimension_answers:
+        try:
+            logger.info("Auto-synthesizing career domains with fresh resume profile and assessment answers...")
+            dual_ai_result = await ai_service.analyze_assessment(
+                db,
+                dimension_answers,
+                resume_profile=resume_profile,
+                language=x_language_preference
+            )
+            session_analysis = dual_ai_result.model_dump()
+            recommended_careers = session_analysis.get("recommended_careers", [])
+            if session:
+                session.ai_analysis_json = session_analysis
+                session.role_recommendations = [r.model_dump() for r in dual_ai_result.recommended_careers]
+                db.add(session)
+                await db.commit()
+        except Exception as e:
+            logger.warning(f"Re-synthesis in suggested-domains error: {e}")
+
+    # Group into structured Domain Clusters
+    domains_map = {}
+    for c in recommended_careers:
+        dom_name = c.get("career_domain") or "Core Technology & Software"
+        if dom_name not in domains_map:
+            domains_map[dom_name] = {
+                "domain_name": dom_name,
+                "highest_match": c.get("match_percentage", 75),
+                "roles": [],
+                "key_resume_skills": [],
+                "key_assessment_traits": []
+            }
+        domains_map[dom_name]["roles"].append(c)
+        if c.get("match_percentage", 0) > domains_map[dom_name]["highest_match"]:
+            domains_map[dom_name]["highest_match"] = c.get("match_percentage")
+        for r_reason in c.get("resume_match_reasons", []):
+            if r_reason not in domains_map[dom_name]["key_resume_skills"]:
+                domains_map[dom_name]["key_resume_skills"].append(r_reason)
+        for a_reason in c.get("assessment_match_reasons", []):
+            if a_reason not in domains_map[dom_name]["key_assessment_traits"]:
+                domains_map[dom_name]["key_assessment_traits"].append(a_reason)
+
+    domain_clusters = sorted(domains_map.values(), key=lambda d: d["highest_match"], reverse=True)
+
+    summary_text = (
+        session_analysis.get("career_domains_summary")
+        if session_analysis and session_analysis.get("career_domains_summary")
+        else "Career domains identified by aligning your problem-solving style with verified resume competencies."
+    )
+
+    archetype = (
+        (session_analysis.get("primary_archetype") if session_analysis else None)
+        or (session.computed_archetype if session else None)
+        or "Systems Builder"
+    )
+
+    return APIResponse(
+        success=True,
+        message="Synthesized career domains retrieved successfully",
+        data={
+            "has_resume": has_resume,
+            "has_assessment": has_assessment,
+            "primary_archetype": archetype,
+            "career_domains_summary": summary_text,
+            "domain_clusters": domain_clusters,
+            "recommended_careers": recommended_careers,
+            "resume_profile_preview": {
+                "skills_count": len(resume_profile.get("skills", [])) if resume_profile else 0,
+                "top_skills": (resume_profile.get("skills") or [])[:8] if resume_profile else [],
+                "projects_count": len(resume_profile.get("projects", [])) if resume_profile else 0,
+                "experience_count": len(resume_profile.get("experience", [])) if resume_profile else 0
+            } if resume_profile else None
+        }
     )
 
 

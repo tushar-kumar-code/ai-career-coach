@@ -59,6 +59,8 @@ class UserResponse(BaseModel):
     is_active: bool = True
     is_superuser: bool = False
     has_completed_assessment: bool = False
+    has_uploaded_resume: bool = False
+    is_analyzed: bool = False
 
 
 class AuthResponse(BaseModel):

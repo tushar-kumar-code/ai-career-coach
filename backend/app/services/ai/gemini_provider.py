@@ -1,4 +1,5 @@
 import json
+import time
 import logging
 from typing import Type, TypeVar, List, Dict, Any, Optional
 from pydantic import BaseModel
@@ -12,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 class GeminiProvider(BaseLLMProvider):
-    """Google Gemini AI Provider implementation using google-genai."""
+    """Google Gemini AI Provider implementation using google-genai with terminal telemetry."""
 
     def __init__(self, api_key: Optional[str] = None, model: Optional[str] = None):
         self.api_key = api_key or settings.GEMINI_API_KEY
@@ -26,6 +27,10 @@ class GeminiProvider(BaseLLMProvider):
         if not self.api_key:
             raise AIProviderException("Gemini API key is not configured. Please add your Gemini API key in AI Settings.")
 
+        prompt_preview = prompt.replace("\n", " ").strip()[:80]
+        logger.info(f"🤖 [AI CALL] Gemini ({self.model}) | Generating text: {prompt_preview}...")
+        t0 = time.time()
+
         try:
             from google import genai
             client = genai.Client(api_key=self.api_key)
@@ -33,9 +38,13 @@ class GeminiProvider(BaseLLMProvider):
                 model=self.model,
                 contents=f"{system_instruction}\n\n{prompt}"
             )
-            return response.text or ""
+            elapsed = time.time() - t0
+            output_text = response.text or ""
+            logger.info(f"✨ [AI SUCCESS] Gemini ({self.model}) completed in {elapsed:.2f}s ({len(output_text)} chars)")
+            return output_text
         except Exception as e:
-            logger.error(f"Gemini API error: {str(e)}")
+            elapsed = time.time() - t0
+            logger.error(f"❌ [AI ERROR] Gemini API error after {elapsed:.2f}s: {str(e)}")
             raise AIProviderException(f"Gemini generation failed: {str(e)}")
 
     async def generate_chat(
@@ -47,11 +56,13 @@ class GeminiProvider(BaseLLMProvider):
         if not self.api_key:
             raise AIProviderException("Gemini API key is not configured. Please add your Gemini API key in AI Settings.")
 
+        logger.info(f"🤖 [AI CHAT] Gemini ({self.model}) | Processing chat ({len(messages)} messages)...")
+        t0 = time.time()
+
         try:
             from google import genai
             client = genai.Client(api_key=self.api_key)
-            
-            # Format contents
+
             conversation_text = f"System: {system_instruction}\n\n"
             for msg in messages:
                 role_label = "Assistant" if msg.get("role") in ["assistant", "ai"] else "User"
@@ -62,9 +73,13 @@ class GeminiProvider(BaseLLMProvider):
                 model=self.model,
                 contents=conversation_text
             )
-            return response.text or ""
+            elapsed = time.time() - t0
+            output_text = response.text or ""
+            logger.info(f"✨ [AI SUCCESS] Gemini chat completed in {elapsed:.2f}s ({len(output_text)} chars)")
+            return output_text
         except Exception as e:
-            logger.error(f"Gemini chat error: {str(e)}")
+            elapsed = time.time() - t0
+            logger.error(f"❌ [AI ERROR] Gemini chat error after {elapsed:.2f}s: {str(e)}")
             raise AIProviderException(f"Gemini chat error: {str(e)}")
 
     async def generate_structured(
@@ -76,10 +91,14 @@ class GeminiProvider(BaseLLMProvider):
         if not self.api_key:
             raise AIProviderException("Gemini API key is not configured. Please add your Gemini API key in AI Settings.")
 
+        schema_name = getattr(output_schema, "__name__", "StructuredSchema")
+        logger.info(f"🤖 [AI STRUCTURED] Gemini ({self.model}) | Schema: {schema_name}...")
+        t0 = time.time()
+
         try:
             from google import genai
             from google.genai import types
-            
+
             client = genai.Client(api_key=self.api_key)
             response = client.models.generate_content(
                 model=self.model,
@@ -89,8 +108,12 @@ class GeminiProvider(BaseLLMProvider):
                     response_schema=output_schema,
                 ),
             )
+            elapsed = time.time() - t0
             parsed_data = json.loads(response.text)
-            return output_schema.model_validate(parsed_data)
+            validated = output_schema.model_validate(parsed_data)
+            logger.info(f"✨ [AI SUCCESS] Gemini structured ({schema_name}) validated in {elapsed:.2f}s")
+            return validated
         except Exception as e:
-            logger.error(f"Gemini structured output error: {str(e)}")
+            elapsed = time.time() - t0
+            logger.error(f"❌ [AI ERROR] Gemini structured failed after {elapsed:.2f}s: {str(e)}")
             raise AIProviderException(f"Gemini structured response failed: {str(e)}")

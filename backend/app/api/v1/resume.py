@@ -1,7 +1,7 @@
 from typing import List, Optional
 import uuid
 import logging
-from fastapi import APIRouter, Depends, File, UploadFile, HTTPException, status
+from fastapi import APIRouter, Depends, File, UploadFile, HTTPException, status, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -11,7 +11,14 @@ from app.models.resume import Resume
 from app.models.profile import UserProfile
 from app.models.skill import Skill
 from app.schemas.health import APIResponse
-from app.schemas.resume import ResumeAnalysisResponse, ExtractedSkillSchema, BulletImprovementSchema
+from app.schemas.resume import (
+    ResumeAnalysisResponse,
+    ExtractedSkillSchema,
+    BulletImprovementSchema,
+    JobDescriptionMatchRequest,
+    ATSBreakdownSchema,
+    TargetCareerMatchSchema
+)
 from app.services.resume.extractor import DocumentExtractor
 from app.services.ai.resume_ai import ResumeAIService
 from app.services.firestore.resume_repo import ResumeRepository
@@ -31,55 +38,86 @@ resume_ai_service = ResumeAIService()
 )
 async def upload_resume(
     file: UploadFile = File(...),
+    job_description: Optional[str] = Form(None),
     db: AsyncSession = Depends(get_db),
     user_id: str = Depends(get_current_user_id)
 ):
-    # 1. Validate & extract document text (uploaded directly to Firebase Storage users/{uid}/resumes/{unique_filename})
-    file_path, filename, raw_text = await extractor.process_uploaded_file(file, user_id)
+    # 1. Validate & extract document text in temporary RAM (no file saved to disk or Firebase Storage)
+    try:
+        file_path, filename, raw_text = await extractor.process_uploaded_file(file, user_id)
 
-    # 2. Save initial Resume entity
+        # 2. Execute Groq AI Analysis & Structured Profile Extraction
+        resume_id = str(uuid.uuid4())
+        analysis = await resume_ai_service.analyze_resume_text(
+            db, user_id, resume_id, filename, raw_text, job_description=job_description
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Resume processing error for user {user_id}: {e}")
+        raise HTTPException(
+            status_code=400,
+            detail="Sorry hum aapke baare me nahi jaan payen hai toh please assesment dijiye."
+        )
+
+    # 3. Immediately discard raw resume text and transient buffers from RAM memory
+    del raw_text
+    import gc
+    gc.collect()
+    logger.info("🗑️ [RAM DISCARD] Raw resume file content and text immediately wiped from RAM memory.")
+
+    # 4. Save Resume Record in SQL Database (ZERO resume files or text stored, only extracted profile structure)
     resume = Resume(
+        id=resume_id,
         user_id=user_id,
         filename=filename,
-        file_path=file_path,
-        raw_text=raw_text
+        file_path=None,
+        raw_text=None,
+        formatted_text=None,
+        overall_ats_score=analysis.ats_score,
+        formatting_score=analysis.ats_breakdown.formatting_score,
+        keyword_score=analysis.ats_breakdown.keyword_score,
+        skills_score=analysis.ats_breakdown.skills_score,
+        experience_score=analysis.ats_breakdown.experience_score,
+        readability_score=analysis.ats_breakdown.readability_score,
+        target_career_name=analysis.target_match.target_career_name,
+        target_match_percentage=analysis.target_match.match_percentage,
+        matching_skills=analysis.target_match.matching_skills,
+        missing_skills=analysis.target_match.missing_skills,
+        ats_breakdown_json=analysis.ats_breakdown.model_dump(),
+        formatting_risk_flags=analysis.formatting_risk_flags,
+        parsed_contact_info=analysis.about_user.model_dump() if analysis.about_user else analysis.contact_info.model_dump(),
+        parsed_skills=[s.model_dump() for s in analysis.extracted_skills],
+        parsed_experience=[e.model_dump() for e in analysis.experience],
+        parsed_education=[ed.model_dump() for ed in analysis.education],
+        parsed_projects=[p.model_dump() for p in analysis.projects],
+        improvement_suggestions=[imp.model_dump() for imp in analysis.improvement_suggestions]
     )
     db.add(resume)
     await db.commit()
     await db.refresh(resume)
 
-    # 3. Execute Analysis Service
-    analysis = await resume_ai_service.analyze_resume_text(
-        db, user_id, resume.id, filename, raw_text
-    )
+    # 5. Persist Structured Candidate Profile & Analysis Metrics to Firestore (ZERO resume file stored)
+    candidate_profile_dict = {
+        "about_user": analysis.about_user.model_dump() if analysis.about_user else analysis.contact_info.model_dump(),
+        "skills": [s.model_dump() for s in analysis.extracted_skills],
+        "experience": [e.model_dump() for e in analysis.experience],
+        "projects": [p.model_dump() for p in analysis.projects],
+        "education": [ed.model_dump() for ed in analysis.education],
+        "certifications": [c.model_dump() for c in analysis.certifications],
+        "ats_score": analysis.ats_score,
+        "filename": filename,
+        "resume_id": resume_id
+    }
 
-
-    # 4. Update Resume Record in DB
-    resume.overall_ats_score = analysis.ats_score
-    resume.formatting_score = analysis.ats_breakdown.formatting_score
-    resume.keyword_score = analysis.ats_breakdown.keyword_score
-    resume.skills_score = analysis.ats_breakdown.skills_score
-    resume.experience_score = analysis.ats_breakdown.experience_score
-    resume.readability_score = analysis.ats_breakdown.readability_score
-    resume.target_career_name = analysis.target_match.target_career_name
-    resume.target_match_percentage = analysis.target_match.match_percentage
-    resume.matching_skills = analysis.target_match.matching_skills
-    resume.missing_skills = analysis.target_match.missing_skills
-    resume.ats_breakdown_json = analysis.ats_breakdown.model_dump()
-    resume.formatting_risk_flags = analysis.formatting_risk_flags
-    resume.parsed_contact_info = analysis.contact_info.model_dump()
-    resume.parsed_skills = [s.model_dump() for s in analysis.extracted_skills]
-    resume.improvement_suggestions = [imp.model_dump() for imp in analysis.improvement_suggestions]
-
-    db.add(resume)
-
-    # 5. Persist to Firestore ResumeRepository
     try:
         resume_data = {
             "id": resume.id,
             "filename": filename,
-            "file_path": file_path,
-            "storage_path": file_path,
+            "file_path": None,
+            "storage_path": None,
+            "raw_text": None,  # Resume file is NEVER stored in database
+            "formatted_text": None,  # Resume file is NEVER stored in database
             "overall_ats_score": analysis.ats_score,
             "formatting_score": analysis.ats_breakdown.formatting_score,
             "keyword_score": analysis.ats_breakdown.keyword_score,
@@ -92,15 +130,21 @@ async def upload_resume(
             "missing_skills": analysis.target_match.missing_skills,
             "ats_breakdown_json": analysis.ats_breakdown.model_dump(),
             "formatting_risk_flags": analysis.formatting_risk_flags,
-            "parsed_contact_info": analysis.contact_info.model_dump(),
+            "parsed_contact_info": candidate_profile_dict["about_user"],
             "parsed_skills": [s.model_dump() for s in analysis.extracted_skills],
+            "parsed_experience": candidate_profile_dict["experience"],
+            "parsed_projects": candidate_profile_dict["projects"],
+            "parsed_education": candidate_profile_dict["education"],
+            "parsed_certifications": candidate_profile_dict["certifications"],
+            "about_user": candidate_profile_dict["about_user"],
             "improvement_suggestions": [imp.model_dump() for imp in analysis.improvement_suggestions],
         }
         await ResumeRepository.save_resume(user_id, resume.id, resume_data)
+        logger.info("🔒 [STORAGE PRIVACY] Resume file NOT stored in Firestore or SQLite. Only extracted candidate profile retained.")
     except Exception as e:
         logger.warning(f"Firestore resume save warning: {e}")
 
-    # 6. Persist Skills to Firestore & SQL Skill Table & Update UserProfile readiness
+    # 6. Persist Skills to Firestore & SQL Skill Table & Update UserProfile with Candidate Profile
     for sk in analysis.extracted_skills:
         try:
             await SkillsRepository.upsert_skill_by_name(
@@ -132,7 +176,17 @@ async def upload_resume(
 
     composite_score = int((analysis.ats_score * 0.4) + (analysis.target_match.match_percentage * 0.6))
     try:
-        await UserRepository.update_user_profile(user_id, {"job_readiness_score": composite_score})
+        await UserRepository.update_user_profile(user_id, {
+            "job_readiness_score": composite_score,
+            "candidate_profile": candidate_profile_dict,
+            "has_analyzed_resume": True,
+            "is_analyzed": True
+        })
+        await UserRepository.upsert_user(user_id, {
+            "has_completed_assessment": True,
+            "has_uploaded_resume": True,
+            "is_analyzed": True
+        })
     except Exception as e:
         logger.warning(f"Firestore user readiness update warning: {e}")
 
@@ -141,6 +195,20 @@ async def upload_resume(
     user_profile = p_res.scalars().first()
     if user_profile:
         user_profile.job_readiness_score = composite_score
+        skills_mat = dict(user_profile.skills_matrix or {})
+        skills_mat["candidate_profile"] = candidate_profile_dict
+        user_profile.skills_matrix = skills_mat
+        if not user_profile.target_career and analysis.target_match.match_source != "none" and analysis.target_match.target_career_name:
+            user_profile.target_career = analysis.target_match.target_career_name
+        db.add(user_profile)
+    else:
+        user_profile = UserProfile(
+            user_id=user_id,
+            target_career=analysis.target_match.target_career_name if analysis.target_match.match_source != "none" else None,
+            primary_archetype="The Builder",
+            job_readiness_score=composite_score,
+            skills_matrix={"candidate_profile": candidate_profile_dict}
+        )
         db.add(user_profile)
 
     await db.commit()
@@ -154,9 +222,49 @@ async def upload_resume(
     except Exception as e:
         logger.warning(f"Background skill sync warning: {e}")
 
+    # 7. Re-synthesize Career Domains combining Discovery Assessment + Uploaded Resume
+    try:
+        from app.models.assessment import AssessmentResponse
+        from app.services.ai.discovery_ai import ai_service
+        from app.services.firestore.assessment_repo import AssessmentRepository
+        a_stmt = select(AssessmentResponse).where(
+            AssessmentResponse.user_id == user_id,
+            AssessmentResponse.status == "COMPLETED"
+        ).order_by(AssessmentResponse.updated_at.desc())
+        a_res = await db.execute(a_stmt)
+        completed_session = a_res.scalars().first()
+        if completed_session and completed_session.dimension_answers:
+            logger.info("Synthesizing Career Domains from uploaded Resume + existing Discovery Assessment...")
+            dual_ai_result = await ai_service.analyze_assessment(
+                db,
+                completed_session.dimension_answers,
+                resume_profile=candidate_profile_dict,
+                language="en"
+            )
+            completed_session.role_recommendations = [r.model_dump() for r in dual_ai_result.recommended_careers]
+            completed_session.ai_analysis_json = dual_ai_result.model_dump()
+            db.add(completed_session)
+            if user_profile:
+                user_profile.recommended_roles = [r.model_dump() for r in dual_ai_result.recommended_careers]
+                db.add(user_profile)
+            await db.commit()
+
+            try:
+                await AssessmentRepository.save_assessment(user_id, completed_session.id, {
+                    "role_recommendations": [r.model_dump() for r in dual_ai_result.recommended_careers],
+                    "ai_analysis_json": dual_ai_result.model_dump()
+                })
+                await UserRepository.update_user_profile(user_id, {
+                    "recommended_roles": [r.model_dump() for r in dual_ai_result.recommended_careers]
+                })
+            except Exception as fe:
+                logger.warning(f"Firestore career update after resume upload warning: {fe}")
+    except Exception as e:
+        logger.warning(f"Career domain synthesis after resume upload error: {e}")
+
     return APIResponse(
         success=True,
-        message="Resume uploaded and analyzed successfully",
+        message="Resume verified, structured profile created, and analyzed successfully",
         data=analysis
     )
 
@@ -240,23 +348,39 @@ async def get_resume_analysis(
     try:
         fs_resume = await ResumeRepository.get_latest_resume(user_id)
         if fs_resume and fs_resume.get("ats_breakdown_json"):
+            contact_data = fs_resume.get("about_user") or fs_resume.get("parsed_contact_info") or {"name": "Candidate"}
+            target_name = fs_resume.get("target_career_name")
+            is_general = not target_name or target_name in ["None Selected (General Mode)", "none", "None"]
+
+            target_match_data = {
+                "target_career_name": "None Selected (General Mode)" if is_general else target_name,
+                "match_percentage": 0 if is_general else (fs_resume.get("target_match_percentage") or 0),
+                "matching_skills": fs_resume.get("matching_skills") or [],
+                "missing_skills": fs_resume.get("missing_skills") or [],
+                "experience_alignment": "General resume evaluation mode active. No target career specified." if is_general else f"Matched skills against {target_name} requirements.",
+                "recommendation": "Select a target career from Career Discovery or paste a job description to see role-specific matching." if is_general else f"Focus on adding missing skills: {', '.join((fs_resume.get('missing_skills') or [])[:3]) if fs_resume.get('missing_skills') else 'None'}",
+                "match_source": "none" if is_general else "catalog",
+                "preferred_skills_matching": (fs_resume.get("ats_breakdown_json") or {}).get("preferred_skills_matching", []),
+                "preferred_skills_missing": (fs_resume.get("ats_breakdown_json") or {}).get("preferred_skills_missing", [])
+            }
+
             analysis_response = ResumeAnalysisResponse(
                 id=fs_resume.get("id"),
                 filename=fs_resume.get("filename"),
                 ats_score=fs_resume.get("overall_ats_score") or 0,
                 ats_breakdown=fs_resume.get("ats_breakdown_json") or {},
-                target_match={
-                    "target_career_name": fs_resume.get("target_career_name") or "Software Developer",
-                    "match_percentage": fs_resume.get("target_match_percentage") or 70,
-                    "matching_skills": fs_resume.get("matching_skills") or [],
-                    "missing_skills": fs_resume.get("missing_skills") or [],
-                    "experience_alignment": "Matched skills with target role requirements.",
-                    "recommendation": f"Focus on adding missing skills: {', '.join((fs_resume.get('missing_skills') or [])[:3]) if fs_resume.get('missing_skills') else 'None'}"
-                },
-                contact_info=fs_resume.get("parsed_contact_info") or {"name": "Candidate"},
+                target_match=target_match_data,
+                contact_info=contact_data,
                 extracted_skills=fs_resume.get("parsed_skills") or [],
                 formatting_risk_flags=fs_resume.get("formatting_risk_flags") or [],
-                improvement_suggestions=fs_resume.get("improvement_suggestions") or []
+                improvement_suggestions=fs_resume.get("improvement_suggestions") or [],
+                formatted_text=None,
+                raw_text=None,
+                about_user=contact_data,
+                experience=fs_resume.get("parsed_experience") or [],
+                projects=fs_resume.get("parsed_projects") or [],
+                education=fs_resume.get("parsed_education") or [],
+                certifications=fs_resume.get("parsed_certifications") or []
             )
             return APIResponse(
                 success=True,
@@ -271,15 +395,11 @@ async def get_resume_analysis(
     res = await db.execute(stmt)
     resume = res.scalars().first()
 
-    if not resume:
+    if not resume and user_id == "demo-user-12345":
         demo_stmt = select(Resume).where(Resume.user_id == "demo-user-12345").order_by(Resume.created_at.desc())
         demo_res = await db.execute(demo_stmt)
         demo_resume = demo_res.scalars().first()
         if demo_resume and demo_resume.ats_breakdown_json:
-            demo_resume.user_id = user_id
-            db.add(demo_resume)
-            await db.commit()
-            await db.refresh(demo_resume)
             resume = demo_resume
 
     if not resume or not resume.ats_breakdown_json:
@@ -289,29 +409,265 @@ async def get_resume_analysis(
             data=None
         )
 
+    contact_data = resume.parsed_contact_info or {"name": "Candidate"}
+    target_name = resume.target_career_name
+    is_general = not target_name or target_name in ["None Selected (General Mode)", "none", "None"]
+
+    target_match_data = {
+        "target_career_name": "None Selected (General Mode)" if is_general else target_name,
+        "match_percentage": 0 if is_general else (resume.target_match_percentage or 0),
+        "matching_skills": resume.matching_skills or [],
+        "missing_skills": resume.missing_skills or [],
+        "experience_alignment": "General resume evaluation mode active. No target career specified." if is_general else f"Matched skills against {target_name} requirements.",
+        "recommendation": "Select a target career from Career Discovery or paste a job description to see role-specific matching." if is_general else f"Focus on adding missing skills: {', '.join((resume.missing_skills or [])[:3]) if resume.missing_skills else 'None'}",
+        "match_source": "none" if is_general else "catalog",
+        "preferred_skills_matching": (resume.ats_breakdown_json or {}).get("preferred_skills_matching", []),
+        "preferred_skills_missing": (resume.ats_breakdown_json or {}).get("preferred_skills_missing", [])
+    }
+
     analysis_response = ResumeAnalysisResponse(
         id=resume.id,
         filename=resume.filename,
         ats_score=resume.overall_ats_score,
         ats_breakdown=resume.ats_breakdown_json,
-        target_match={
-            "target_career_name": resume.target_career_name or "Software Developer",
-            "match_percentage": resume.target_match_percentage,
-            "matching_skills": resume.matching_skills,
-            "missing_skills": resume.missing_skills,
-            "experience_alignment": "Matched skills with target role requirements.",
-            "recommendation": f"Focus on adding missing skills: {', '.join(resume.missing_skills[:3]) if resume.missing_skills else 'None'}"
-        },
-        contact_info=resume.parsed_contact_info or {"name": "Candidate"},
+        target_match=target_match_data,
+        contact_info=contact_data,
         extracted_skills=resume.parsed_skills or [],
         formatting_risk_flags=resume.formatting_risk_flags or [],
-        improvement_suggestions=resume.improvement_suggestions or []
+        improvement_suggestions=resume.improvement_suggestions or [],
+        formatted_text=None,
+        raw_text=None,
+        about_user=contact_data,
+        experience=resume.parsed_experience or [],
+        projects=resume.parsed_projects or [],
+        education=resume.parsed_education or [],
+        certifications=[]
     )
 
     return APIResponse(
         success=True,
         message="Resume analysis retrieved",
         data=analysis_response
+    )
+
+
+@router.post(
+    "/match-jd",
+    response_model=APIResponse[ResumeAnalysisResponse],
+    summary="Match existing uploaded resume against a specific Job Description"
+)
+async def match_job_description(
+    request: JobDescriptionMatchRequest,
+    db: AsyncSession = Depends(get_db),
+    user_id: str = Depends(get_current_user_id)
+):
+    """
+    Evaluates candidate's existing uploaded resume against a specific pasted Job Description.
+    Calculates Mode A Job-Specific ATS score and requirements match without needing to re-upload document.
+    """
+    if not request.job_description or len(request.job_description.strip()) < 20:
+        raise HTTPException(
+            status_code=400,
+            detail="Job description must be at least 20 characters long."
+        )
+
+    # 1. Fetch user's latest resume from SQLite or Firestore
+    stmt = select(Resume).where(Resume.user_id == user_id).order_by(Resume.created_at.desc())
+    res = await db.execute(stmt)
+    resume = res.scalars().first()
+
+    fs_resume = None
+    if not resume:
+        fs_resume = await ResumeRepository.get_latest_resume(user_id)
+        if not fs_resume:
+            raise HTTPException(
+                status_code=404,
+                detail="No analyzed resume found. Please upload a resume first before matching against a job description."
+            )
+
+    contact_info = (resume.parsed_contact_info if resume else fs_resume.get("about_user")) or {}
+    raw_skills = (resume.parsed_skills if resume else fs_resume.get("parsed_skills")) or []
+    experience = (resume.parsed_experience if resume else fs_resume.get("parsed_experience")) or []
+    projects = (resume.parsed_projects if resume else fs_resume.get("parsed_projects")) or []
+    education = (resume.parsed_education if resume else fs_resume.get("parsed_education")) or []
+    certifications = (fs_resume.get("parsed_certifications") if fs_resume else []) or []
+
+    skill_names = [s.get("name") if isinstance(s, dict) else str(s) for s in raw_skills if s]
+
+    # Reconstruct parsed dict for ATS engine
+    parsed = {
+        "contact_info": contact_info,
+        "skills": skill_names,
+        "experience": experience,
+        "projects": projects,
+        "education": education,
+        "summary": contact_info.get("summary", "")
+    }
+
+    # Build simulated text representation for keyword overlap analysis
+    simulated_text = (
+        f"{contact_info.get('summary', '')}\n"
+        f"Skills: {', '.join(skill_names)}\n"
+        f"Experience:\n" + "\n".join([f"{e.get('role', '')} {e.get('company', '')} {e.get('description', '')}" for e in experience if isinstance(e, dict)]) + "\n"
+        f"Projects:\n" + "\n".join([f"{p.get('title', '')} {p.get('description', '')} {', '.join(p.get('technologies', []))}" for p in projects if isinstance(p, dict)]) + "\n"
+        f"Education:\n" + "\n".join([f"{ed.get('degree', '')} {ed.get('institution', '')}" for ed in education if isinstance(ed, dict)])
+    )
+
+    # 2. Evaluate ATS against Specific Job Description (Mode A)
+    ats_breakdown, risk_flags = resume_ai_service.ats_engine.evaluate_resume(
+        parsed_resume=parsed,
+        raw_text=simulated_text,
+        target_role="Specific Job Description Vacancy",
+        job_description=request.job_description
+    )
+
+    # 3. Match against Target Job Description
+    target_match = await resume_ai_service.target_matcher.match_resume_to_target(
+        db=db,
+        user_id=user_id,
+        resume_skills=skill_names,
+        job_description=request.job_description
+    )
+
+    # 4. Generate improvements
+    improvements = resume_ai_service.improver.generate_improvements(
+        parsed, target_match.missing_skills
+    )
+
+    # 5. Update SQLite record if present
+    if resume:
+        resume.overall_ats_score = ats_breakdown.overall_ats_score
+        resume.formatting_score = ats_breakdown.formatting_score
+        resume.keyword_score = ats_breakdown.keyword_score
+        resume.skills_score = ats_breakdown.skills_score
+        resume.experience_score = ats_breakdown.experience_score
+        resume.readability_score = ats_breakdown.readability_score
+        resume.target_career_name = target_match.target_career_name
+        resume.target_match_percentage = target_match.match_percentage
+        resume.matching_skills = target_match.matching_skills
+        resume.missing_skills = target_match.missing_skills
+        resume.ats_breakdown_json = ats_breakdown.model_dump()
+        resume.improvement_suggestions = [imp.model_dump() for imp in improvements]
+        db.add(resume)
+        await db.commit()
+
+    # 6. Update Firestore record
+    try:
+        resume_id = resume.id if resume else fs_resume.get("id")
+        await ResumeRepository.save_resume(user_id, resume_id, {
+            "overall_ats_score": ats_breakdown.overall_ats_score,
+            "formatting_score": ats_breakdown.formatting_score,
+            "keyword_score": ats_breakdown.keyword_score,
+            "skills_score": ats_breakdown.skills_score,
+            "experience_score": ats_breakdown.experience_score,
+            "readability_score": ats_breakdown.readability_score,
+            "target_career_name": target_match.target_career_name,
+            "target_match_percentage": target_match.match_percentage,
+            "matching_skills": target_match.matching_skills,
+            "missing_skills": target_match.missing_skills,
+            "ats_breakdown_json": ats_breakdown.model_dump(),
+            "improvement_suggestions": [imp.model_dump() for imp in improvements]
+        })
+    except Exception as e:
+        logger.warning(f"Firestore update after match-jd notice: {e}")
+
+    analysis_response = ResumeAnalysisResponse(
+        id=resume.id if resume else fs_resume.get("id"),
+        filename=resume.filename if resume else fs_resume.get("filename", "Resume"),
+        ats_score=ats_breakdown.overall_ats_score,
+        ats_breakdown=ats_breakdown,
+        target_match=target_match,
+        contact_info=contact_info,
+        extracted_skills=raw_skills,
+        formatting_risk_flags=risk_flags,
+        improvement_suggestions=improvements,
+        formatted_text=None,
+        raw_text=None,
+        about_user=contact_info,
+        experience=experience,
+        projects=projects,
+        education=education,
+        certifications=certifications
+    )
+
+    return APIResponse(
+        success=True,
+        message="Resume successfully evaluated against specific job description",
+        data=analysis_response
+    )
+
+
+@router.get(
+    "/profile",
+    response_model=APIResponse[Optional[dict]],
+    summary="Get user's extracted candidate profile from resume"
+)
+async def get_candidate_profile(
+    db: AsyncSession = Depends(get_db),
+    user_id: str = Depends(get_current_user_id)
+):
+    """Returns candidate profile (About User, Skills, Experience, Projects, Education) extracted from resume."""
+    # 1. Check user profile in Firestore
+    try:
+        user_doc = await UserRepository.get_user(user_id)
+        if user_doc and user_doc.get("candidate_profile"):
+            return APIResponse(
+                success=True,
+                message="Candidate profile retrieved from Firestore",
+                data=user_doc.get("candidate_profile")
+            )
+    except Exception as e:
+        logger.warning(f"Firestore get_candidate_profile notice: {e}")
+
+    # 2. Check latest resume in Firestore
+    try:
+        fs_resume = await ResumeRepository.get_latest_resume(user_id)
+        if fs_resume:
+            profile_data = {
+                "about_user": fs_resume.get("about_user") or fs_resume.get("parsed_contact_info") or {"name": "Candidate"},
+                "skills": fs_resume.get("parsed_skills") or [],
+                "experience": fs_resume.get("parsed_experience") or [],
+                "projects": fs_resume.get("parsed_projects") or [],
+                "education": fs_resume.get("parsed_education") or [],
+                "certifications": fs_resume.get("parsed_certifications") or [],
+                "ats_score": fs_resume.get("overall_ats_score") or 0,
+                "filename": fs_resume.get("filename") or "Resume"
+            }
+            return APIResponse(
+                success=True,
+                message="Candidate profile retrieved",
+                data=profile_data
+            )
+    except Exception as e:
+        logger.warning(f"Firestore get_candidate_profile fallback notice: {e}")
+
+    # 3. SQLite fallback
+    stmt = select(Resume).where(Resume.user_id == user_id).order_by(Resume.created_at.desc())
+    res = await db.execute(stmt)
+    resume = res.scalars().first()
+
+    if not resume:
+        return APIResponse(
+            success=False,
+            message="No resume profile available. Please upload your resume first.",
+            data=None
+        )
+
+    profile_data = {
+        "about_user": resume.parsed_contact_info or {"name": "Candidate"},
+        "skills": resume.parsed_skills or [],
+        "experience": resume.parsed_experience or [],
+        "projects": resume.parsed_projects or [],
+        "education": resume.parsed_education or [],
+        "certifications": [],
+        "ats_score": resume.overall_ats_score,
+        "filename": resume.filename
+    }
+
+    return APIResponse(
+        success=True,
+        message="Candidate profile retrieved",
+        data=profile_data
     )
 
 

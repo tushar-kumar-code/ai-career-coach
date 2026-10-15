@@ -67,7 +67,11 @@ class GroqProvider(BaseLLMProvider):
             {"role": "user", "content": prompt}
         ]
 
+        prompt_preview = prompt.replace("\n", " ").strip()[:90]
         for model_name in self._get_candidate_models():
+            import time
+            t0 = time.time()
+            logger.info(f"🤖 [AI CALL] Groq ({model_name}) | Task: {prompt_preview}...")
             try:
                 try:
                     from groq import Groq
@@ -78,18 +82,23 @@ class GroqProvider(BaseLLMProvider):
                         temperature=0.4
                     )
                     self.model = model_name
-                    return completion.choices[0].message.content or ""
+                    content = completion.choices[0].message.content or ""
+                    elapsed = time.time() - t0
+                    logger.info(f"✨ [AI SUCCESS] Groq ({model_name}) answered in {elapsed:.2f}s ({len(content)} chars)")
+                    return content
                 except Exception as sdk_err:
                     # Try direct HTTP fallback
                     content = await self._direct_http_chat(model=model_name, messages=messages, temperature=0.4)
                     self.model = model_name
+                    elapsed = time.time() - t0
+                    logger.info(f"✨ [AI SUCCESS] Groq ({model_name} HTTP fallback) answered in {elapsed:.2f}s ({len(content)} chars)")
                     return content
             except Exception as e:
                 last_error = e
-                logger.warning(f"Groq generation failed with model {model_name}: {e}. Trying fallback...")
+                logger.warning(f"🔄 [AI FALLBACK] Model {model_name} failed: {e}. Trying fallback...")
                 continue
 
-        logger.error(f"Groq API error across all models: {str(last_error)}")
+        logger.error(f"❌ [AI ERROR] Groq API error across all models: {str(last_error)}")
         raise AIProviderException(f"Groq generation error: {str(last_error)}")
 
     async def generate_chat(
@@ -108,6 +117,9 @@ class GroqProvider(BaseLLMProvider):
 
         last_error = None
         for model_name in self._get_candidate_models():
+            import time
+            t0 = time.time()
+            logger.info(f"🤖 [AI CHAT] Groq ({model_name}) | Processing multi-turn chat ({len(messages)} messages)...")
             try:
                 try:
                     from groq import Groq
@@ -118,17 +130,22 @@ class GroqProvider(BaseLLMProvider):
                         temperature=0.5
                     )
                     self.model = model_name
-                    return completion.choices[0].message.content or ""
+                    content = completion.choices[0].message.content or ""
+                    elapsed = time.time() - t0
+                    logger.info(f"✨ [AI SUCCESS] Groq chat answered in {elapsed:.2f}s ({len(content)} chars)")
+                    return content
                 except Exception as sdk_err:
                     content = await self._direct_http_chat(model=model_name, messages=formatted_messages, temperature=0.5)
                     self.model = model_name
+                    elapsed = time.time() - t0
+                    logger.info(f"✨ [AI SUCCESS] Groq chat (fallback) answered in {elapsed:.2f}s")
                     return content
             except Exception as e:
                 last_error = e
-                logger.warning(f"Groq chat failed with model {model_name}: {e}. Trying fallback...")
+                logger.warning(f"🔄 [AI FALLBACK] Groq chat failed with model {model_name}: {e}. Trying fallback...")
                 continue
 
-        logger.error(f"Groq chat error across all models: {str(last_error)}")
+        logger.error(f"❌ [AI ERROR] Groq chat error across all models: {str(last_error)}")
         raise AIProviderException(f"Groq chat error: {str(last_error)}")
 
     async def generate_structured(
@@ -155,7 +172,11 @@ class GroqProvider(BaseLLMProvider):
         ]
 
         last_error = None
+        prompt_snippet = prompt.replace("\n", " ").strip()[:90]
         for model_name in self._get_candidate_models():
+            import time
+            t0 = time.time()
+            logger.info(f"🤖 [AI STRUCTURED] Groq ({model_name}) | Schema: {output_schema.__name__} | Task: {prompt_snippet}...")
             try:
                 raw_text = ""
                 try:
@@ -198,11 +219,14 @@ class GroqProvider(BaseLLMProvider):
 
                 parsed_json = json.loads(clean_text)
                 self.model = model_name
-                return output_schema.model_validate(parsed_json)
+                result_obj = output_schema.model_validate(parsed_json)
+                elapsed = time.time() - t0
+                logger.info(f"✨ [AI SUCCESS] Groq generated valid {output_schema.__name__} in {elapsed:.2f}s")
+                return result_obj
             except Exception as e:
                 last_error = e
-                logger.warning(f"Groq structured generation failed with model {model_name}: {e}. Trying fallback...")
+                logger.warning(f"🔄 [AI FALLBACK] Groq structured generation failed with model {model_name}: {e}. Trying fallback...")
                 continue
 
-        logger.error(f"Groq structured generation error across all models: {str(last_error)}")
+        logger.error(f"❌ [AI ERROR] Groq structured generation error across all models: {str(last_error)}")
         raise AIProviderException(f"Groq structured response failed: {str(last_error)}")

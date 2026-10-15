@@ -13,6 +13,7 @@ import {
   clearAuthToken,
   notifyLoginEvent,
 } from '@/lib/api-client';
+import { terminalLogger } from '@/lib/terminal-logger';
 
 interface AuthContextType {
   user: UserAuthData | null;
@@ -20,12 +21,15 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   hasCompletedAssessment: boolean;
+  hasUploadedResume: boolean;
+  isAnalyzed: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, fullName?: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
   demoLogin: () => Promise<void>;
   logout: () => Promise<void>;
   markAssessmentCompleted: () => void;
+  markResumeAnalyzed: () => void;
   refreshUser: () => Promise<UserAuthData | undefined>;
 }
 
@@ -56,6 +60,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const parsed = JSON.parse(cachedUserStr);
             if (parsed && parsed.email && parsed.email !== 'user@aicareercoach.ai') {
               setUser(parsed);
+              terminalLogger.auth(`Session restored: ${parsed.email}`);
             } else {
               localStorage.removeItem('auth_user');
             }
@@ -124,6 +129,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       saveAuthToken(activeToken);
       setToken(activeToken);
       setUser(res.user);
+      terminalLogger.auth(`User logged in successfully: ${res.user.email}`);
 
       // Trigger background login success notification
       notifyLoginEvent();
@@ -165,6 +171,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       saveAuthToken(activeToken);
       setToken(activeToken);
       setUser(res.user);
+      terminalLogger.auth(`New user registered successfully: ${res.user.email}`);
       router.push('/assessment');
     } finally {
       setIsLoading(false);
@@ -188,6 +195,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Save Firebase token and use it as the auth bearer
       saveAuthToken(idToken);
       setToken(idToken);
+      terminalLogger.auth(`Google sign-in successful: ${cred.user.email}`);
 
       // Trigger background login success notification email
       notifyLoginEvent();
@@ -241,6 +249,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           saveAuthToken(res.access_token);
           setToken(res.access_token);
           setUser(res.user);
+          terminalLogger.auth(`Fallback Demo Access activated: ${res.user.email}`);
           if (res.user.has_completed_assessment) {
             router.push('/dashboard');
           } else {
@@ -277,6 +286,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const res = await demoLoginUser();
       setToken(res.access_token);
       setUser(res.user);
+      terminalLogger.auth(`Quick Demo Access signed in: ${res.user.email}`);
       if (res.user.has_completed_assessment) {
         router.push('/dashboard');
       } else {
@@ -288,6 +298,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = async () => {
+    terminalLogger.auth('User logging out');
     // Try Firebase sign-out if it was used (non-critical)
     try {
       const { auth } = await import('@/lib/firebase');
@@ -306,10 +317,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     router.push('/login');
   };
 
+  const isAnalyzed = Boolean(
+    user?.is_analyzed ||
+    user?.has_completed_assessment ||
+    user?.has_uploaded_resume
+  );
+
   const markAssessmentCompleted = () => {
     setUser((prev) => {
       if (!prev) return prev;
-      const updated = { ...prev, has_completed_assessment: true };
+      const updated = {
+        ...prev,
+        has_completed_assessment: true,
+        is_analyzed: true,
+      };
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('auth_user', JSON.stringify(updated));
+      }
+      return updated;
+    });
+  };
+
+  const markResumeAnalyzed = () => {
+    setUser((prev) => {
+      if (!prev) return prev;
+      const updated = {
+        ...prev,
+        has_uploaded_resume: true,
+        has_completed_assessment: true,
+        is_analyzed: true,
+      };
       if (typeof window !== 'undefined') {
         localStorage.setItem('auth_user', JSON.stringify(updated));
       }
@@ -337,13 +374,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         token,
         isAuthenticated: !!user,
         isLoading,
-        hasCompletedAssessment: !!user?.has_completed_assessment,
+        hasCompletedAssessment: isAnalyzed,
+        hasUploadedResume: !!user?.has_uploaded_resume,
+        isAnalyzed,
         login,
         register,
         loginWithGoogle,
         demoLogin,
         logout,
         markAssessmentCompleted,
+        markResumeAnalyzed,
         refreshUser,
       }}
     >

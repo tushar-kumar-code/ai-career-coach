@@ -98,7 +98,7 @@ interface SidebarProps {
 
 export default function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
   const pathname = usePathname();
-  const { user, logout, hasCompletedAssessment } = useAuth();
+  const { user, logout, hasCompletedAssessment, isAnalyzed } = useAuth();
   const { t } = useLanguage();
 
   // Close mobile drawer on Escape key press
@@ -135,14 +135,15 @@ export default function Sidebar({ isMobileOpen = false, onClose }: SidebarProps)
     ? user.email[0].toUpperCase()
     : 'CC';
 
-  const visibleGroups = hasCompletedAssessment
+  const visibleGroups = isAnalyzed
     ? NAV_GROUPS
     : [
         {
-          group: 'foundation',
-          title: 'Career Foundation (Required)',
+          group: 'onboarding',
+          title: 'Career Profile Analysis (Required)',
           items: [
-            { key: 'assessment', label: 'Discovery Assessment', href: '/assessment', icon: Compass, step: '1' },
+            { key: 'resume', label: 'Upload Resume (Instant AI Analysis)', href: '/resume', icon: FileText, step: 'Option 1' },
+            { key: 'assessment', label: 'Discovery Assessment', href: '/assessment', icon: Compass, step: 'Option 2' },
           ]
         }
       ];
