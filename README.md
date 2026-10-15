@@ -8,6 +8,13 @@
 
 <br/>
 
+[![Current Project](https://img.shields.io/badge/🚀_Current_Project-Access_Application-blue?style=for-the-badge&logo=github)](https://github.com/tushar-kumar-code/ai-career-coach)
+[![Run Application](https://img.shields.io/badge/⚡_Run_in_Browser-GitHub_Codespaces-success?style=for-the-badge&logo=github)](https://github.com/codespaces/new?hide_repo_select=true&ref=main&repo=tushar-kumar-code%2Fai-career-coach)
+[![Latest Push](https://img.shields.io/badge/🔄_Latest_Pushed_Version-main_branch-orange?style=for-the-badge&logo=git)](https://github.com/tushar-kumar-code/ai-career-coach/commits/main)
+
+<br/>
+<br/>
+
 ![Next.js](https://img.shields.io/badge/Next.js-14-black?style=for-the-badge&logo=next.js)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.5-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white)
@@ -32,14 +39,23 @@ The platform integrates 13 connected modules — from career discovery and resum
 
 ## 🔗 Quick Access
 
+> ### 🚀 [👉 Click Here to Access Current Project Application (Latest Pushed Version)](https://github.com/tushar-kumar-code/ai-career-coach)
+>
+> 📌 **Instant Access Links for [@tushar-kumar-code](https://github.com/tushar-kumar-code):**
+> - 📦 **Current Pushed Project Repository:** [https://github.com/tushar-kumar-code/ai-career-coach](https://github.com/tushar-kumar-code/ai-career-coach)
+> - ⚡ **Run Current Application in Browser (1-Click Cloud):** [Open in GitHub Codespaces](https://github.com/codespaces/new?hide_repo_select=true&ref=main&repo=tushar-kumar-code%2Fai-career-coach)
+> - 🔄 **Latest Pushed Commits & Updates:** [View Recent Pushes & Commits](https://github.com/tushar-kumar-code/ai-career-coach/commits/main)
+> - 💻 **Local Running Application:** [http://localhost:3000](http://localhost:3000)
+
 | Resource | Access Link | Description |
 |---|---|---|
-| 📦 **Current Updated Project (GitHub `main`)** | [https://github.com/tushar-kumar-code/ai-career-coach/tree/main](https://github.com/tushar-kumar-code/ai-career-coach/tree/main) | Latest pushed source code & files |
-| 🔄 **Latest Updates & Commits History** | [https://github.com/tushar-kumar-code/ai-career-coach/commits/main](https://github.com/tushar-kumar-code/ai-career-coach/commits/main) | Real-time version updates & push history |
-| 🌐 **Live Web Application (Cloud Demo)** | [https://ai-career-coach-frontend-live.onrender.com](https://ai-career-coach-frontend-live.onrender.com) | Current live deployed web application |
-| 💻 **Local Live Instance** | [http://localhost:3000](http://localhost:3000) | Instant real-time local version |
+| 🚀 **Current Project Application (Latest Push)** | [https://github.com/tushar-kumar-code/ai-career-coach](https://github.com/tushar-kumar-code/ai-career-coach) | Direct access to current pushed application repository |
+| ⚡ **Run Live in Browser (Codespaces)** | [Open in GitHub Codespaces](https://github.com/codespaces/new?hide_repo_select=true&ref=main&repo=tushar-kumar-code%2Fai-career-coach) | 1-Click cloud execution of application directly in browser |
+| 🔄 **Latest Updates & Commits History** | [https://github.com/tushar-kumar-code/ai-career-coach/commits/main](https://github.com/tushar-kumar-code/ai-career-coach/commits/main) | Real-time version history & current commit updates |
+| 💻 **Local Live Instance** | [http://localhost:3000](http://localhost:3000) | Instant real-time local version on your machine |
+| 🌐 **Cloud Deployment Guide** | [RENDER_DEPLOYMENT.md](./RENDER_DEPLOYMENT.md) | Guide to deploy live on Render free tier |
 
-> 💡 **Current Version Note**: Pushing updates to the `main` branch immediately updates the repository files at **[Current Updated Project](https://github.com/tushar-kumar-code/ai-career-coach/tree/main)** and triggers automated deployment to the live cloud demo.
+> 💡 **Current Version Note**: Har baar jab aap changes push karte hain (`git push origin main`), GitHub repository [tushar-kumar-code/ai-career-coach](https://github.com/tushar-kumar-code/ai-career-coach) turant update ho jati hai. Aap directly upar diye gaye links se current version access kar sakte hain ya GitHub Codespaces me 1-click se online run kar sakte hain.
 
 ---
 
