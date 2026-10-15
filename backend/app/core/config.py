@@ -9,6 +9,18 @@ class Settings(BaseSettings):
     DEBUG: bool = True
     ENVIRONMENT: str = "development"
 
+    @field_validator("DEBUG", mode="before")
+    def validate_debug(cls, v: Any) -> bool:
+        if isinstance(v, bool):
+            return v
+        if isinstance(v, str):
+            val = v.strip().lower()
+            if val in ("true", "1", "t", "yes", "y", "on"):
+                return True
+            if val in ("false", "0", "f", "no", "n", "off"):
+                return False
+        return False
+
     # CORS origins
     BACKEND_CORS_ORIGINS: Union[List[str], str] = [
         "http://localhost:3000",
