@@ -14,9 +14,7 @@ The platform integrates 13 connected modules — from career discovery and resum
 
 ## 🔗 Quick Access
 
-> ### 🚀 [👉 Click Here to Open AI Career Coach (Local Live Application)](http://localhost:3000)
->
-> 🌐 **Cloud Live Web App:** 
+🌐 **Cloud Live Web App:**[http://localhost:3000](http://localhost:3000/)
 
 | Service                                                   | Access Link                                                                                                             | Description                                                         |
 | --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
