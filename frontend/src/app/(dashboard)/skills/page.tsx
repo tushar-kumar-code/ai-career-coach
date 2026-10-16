@@ -328,6 +328,14 @@ export default function SkillsPage() {
                 skillName={gap.skill_name}
                 priority={gap.priority}
                 variant="row"
+                onAdded={(name, msg) => {
+                  setFocusFeedback({
+                    skill: name,
+                    msg: msg,
+                    status: 'added'
+                  });
+                  setTimeout(() => setFocusFeedback(null), 6000);
+                }}
               />
             ))}
           </div>

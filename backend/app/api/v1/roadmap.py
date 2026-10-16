@@ -828,6 +828,34 @@ async def focus_skill(
     res = await db.execute(stmt)
     roadmap = res.scalars().first()
 
+    # If not found in SQLite, check Firestore first
+    if not roadmap:
+        try:
+            fs_roadmap = await RoadmapRepository.get_active_roadmap(user_id)
+            if fs_roadmap and fs_roadmap.get("phases"):
+                roadmap = Roadmap(
+                    user_id=user_id,
+                    target_role=fs_roadmap.get("target_role", "Software Developer"),
+                    user_level=fs_roadmap.get("user_level", "Beginner"),
+                    overall_progress_percent=fs_roadmap.get("overall_progress_percent", 0),
+                    is_active=True,
+                    is_outdated=False,
+                    hours_per_day=fs_roadmap.get("hours_per_day", 1),
+                    days_per_week=fs_roadmap.get("days_per_week", 5),
+                    preferred_learning_style=fs_roadmap.get("preferred_learning_style", "Hands-on"),
+                    total_estimated_weeks=fs_roadmap.get("total_estimated_weeks", 12),
+                    phases=fs_roadmap.get("phases", []),
+                    completed_task_ids=fs_roadmap.get("completed_task_ids", []),
+                    completed_milestone_ids=fs_roadmap.get("completed_milestone_ids", []),
+                    completed_project_ids=fs_roadmap.get("completed_project_ids", [])
+                )
+                db.add(roadmap)
+                await db.commit()
+                await db.refresh(roadmap)
+        except Exception as e:
+            logger.warning(f"Notice while restoring Firestore roadmap in focus_skill: {e}")
+
+    # If still not found, generate a fresh roadmap
     if not roadmap:
         u_skills = await ingestion_engine.ingest_user_skills(db, user_id)
         target_career, _, _, missing_gaps, _ = await gap_engine.calculate_skill_gaps(db, user_id, u_skills)
@@ -840,22 +868,27 @@ async def focus_skill(
         )
 
     phases = copy.deepcopy(roadmap.phases or [])
-    
-    # 1. Check if an incomplete task already exists matching this skill
-    found_task = None
-    target_phase_idx = 0
+    if not phases:
+        phases.append({
+            "id": "phase-1",
+            "phase_number": 1,
+            "title": f"Phase 1: Core {skill_clean} & Foundations",
+            "type": "Foundation",
+            "skills": [skill_clean],
+            "learning_objectives": [f"Master {skill_clean} basics and application"],
+            "progress_percent": 0,
+            "tasks": []
+        })
+
+    # Find first active incomplete phase (so the task is immediately actionable)
+    active_phase_idx = 0
     for p_idx, phase in enumerate(phases):
-        for task in phase.get("tasks", []):
-            task_skill = task.get("skill") or task.get("title", "")
-            if (skill_clean.lower() in task_skill.lower() or 
-                skill_clean.lower() in task.get("title", "").lower()):
-                found_task = task
-                target_phase_idx = p_idx
-                break
-        if found_task:
+        p_tasks = phase.get("tasks", [])
+        if any(not t.get("is_completed") for t in p_tasks):
+            active_phase_idx = p_idx
             break
 
-    # Check today's current focus
+    # Check if this skill is already top of today's focus
     focus_dict = roadmap_engine.get_today_focus_tasks(roadmap)
     today_tasks = focus_dict.get("today_tasks", [])
     if today_tasks:
@@ -874,60 +907,99 @@ async def focus_skill(
                 )
             )
 
+    found_task = None
+    existing_phase_idx = -1
+    for p_idx, phase in enumerate(phases):
+        for task in phase.get("tasks", []):
+            task_skill = task.get("skill") or task.get("title", "")
+            if (skill_clean.lower() in task_skill.lower() or 
+                skill_clean.lower() in task.get("title", "").lower()):
+                found_task = task
+                existing_phase_idx = p_idx
+                break
+        if found_task:
+            break
+
     if found_task:
-        # Prioritize this task by moving it to the top of its phase's tasks
-        phase_tasks = phases[target_phase_idx].get("tasks", [])
-        phase_tasks = [t for t in phase_tasks if t.get("id") != found_task.get("id")]
-        phase_tasks.insert(0, found_task)
-        phases[target_phase_idx]["tasks"] = phase_tasks
+        # Remove from old position
+        if existing_phase_idx >= 0:
+            phases[existing_phase_idx]["tasks"] = [
+                t for t in phases[existing_phase_idx].get("tasks", [])
+                if t.get("id") != found_task.get("id")
+            ]
+        # Ensure task is marked uncompleted and prioritized in the active phase
+        found_task["is_completed"] = False
+        found_task["completed_at"] = None
+        found_task["is_priority"] = True
+        found_task["priority_reason"] = f"Focused skill gap: {skill_clean}"
+        found_task["skill"] = skill_clean
+        if not found_task.get("topics_to_learn"):
+            found_task["topics_to_learn"] = [
+                f"{skill_clean} Core Syntax & Semantics",
+                f"{skill_clean} Common Algorithms & Patterns",
+                f"{skill_clean} Practice Project Implementation"
+            ]
+        phases[active_phase_idx].setdefault("tasks", []).insert(0, found_task)
+        phase_skills = phases[active_phase_idx].setdefault("skills", [])
+        if skill_clean not in phase_skills:
+            phase_skills.append(skill_clean)
+
         status_msg = "prioritized"
-        user_msg = f"Task for '{skill_clean}' prioritized in your active roadmap"
+        user_msg = f"Task for '{skill_clean}' prioritized in Level {active_phase_idx + 1} and Today's Focus!"
     else:
-        # Create a new focused task in the first phase
+        # Create a new rich focused task directly in the active phase
         new_task_id = f"task_focus_{uuid.uuid4().hex[:8]}"
+        target_role_str = roadmap.target_role or "Software Developer"
         found_task = {
             "id": new_task_id,
             "title": f"Master {skill_clean} Fundamentals & Core Implementation",
-            "description": f"Focused practice and mastery of {skill_clean}.",
-            "estimated_minutes": 30,
+            "description": f"Hands-on study and practical implementation of {skill_clean} for {target_role_str}.",
+            "estimated_minutes": 35,
             "task_type": "Practice",
-            "why_it_matters": f"Essential skill gap for {roadmap.target_role}.",
+            "skill": skill_clean,
+            "why_it_matters": f"Identified as a critical skill gap for {target_role_str} placement readiness.",
             "is_completed": False,
             "completed_at": None,
-            "concept_explanation": f"Core principles and application of {skill_clean}.",
-            "practice_exercise": f"Implement a working component demonstrating {skill_clean}.",
-            "check_quiz_question": f"How is {skill_clean} utilized in {roadmap.target_role}?",
-            "check_quiz_options": [
-                f"A) Core technical requirement for {roadmap.target_role}",
-                f"B) Optional hobby knowledge",
-                f"C) Not relevant"
+            "topics_to_learn": [
+                f"{skill_clean} Core Fundamentals",
+                f"{skill_clean} Problem Solving & Best Practices",
+                f"{skill_clean} Applied Project Exercise"
             ],
-            "check_quiz_answer": f"A) Core technical requirement for {roadmap.target_role}",
+            "learning_focus": f"Prioritize core syntax, idiomatic patterns, and hands-on coding with {skill_clean}.",
+            "practice_goal": f"Build a tested module demonstrating {skill_clean} concepts.",
+            "difficulty_level": "Intermediate",
+            "concept_explanation": f"Core principles, idioms, and industry standards for using {skill_clean} in {target_role_str} roles.",
+            "practice_exercise": f"Write a clean, functional implementation utilizing {skill_clean}.",
+            "check_quiz_question": f"What is the primary value of {skill_clean} in {target_role_str} workflows?",
+            "check_quiz_options": [
+                f"A) Core technical competency directly assessed in interviews",
+                f"B) Optional hobby concept not tested by recruiters",
+                f"C) Replaced by legacy utilities"
+            ],
+            "check_quiz_answer": f"A) Core technical competency directly assessed in interviews",
             "is_priority": True,
-            "priority_reason": f"Manually prioritized focus skill: {skill_clean}"
+            "priority_reason": f"Added from Missing Target Career Skills: {skill_clean}"
         }
-        if phases:
-            if "tasks" not in phases[0]:
-                phases[0]["tasks"] = []
-            phases[0]["tasks"].insert(0, found_task)
-        else:
-            phases.append({
-                "id": "phase-1",
-                "phase_number": 1,
-                "title": f"Phase 1: Core {skill_clean} Foundations",
-                "type": "Foundation",
-                "skills": [skill_clean],
-                "learning_objectives": [f"Learn {skill_clean}"],
-                "progress_percent": 0,
-                "tasks": [found_task]
-            })
+
+        phases[active_phase_idx].setdefault("tasks", []).insert(0, found_task)
+        phase_skills = phases[active_phase_idx].setdefault("skills", [])
+        if skill_clean not in phase_skills:
+            phase_skills.append(skill_clean)
+
         status_msg = "added"
-        user_msg = f"New focus task for '{skill_clean}' added to Today's Focus"
+        user_msg = f"'{skill_clean}' added to Level {active_phase_idx + 1} and Today's Focus!"
 
     roadmap.phases = phases
     flag_modified(roadmap, "phases")
     await db.commit()
     await db.refresh(roadmap)
+
+    # Sync to Firestore if configured
+    serialized = _serialize_roadmap(roadmap)
+    try:
+        await RoadmapRepository.save_roadmap(user_id, roadmap.id, serialized.model_dump())
+    except Exception as e:
+        logger.warning(f"Firestore update roadmap notice: {e}")
 
     task_schema = RoadmapTaskSchema(**found_task)
     return APIResponse(
