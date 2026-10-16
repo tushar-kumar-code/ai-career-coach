@@ -134,7 +134,7 @@ git add .
 Commit ke sath ek chhota message likhein ki aapne kya kaam kiya hai:
 
 ```powershell
-git commit -m "your commit message yahan likhein"
+git commit -m "updated readme quick access link"
 ```
 
 *(Udaharan: `git commit -m "updated UI and fixed mobile login"`)*
