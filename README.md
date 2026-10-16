@@ -4,6 +4,7 @@
 
 ### Your Personal AI-Powered Career & Placement Companion
 
+[![Mobile Login](https://img.shields.io/badge/📱_Mobile_Login-Wi--Fi-orange?style=for-the-badge)](http://10.78.38.113:3000/login)
 [![Open Login Page](https://img.shields.io/badge/🔐_Open_Login_Page-Local_App-blue?style=for-the-badge)](http://localhost:3000/login)
 [![Cloud Login Page](https://img.shields.io/badge/🌐_Open_Login_Page-Cloud_Demo-success?style=for-the-badge)](https://ai-career-coach-frontend.onrender.com/login)
 
@@ -28,7 +29,8 @@ The platform integrates 13 connected modules — from career discovery and resum
 
 | Service | Access Link | Description |
 |---|---|---|
-| 🔐 **Direct Login Page (Local)** | [http://localhost:3000/login](http://localhost:3000/login) | Click to open Project Login Page directly on your computer |
+| 📱 **Mobile Login (Same Wi-Fi)** | [http://10.78.38.113:3000/login](http://10.78.38.113:3000/login) | Mobile me open karne ke liye (jab phone aur laptop same Wi-Fi pe hon) |
+| 🔐 **Direct Login Page (PC)** | [http://localhost:3000/login](http://localhost:3000/login) | Click to open Project Login Page directly on your computer |
 | 🌐 **Live Login Page (Cloud)** | [https://ai-career-coach-frontend.onrender.com/login](https://ai-career-coach-frontend.onrender.com/login) | Click to open Project Login Page in browser (Cloud Demo) |
 | 💻 **Main Home Page** | [http://localhost:3000](http://localhost:3000) | Landing page & Overview |
 | ⚡ **Live API & Backend (Health)** | [http://127.0.0.1:8000/api/v1/health](http://127.0.0.1:8000/api/v1/health) | Local backend REST API service |
