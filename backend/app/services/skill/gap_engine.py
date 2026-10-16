@@ -72,11 +72,11 @@ class SkillGapEngine:
             req_level = rec_prof_map.get(sk_norm, rec_prof_map.get(sk_lower, "Intermediate"))
 
             # Determine gap status & priority based on level & confidence
-            if sk.proficiency_percent >= 75 and sk.confidence_score >= 60:
+            if (sk.proficiency_percent >= 60 and sk.confidence_score >= 40) or sk.confidence_status == "Verified" or (target_req == "Optional" and sk.proficiency_percent >= 50):
                 gap_status = "Matched"
                 priority = "Low"
-                p_reason = f"Strong proficiency ({sk.proficiency_level}) with {sk.confidence_status} system confidence."
-            elif sk.proficiency_percent >= 50:
+                p_reason = f"Matched prerequisite ({sk.proficiency_level}) with {sk.confidence_status} confidence."
+            elif sk.proficiency_percent >= 45:
                 gap_status = "Partially Matched"
                 priority = "High" if target_req == "Required" else ("Medium" if target_req == "Important" else "Low")
                 p_reason = f"Current level is {sk.proficiency_level}; target role '{target_title}' requires {req_level} proficiency."

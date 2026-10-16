@@ -57,14 +57,35 @@ export default function SkillsPage() {
 
 
   useEffect(() => {
+    // 1. Immediately restore cached profile if available to prevent blank/lost state on back navigation
+    if (typeof window !== 'undefined') {
+      const cached = localStorage.getItem('cached_skill_profile');
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          if (parsed && parsed.total_skills_count) {
+            setProfile(parsed);
+            setLoading(false);
+          }
+        } catch (e) {}
+      }
+    }
     loadProfile();
   }, []);
 
   const loadProfile = async () => {
-    setLoading(true);
+    // Only show full-screen loader if there is no profile yet
+    setProfile((prev) => {
+      if (!prev) setLoading(true);
+      return prev;
+    });
+
     try {
       const data = await getSkillProfile();
       setProfile(data);
+      if (typeof window !== 'undefined' && data) {
+        localStorage.setItem('cached_skill_profile', JSON.stringify(data));
+      }
     } catch (err) {
       console.error('Failed to load skill profile:', err);
     } finally {
@@ -77,6 +98,9 @@ export default function SkillsPage() {
     try {
       const updated = await recalculateSkills();
       setProfile(updated);
+      if (typeof window !== 'undefined' && updated) {
+        localStorage.setItem('cached_skill_profile', JSON.stringify(updated));
+      }
     } catch (err) {
       console.error('Recalculate error:', err);
     } finally {
