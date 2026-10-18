@@ -276,6 +276,16 @@ export interface BulletImprovement {
   explanation: string;
 }
 
+export interface ResumeDomainSuggestion {
+  domain_name: string;
+  match_percentage: number;
+  fit_reason: string;
+  matched_skills: string[];
+  recommended_roles: string[];
+  growth_areas: string[];
+  category?: string;
+}
+
 export interface ResumeAnalysisData {
   id: string;
   filename: string;
@@ -297,6 +307,7 @@ export interface ResumeAnalysisData {
   publications?: ResumePublicationItem[];
   languages?: ResumeLanguageItem[];
   extracurriculars?: ResumeExtracurricularItem[];
+  suggested_domains?: ResumeDomainSuggestion[];
 }
 
 // ----------------------------------------------------

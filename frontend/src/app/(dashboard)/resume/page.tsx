@@ -28,6 +28,7 @@ import { uploadResumeFile, getResumeAnalysis, matchJobDescription } from '@/lib/
 import { ResumeAnalysisData, ScoringFactorItem, EligibilityItem } from '@/lib/types';
 import SkillActionBadge from '@/components/common/SkillActionBadge';
 import CandidateProfileCard from '@/components/resume/CandidateProfileCard';
+import ResumeDomainSuggestions from '@/components/resume/ResumeDomainSuggestions';
 
 export default function ResumePage() {
   const { user, isLoading: authLoading, markResumeAnalyzed, refreshUser } = useAuth();
@@ -409,6 +410,9 @@ export default function ResumePage() {
             </div>
             <CandidateProfileCard resumeData={analysis} />
           </section>
+
+          {/* AI Career Domain Suggestions */}
+          <ResumeDomainSuggestions resumeData={analysis} />
 
           {/* Top Metric Cards Row */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

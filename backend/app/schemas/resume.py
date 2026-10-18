@@ -171,6 +171,16 @@ class BulletImprovementSchema(BaseModel):
     explanation: str
 
 
+class ResumeDomainSuggestion(BaseModel):
+    domain_name: str
+    match_percentage: int = Field(ge=0, le=100)
+    fit_reason: str
+    matched_skills: List[str] = Field(default_factory=list)
+    recommended_roles: List[str] = Field(default_factory=list)
+    growth_areas: List[str] = Field(default_factory=list)
+    category: str = "Technology"
+
+
 class JobDescriptionMatchRequest(BaseModel):
     job_description: str = Field(..., min_length=20, max_length=15000, description="Pasted job description text")
 
@@ -201,3 +211,5 @@ class ResumeAnalysisResponse(BaseModel):
     scoring_mode: str = "general"  # target_role | job_description | general
     job_description_snippet: Optional[str] = None
     recommended_career_paths: List[str] = Field(default_factory=list)
+    suggested_domains: List[ResumeDomainSuggestion] = Field(default_factory=list)
+

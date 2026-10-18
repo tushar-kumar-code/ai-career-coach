@@ -87,6 +87,7 @@ async def upload_resume(
     ats_breakdown_dict["publications"] = pub_list
     ats_breakdown_dict["languages"] = lang_list
     ats_breakdown_dict["extracurriculars"] = extra_list
+    ats_breakdown_dict["suggested_domains"] = [d.model_dump() for d in analysis.suggested_domains]
 
     resume = Resume(
         id=resume_id,
@@ -130,6 +131,7 @@ async def upload_resume(
         "publications": pub_list,
         "languages": lang_list,
         "extracurriculars": extra_list,
+        "suggested_domains": [d.model_dump() for d in analysis.suggested_domains],
         "ats_score": analysis.ats_score,
         "filename": filename,
         "resume_id": resume_id
@@ -148,6 +150,7 @@ async def upload_resume(
             "keyword_score": analysis.ats_breakdown.keyword_score,
             "skills_score": analysis.ats_breakdown.skills_score,
             "experience_score": analysis.ats_breakdown.experience_score,
+            "suggested_domains": [d.model_dump() for d in analysis.suggested_domains],
             "readability_score": analysis.ats_breakdown.readability_score,
             "target_career_name": analysis.target_match.target_career_name,
             "target_match_percentage": analysis.target_match.match_percentage,
@@ -416,6 +419,17 @@ async def get_resume_analysis(
                 "preferred_skills_missing": (fs_resume.get("ats_breakdown_json") or {}).get("preferred_skills_missing", [])
             }
 
+            suggested_domains_raw = fs_resume.get("suggested_domains") or (fs_resume.get("ats_breakdown_json") or {}).get("suggested_domains")
+            if not suggested_domains_raw:
+                suggested_domains_raw = [
+                    d.model_dump() for d in resume_ai_service.generate_domain_suggestions(
+                        extracted_skills=fs_resume.get("parsed_skills") or [],
+                        projects=fs_resume.get("parsed_projects") or [],
+                        experience=fs_resume.get("parsed_experience") or [],
+                        education=fs_resume.get("parsed_education") or []
+                    )
+                ]
+
             analysis_response = ResumeAnalysisResponse(
                 id=fs_resume.get("id"),
                 filename=fs_resume.get("filename"),
@@ -436,7 +450,8 @@ async def get_resume_analysis(
                 achievements=fs_resume.get("parsed_achievements") or [],
                 publications=fs_resume.get("parsed_publications") or [],
                 languages=fs_resume.get("parsed_languages") or [],
-                extracurriculars=fs_resume.get("parsed_extracurriculars") or []
+                extracurriculars=fs_resume.get("parsed_extracurriculars") or [],
+                suggested_domains=suggested_domains_raw
             )
             return APIResponse(
                 success=True,
@@ -489,6 +504,17 @@ async def get_resume_analysis(
         "preferred_skills_missing": (resume.ats_breakdown_json or {}).get("preferred_skills_missing", [])
     }
 
+    suggested_domains_sql = (resume.ats_breakdown_json or {}).get("suggested_domains")
+    if not suggested_domains_sql:
+        suggested_domains_sql = [
+            d.model_dump() for d in resume_ai_service.generate_domain_suggestions(
+                extracted_skills=resume.parsed_skills or [],
+                projects=projects,
+                experience=resume.parsed_experience or [],
+                education=resume.parsed_education or []
+            )
+        ]
+
     analysis_response = ResumeAnalysisResponse(
         id=resume.id,
         filename=resume.filename,
@@ -509,7 +535,8 @@ async def get_resume_analysis(
         achievements=achievements,
         publications=publications,
         languages=languages,
-        extracurriculars=extracurriculars
+        extracurriculars=extracurriculars,
+        suggested_domains=suggested_domains_sql
     )
 
     return APIResponse(
@@ -663,7 +690,15 @@ async def match_job_description(
         achievements=achievements,
         publications=publications,
         languages=languages,
-        extracurriculars=extracurriculars
+        extracurriculars=extracurriculars,
+        suggested_domains=[
+            d.model_dump() for d in resume_ai_service.generate_domain_suggestions(
+                extracted_skills=raw_skills,
+                projects=projects,
+                experience=experience,
+                education=education
+            )
+        ]
     )
 
     return APIResponse(

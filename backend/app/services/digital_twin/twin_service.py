@@ -6,7 +6,7 @@ Handles upsert logic (once-per-day snapshot saving).
 """
 import logging
 import datetime
-from typing import Dict
+from typing import Dict, Optional, Any, List
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 

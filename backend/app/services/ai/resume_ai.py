@@ -31,7 +31,8 @@ from app.schemas.resume import (
     ResumeAchievementItem,
     ResumePublicationItem,
     ResumeLanguageItem,
-    ResumeExtracurricularItem
+    ResumeExtracurricularItem,
+    ResumeDomainSuggestion
 )
 
 logger = logging.getLogger(__name__)
@@ -492,6 +493,14 @@ class ResumeAIService:
         if contact.summary:
             contact.summary = self._clean_summary(contact.summary, contact)
 
+        # 9. Generate Intelligent Career Domain Suggestions based on parsed profile
+        domain_suggestions = self.generate_domain_suggestions(
+            extracted_skills=extracted_skills,
+            projects=extraction.projects,
+            experience=extraction.experience,
+            education=extraction.education
+        )
+
         return ResumeAnalysisResponse(
             id=resume_id,
             filename=filename,
@@ -512,7 +521,8 @@ class ResumeAIService:
             achievements=extraction.achievements,
             publications=extraction.publications,
             languages=extraction.languages,
-            extracurriculars=extraction.extracurriculars
+            extracurriculars=extraction.extracurriculars,
+            suggested_domains=domain_suggestions
         )
 
     @staticmethod
@@ -688,6 +698,300 @@ class ResumeAIService:
         extraction.projects = new_projects
         extraction.extracurriculars = new_extracurriculars
         return extraction
+
+    @classmethod
+    def generate_domain_suggestions(
+        cls,
+        extracted_skills: List[Any],
+        projects: List[Any],
+        experience: List[Any],
+        education: Optional[List[Any]] = None
+    ) -> List[ResumeDomainSuggestion]:
+        """
+        Analyzes candidate verified skills, project portfolio, and work experience
+        to produce personalized, deterministic career domain suggestions with fit rationale,
+        supporting skills, and high-leverage growth areas.
+        """
+        skill_names = set()
+        for sk in (extracted_skills or []):
+            if isinstance(sk, str):
+                skill_names.add(sk.strip().lower())
+            elif isinstance(sk, dict) and sk.get("name"):
+                skill_names.add(sk["name"].strip().lower())
+            elif hasattr(sk, "name") and sk.name:
+                skill_names.add(sk.name.strip().lower())
+
+        projects_text = ""
+        project_titles = []
+        for p in (projects or []):
+            p_dict = p if isinstance(p, dict) else (p.model_dump() if hasattr(p, "model_dump") else {})
+            title = p_dict.get("title", "")
+            if title:
+                project_titles.append(title)
+            desc = p_dict.get("description", "")
+            techs = " ".join(p_dict.get("technologies", []))
+            projects_text += f" {title} {desc} {techs}"
+
+        exp_text = ""
+        exp_roles = []
+        for e in (experience or []):
+            e_dict = e if isinstance(e, dict) else (e.model_dump() if hasattr(e, "model_dump") else {})
+            role = e_dict.get("role", "")
+            if role:
+                exp_roles.append(role)
+            company = e_dict.get("company", "")
+            desc = e_dict.get("description", "")
+            achievements = " ".join(e_dict.get("key_achievements", []))
+            exp_text += f" {role} {company} {desc} {achievements}"
+
+        full_corpus = f"{projects_text} {exp_text}".lower()
+
+        def has_competency(comp: str) -> bool:
+            comp_clean = comp.lower().strip()
+            if comp_clean in skill_names:
+                return True
+            for sk in skill_names:
+                if comp_clean == sk or f" {comp_clean} " in f" {sk} ":
+                    return True
+            pattern = r'\b' + re.escape(comp_clean) + r'\b'
+            if re.search(pattern, full_corpus):
+                return True
+            return False
+
+        domain_definitions = [
+            {
+                "domain_name": "Artificial Intelligence & Machine Learning",
+                "core_skills": [
+                    "Python", "PyTorch", "TensorFlow", "TensorFlow Lite", "Keras",
+                    "Machine Learning", "Deep Learning", "LLMs", "LLaMA", "Groq",
+                    "RAG", "LangChain", "MediaPipe", "OpenCV", "Scikit-Learn",
+                    "Pandas", "NumPy", "ChromaDB", "Vector Databases", "NLP",
+                    "Computer Vision", "AI Inference"
+                ],
+                "recommended_roles": [
+                    "AI / Machine Learning Engineer",
+                    "LLM & Generative AI Developer",
+                    "Computer Vision / Edge AI Specialist",
+                    "Data Scientist"
+                ],
+                "growth_areas": [
+                    "LangChain & LlamaIndex Agentic Workflows",
+                    "Model Quantization (GGUF, TensorRT) for Edge Devices",
+                    "PEFT / LoRA Fine-Tuning Pipelines"
+                ],
+                "project_keywords": ["rag", "llm", "llama", "mediapipe", "tensorflow", "pytorch", "model", "avatar", "vision", "ai", "inference", "nlp"],
+                "exp_keywords": ["ai", "machine learning", "ml", "data science", "deep learning"]
+            },
+            {
+                "domain_name": "Backend & Cloud API Systems",
+                "core_skills": [
+                    "Python", "FastAPI", "Django", "Flask", "Java", "Node.js",
+                    "Express", "REST APIs", "GraphQL", "Microservices", "PostgreSQL",
+                    "MySQL", "MongoDB", "SQLite", "Redis", "Firebase", "SQL",
+                    "OOP", "Docker", "Git"
+                ],
+                "recommended_roles": [
+                    "Backend Systems Engineer",
+                    "API & Microservices Architect",
+                    "Cloud Services Backend Developer",
+                    "Python Systems Developer"
+                ],
+                "growth_areas": [
+                    "Distributed Message Streaming (Apache Kafka / RabbitMQ)",
+                    "High-Concurrency Caching with Redis Clusters",
+                    "Docker & Kubernetes Container Orchestration"
+                ],
+                "project_keywords": ["fastapi", "backend", "api", "database", "firebase", "sql", "pipeline", "microservice", "server"],
+                "exp_keywords": ["backend", "software developer", "software engineer", "developer", "api"]
+            },
+            {
+                "domain_name": "Mobile & Cross-Platform Development",
+                "core_skills": [
+                    "Flutter", "Dart", "Android", "Android SDK", "Java", "Kotlin",
+                    "Swift", "iOS", "React Native", "XML", "Mobile UI",
+                    "On-Device AI", "MediaPipe"
+                ],
+                "recommended_roles": [
+                    "Mobile Application Developer (Flutter / Android)",
+                    "Cross-Platform Systems Engineer",
+                    "On-Device Mobile AI Engineer"
+                ],
+                "growth_areas": [
+                    "Advanced State Management (Riverpod / BLoC Architecture)",
+                    "Declarative Android UI with Jetpack Compose",
+                    "Mobile CI/CD Pipeline Automation (Fastlane)"
+                ],
+                "project_keywords": ["flutter", "android", "mobile", "app", "mediapipe", "tflite", "sign language", "complaint"],
+                "exp_keywords": ["mobile", "android", "flutter"]
+            },
+            {
+                "domain_name": "Full-Stack & Web Engineering",
+                "core_skills": [
+                    "JavaScript", "TypeScript", "React", "Next.js", "Node.js",
+                    "HTML", "CSS", "Tailwind CSS", "REST APIs", "FastAPI",
+                    "Full Stack", "vis.js", "Git"
+                ],
+                "recommended_roles": [
+                    "Full Stack Web Developer",
+                    "Frontend Applications Engineer",
+                    "Interactive Systems Developer"
+                ],
+                "growth_areas": [
+                    "Next.js App Router, SSR & Server Actions",
+                    "Predictable State Management (Zustand / Redux Toolkit)",
+                    "End-to-End Automated Testing with Playwright"
+                ],
+                "project_keywords": ["fullstack", "full-stack", "web", "frontend", "react", "next.js", "vis.js"],
+                "exp_keywords": ["full stack", "fullstack", "web developer", "frontend"]
+            },
+            {
+                "domain_name": "Data Science & Analytics",
+                "core_skills": [
+                    "SQL", "Python", "Pandas", "NumPy", "Data Analysis",
+                    "Data Visualization", "Tableau", "PowerBI", "Scikit-Learn",
+                    "Statistics", "Data Preprocessing", "ETL"
+                ],
+                "recommended_roles": [
+                    "Data Scientist",
+                    "Data Analyst",
+                    "Business Intelligence Engineer"
+                ],
+                "growth_areas": [
+                    "Analytics Engineering with dbt (Data Build Tool)",
+                    "Advanced Statistical Hypothesis Testing & A/B Experimentation",
+                    "Cloud Warehousing with Snowflake / BigQuery"
+                ],
+                "project_keywords": ["data", "dataset", "analytics", "visualization", "preprocessing", "statistical"],
+                "exp_keywords": ["data", "analyst", "analytics", "scientist"]
+            },
+            {
+                "domain_name": "Cloud Infrastructure & DevOps",
+                "core_skills": [
+                    "AWS", "GCP", "Azure", "Docker", "Kubernetes", "Terraform",
+                    "CI/CD", "Linux", "Bash", "Git", "Nginx", "Firebase"
+                ],
+                "recommended_roles": [
+                    "Cloud Infrastructure Engineer",
+                    "DevOps & CI/CD Automation Specialist",
+                    "Site Reliability Engineer (SRE)"
+                ],
+                "growth_areas": [
+                    "Infrastructure as Code (IaC) with Terraform & Pulumi",
+                    "Production Kubernetes Deployment & Helm Charts",
+                    "Cloud Observability with Prometheus & Grafana"
+                ],
+                "project_keywords": ["cloud", "devops", "docker", "deploy", "pipeline", "ci/cd", "infrastructure"],
+                "exp_keywords": ["devops", "cloud", "infra", "sre"]
+            },
+            {
+                "domain_name": "Cybersecurity & Systems Defense",
+                "core_skills": [
+                    "Networking Protocols", "Linux", "Penetration Testing",
+                    "Vulnerability Testing", "Cryptography", "Wireshark", "OWASP",
+                    "Python", "Security"
+                ],
+                "recommended_roles": [
+                    "Cybersecurity Analyst",
+                    "Information Security Specialist",
+                    "Vulnerability Assessment Engineer"
+                ],
+                "growth_areas": [
+                    "CompTIA Security+ / CEH Practical Defense Skills",
+                    "Zero Trust Architecture & Identity Governance",
+                    "Automated Vulnerability Scanning (SAST / DAST)"
+                ],
+                "project_keywords": ["security", "cyber", "auth", "vulnerability", "encryption"],
+                "exp_keywords": ["security", "cyber"]
+            }
+        ]
+
+        suggestions: List[ResumeDomainSuggestion] = []
+
+        for dom in domain_definitions:
+            matched_skills = [sk for sk in dom["core_skills"] if has_competency(sk)]
+
+            matched_projects = []
+            for p in (projects or []):
+                p_dict = p if isinstance(p, dict) else (p.model_dump() if hasattr(p, "model_dump") else {})
+                p_str = f"{p_dict.get('title', '')} {p_dict.get('description', '')} {' '.join(p_dict.get('technologies', []))}".lower()
+                for kw in dom["project_keywords"]:
+                    if kw in p_str:
+                        p_title = p_dict.get("title", "")
+                        if p_title and p_title not in matched_projects:
+                            matched_projects.append(p_title)
+                        break
+
+            matched_exps = []
+            for e in (experience or []):
+                e_dict = e if isinstance(e, dict) else (e.model_dump() if hasattr(e, "model_dump") else {})
+                e_str = f"{e_dict.get('role', '')} {e_dict.get('description', '')}".lower()
+                for kw in dom["exp_keywords"]:
+                    if kw in e_str:
+                        role_name = e_dict.get("role", "")
+                        if role_name and role_name not in matched_exps:
+                            matched_exps.append(role_name)
+                        break
+
+            score = 0
+            if matched_skills:
+                score += min(60, int((len(matched_skills) / 5) * 55))
+
+            if matched_projects:
+                score += min(25, len(matched_projects) * 12)
+
+            if matched_exps:
+                score += min(15, len(matched_exps) * 8)
+
+            if score >= 65:
+                match_pct = min(96, score + 10)
+            elif score >= 40:
+                match_pct = min(80, score + 15)
+            elif score >= 20:
+                match_pct = min(68, score + 20)
+            elif matched_skills:
+                match_pct = 45
+            else:
+                match_pct = 20
+
+            if match_pct < 40 and not matched_projects:
+                continue
+
+            reasons = []
+            if matched_projects:
+                p_names = ", ".join(f"'{p}'" for p in matched_projects[:2])
+                reasons.append(f"Hands-on project proof: {p_names}")
+            if matched_exps:
+                e_names = ", ".join(f"'{e}'" for e in matched_exps[:2])
+                reasons.append(f"Practical role experience: {e_names}")
+            if matched_skills:
+                top_s = ", ".join(matched_skills[:4])
+                reasons.append(f"Demonstrated core skills: {top_s}")
+
+            fit_reason = ". ".join(reasons) + "." if reasons else "Applicable career domain based on candidate's technical profile."
+
+            suggestions.append(ResumeDomainSuggestion(
+                domain_name=dom["domain_name"],
+                match_percentage=match_pct,
+                fit_reason=fit_reason,
+                matched_skills=matched_skills[:8],
+                recommended_roles=dom["recommended_roles"],
+                growth_areas=dom["growth_areas"]
+            ))
+
+        suggestions.sort(key=lambda s: s.match_percentage, reverse=True)
+
+        if not suggestions:
+            suggestions.append(ResumeDomainSuggestion(
+                domain_name="Core Technology & Software Development",
+                match_percentage=75,
+                fit_reason="Strong foundational engineering skills applicable across modern software projects.",
+                matched_skills=[s for s in list(skill_names)[:5]],
+                recommended_roles=["Software Developer", "Junior Backend Developer", "Application Specialist"],
+                growth_areas=["Version Control & Git Best Practices", "Data Structures & Algorithms", "REST API Construction"]
+            ))
+
+        return suggestions[:4]
+
 
 
 

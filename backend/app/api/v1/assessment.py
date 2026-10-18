@@ -700,6 +700,33 @@ async def get_suggested_domains(
         except Exception as e:
             logger.warning(f"Re-synthesis in suggested-domains error: {e}")
 
+    # Fallback to resume-based domain synthesis if no assessment answers exist yet
+    if has_resume and not recommended_careers:
+        from app.services.ai.resume_ai import ResumeAIService
+        resume_domains = ResumeAIService.generate_domain_suggestions(
+            extracted_skills=resume_profile.get("skills") or [],
+            projects=resume_profile.get("projects") or [],
+            experience=resume_profile.get("experience") or [],
+            education=resume_profile.get("education") or []
+        )
+        for dom in resume_domains:
+            for role_title in dom.recommended_roles:
+                slug = role_title.lower().replace(" ", "-").replace("/", "-")
+                c_item = {
+                    "slug": slug,
+                    "title": role_title,
+                    "match_percentage": dom.match_percentage,
+                    "confidence_percentage": 90,
+                    "career_domain": dom.domain_name,
+                    "why_recommended": [dom.fit_reason],
+                    "supporting_strengths": dom.matched_skills[:4],
+                    "potential_challenges": ["Continuous technological updates"],
+                    "learning_gaps": dom.growth_areas[:2],
+                    "resume_match_reasons": dom.matched_skills[:4],
+                    "assessment_match_reasons": []
+                }
+                recommended_careers.append(c_item)
+
     # Group into structured Domain Clusters
     domains_map = {}
     for c in recommended_careers:

@@ -42,6 +42,11 @@ Python, JavaScript, TypeScript, React, FastAPI, PostgreSQL, Docker, Git
     assert data["data"]["ats_score"] >= 60
     assert data["data"]["contact_info"]["email"] == "jane.doe@example.com"
     assert "Python" in [s["name"] for s in data["data"]["extracted_skills"]]
+    assert "suggested_domains" in data["data"]
+    assert len(data["data"]["suggested_domains"]) >= 1
+    assert data["data"]["suggested_domains"][0]["match_percentage"] > 0
+    assert "domain_name" in data["data"]["suggested_domains"][0]
+    assert "fit_reason" in data["data"]["suggested_domains"][0]
 
 
 def test_resume_unsupported_file_format():
@@ -66,6 +71,8 @@ def test_get_resume_analysis_and_skills():
     assert data["success"] is True
     assert data["data"] is not None
     assert "ats_breakdown" in data["data"]
+    assert "suggested_domains" in data["data"]
+    assert len(data["data"]["suggested_domains"]) >= 1
 
     # 2. Get Skills
     skills_resp = client.get("/api/v1/resume/skills")
