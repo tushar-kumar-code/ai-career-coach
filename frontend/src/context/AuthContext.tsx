@@ -128,45 +128,72 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (email: string, password: string) => {
     setIsLoading(true);
     try {
-      // 1. Authenticate with backend
-      const res = await loginUser(email, password);
-      let activeToken = res.access_token;
+      let activeToken: string | null = null;
+      let authenticatedUser: UserAuthData | null = null;
 
-      // 2. Also authenticate / sync with Firebase Auth if configured
+      // 1. Attempt standard Backend database authentication
       try {
-        const { auth, isFirebaseConfigured } = await import('@/lib/firebase');
-        if (isFirebaseConfigured && auth) {
-          const { signInWithEmailAndPassword, createUserWithEmailAndPassword } = await import('firebase/auth');
-          try {
+        const res = await loginUser(email, password);
+        activeToken = res.access_token;
+        authenticatedUser = res.user;
+      } catch (backendErr: any) {
+        // 2. Fallback: Check Firebase Authentication (for users created in Firebase Console or Google/Email)
+        try {
+          const { auth, isFirebaseConfigured } = await import('@/lib/firebase');
+          if (isFirebaseConfigured && auth) {
+            const { signInWithEmailAndPassword } = await import('firebase/auth');
             const cred = await signInWithEmailAndPassword(auth, email, password);
             const fbToken = await cred.user.getIdToken();
             activeToken = fbToken;
-          } catch (fbSignInErr: any) {
-            // If user exists in backend but not yet created in Firebase Auth, create in Firebase seamlessly
-            const code = fbSignInErr.code || '';
-            if (code === 'auth/user-not-found' || code === 'auth/invalid-credential') {
+            saveAuthToken(fbToken);
+
+            // Fetch or auto-provision profile on backend with Firebase token
+            try {
+              const me = await getMe();
+              authenticatedUser = me;
+            } catch {
+              // If backend hasn't seen this user yet, create local record
               try {
-                const newCred = await createUserWithEmailAndPassword(auth, email, password);
-                const fbToken = await newCred.user.getIdToken();
-                activeToken = fbToken;
-              } catch {}
+                const regRes = await registerUser(email, password, cred.user.displayName || email.split('@')[0]);
+                authenticatedUser = regRes.user;
+                if (!activeToken) activeToken = regRes.access_token;
+              } catch {
+                authenticatedUser = {
+                  id: cred.user.uid,
+                  email: cred.user.email || email,
+                  full_name: cred.user.displayName || email.split('@')[0],
+                  is_active: true,
+                  has_completed_assessment: false,
+                  has_uploaded_resume: false,
+                  is_analyzed: false,
+                };
+              }
             }
+          } else {
+            throw backendErr;
           }
+        } catch (firebaseErr: any) {
+          // Both backend and Firebase auth failed — show clean error
+          throw backendErr;
         }
-      } catch {}
+      }
+
+      if (!activeToken || !authenticatedUser) {
+        throw new Error('Invalid email or password. Please check your credentials or register a new account.');
+      }
 
       saveAuthToken(activeToken);
-      if (typeof window !== 'undefined' && res.user) {
-        localStorage.setItem('auth_user', JSON.stringify(res.user));
+      if (typeof window !== 'undefined' && authenticatedUser) {
+        localStorage.setItem('auth_user', JSON.stringify(authenticatedUser));
       }
       setToken(activeToken);
-      setUser(res.user);
-      terminalLogger.auth(`User logged in successfully: ${res.user.email}`);
+      setUser(authenticatedUser);
+      terminalLogger.auth(`User logged in successfully: ${authenticatedUser.email}`);
 
       // Trigger background login success notification
       notifyLoginEvent();
 
-      if (res.user.has_completed_assessment) {
+      if (authenticatedUser.has_completed_assessment || authenticatedUser.is_analyzed) {
         router.push('/dashboard');
       } else {
         router.push('/assessment');
