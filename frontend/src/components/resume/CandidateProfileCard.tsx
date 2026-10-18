@@ -27,6 +27,99 @@ interface CandidateProfileCardProps {
   compact?: boolean;
 }
 
+export function cleanProfessionalSummary(
+  rawSummary?: string,
+  contactInfo?: {
+    name?: string;
+    headline?: string;
+    email?: string;
+    phone?: string;
+    location?: string;
+    github?: string;
+    linkedin?: string;
+    portfolio?: string;
+  }
+): string {
+  if (!rawSummary || !rawSummary.trim()) return '';
+
+  const name = contactInfo?.name?.trim().toLowerCase() || '';
+  const email = contactInfo?.email?.trim().toLowerCase() || '';
+  const phone = contactInfo?.phone?.replace(/\D/g, '') || '';
+  const headline = contactInfo?.headline?.trim().toLowerCase() || '';
+  const location = contactInfo?.location?.trim().toLowerCase() || '';
+
+  const lines = rawSummary.split(/\r?\n/);
+  const cleanedLines: string[] = [];
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line) continue;
+
+    const lower = line.toLowerCase();
+
+    // 1. Skip Candidate Name
+    if (name && (lower === name || lower.startsWith(name + ' -') || lower.startsWith(name + ' |'))) {
+      continue;
+    }
+
+    // 2. Skip Headline / Role
+    if (headline && (lower === headline || lower.startsWith(headline + ' |'))) {
+      continue;
+    }
+
+    // 3. Skip URLs, GitHub, LinkedIn, emails
+    if (
+      lower.includes('http://') ||
+      lower.includes('https://') ||
+      lower.includes('github.com') ||
+      lower.includes('linkedin.com') ||
+      (email && lower.includes(email)) ||
+      /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/.test(line)
+    ) {
+      const words = line.split(/\s+/);
+      const isHeaderLine =
+        lower.includes('|') ||
+        lower.includes('github') ||
+        lower.includes('linkedin') ||
+        words.length < 15;
+      if (isHeaderLine) {
+        continue;
+      }
+    }
+
+    // 4. Skip Phone numbers and contact pipe lines
+    const digitsOnly = line.replace(/\D/g, '');
+    if (phone && digitsOnly.length >= 7 && digitsOnly.includes(phone)) {
+      continue;
+    }
+    if (
+      (lower.includes('|') || lower.includes('•')) &&
+      (lower.includes('phone') || lower.includes('mail') || lower.includes('@') || digitsOnly.length >= 10)
+    ) {
+      continue;
+    }
+
+    // 5. Skip Location
+    if (location && lower === location) {
+      continue;
+    }
+
+    // 6. Skip header title text like "Profile Summary" / "About Me"
+    if (/^(curriculum vitae|resume|profile summary|professional summary|about me|summary)[\s:]*$/i.test(line)) {
+      continue;
+    }
+
+    // 7. Skip pure separators
+    if (/^[|\-•/,\s]+$/.test(line)) {
+      continue;
+    }
+
+    cleanedLines.push(rawLine.trim());
+  }
+
+  return cleanedLines.length > 0 ? cleanedLines.join('\n\n').trim() : rawSummary.trim();
+}
+
 export default function CandidateProfileCard({ resumeData, compact = false }: CandidateProfileCardProps) {
   const [activeTab, setActiveTab] = useState<'all' | 'about' | 'skills' | 'experience' | 'projects' | 'education'>('all');
 
@@ -36,6 +129,8 @@ export default function CandidateProfileCard({ resumeData, compact = false }: Ca
   const projects = resumeData.projects || [];
   const education = resumeData.education || [];
   const certifications = resumeData.certifications || [];
+
+  const cleanedSummary = cleanProfessionalSummary(about?.summary, about);
 
   // Group skills by category
   const skillsByCategory: Record<string, typeof skills> = {};
@@ -166,14 +261,14 @@ export default function CandidateProfileCard({ resumeData, compact = false }: Ca
       {/* Main Body Content */}
       <div className="p-6 space-y-6">
         {/* 1. About / Summary */}
-        {(activeTab === 'all' || activeTab === 'about') && about?.summary && (
+        {(activeTab === 'all' || activeTab === 'about') && cleanedSummary && (
           <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/60 space-y-2">
             <div className="flex items-center space-x-2 text-indigo-400 text-xs font-bold uppercase tracking-wider">
               <User className="w-4 h-4" />
-              <span>About Candidate / Professional Summary</span>
+              <span>Professional Summary</span>
             </div>
             <p className="text-sm text-slate-200 leading-relaxed whitespace-pre-line">
-              {about.summary}
+              {cleanedSummary}
             </p>
           </div>
         )}

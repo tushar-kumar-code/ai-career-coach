@@ -350,6 +350,10 @@ class ResumeAIService:
         if not contact.portfolio:
             contact.portfolio = parsed.get("contact_info", {}).get("portfolio", "")
 
+        # Clean summary to ensure no redundant name, role, email, phone, or links repeat
+        if contact.summary:
+            contact.summary = self._clean_summary(contact.summary, contact)
+
         return ResumeAnalysisResponse(
             id=resume_id,
             filename=filename,
@@ -368,4 +372,36 @@ class ResumeAIService:
             education=extraction.education,
             certifications=extraction.certifications
         )
+
+    @staticmethod
+    def _clean_summary(raw_summary: str, contact: Any) -> str:
+        if not raw_summary or not raw_summary.strip():
+            return ""
+        name = getattr(contact, "name", "").lower().strip()
+        headline = getattr(contact, "headline", "").lower().strip()
+        email = getattr(contact, "email", "").lower().strip()
+        phone_digits = "".join(filter(str.isdigit, getattr(contact, "phone", "")))
+
+        cleaned_lines = []
+        for line in raw_summary.splitlines():
+            line_str = line.strip()
+            if not line_str:
+                continue
+            lower = line_str.lower()
+            if name and (lower == name or lower.startswith(f"{name} -") or lower.startswith(f"{name} |")):
+                continue
+            if headline and (lower == headline or lower.startswith(f"{headline} |")):
+                continue
+            if ("http://" in lower or "https://" in lower or "github.com" in lower or "linkedin.com" in lower or (email and email in lower)):
+                if "|" in lower or "github" in lower or "linkedin" in lower or len(line_str.split()) < 15:
+                    continue
+            digits = "".join(filter(str.isdigit, line_str))
+            if phone_digits and len(phone_digits) >= 7 and phone_digits in digits:
+                continue
+            if ("|" in lower or "•" in lower) and ("phone" in lower or "mail" in lower or "@" in lower or len(digits) >= 10):
+                continue
+            if line_str in ("|", "-", "•", "/", ","):
+                continue
+            cleaned_lines.append(line_str)
+        return "\n\n".join(cleaned_lines).strip() or raw_summary.strip()
 

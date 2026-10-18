@@ -98,7 +98,7 @@ Your task is TWO-FOLD:
        "linkedin": LinkedIn URL,
        "github": GitHub URL,
        "portfolio": portfolio website URL,
-       "summary": professional summary or objective paragraph
+       "summary": clean professional summary or career objective paragraph ONLY (DO NOT repeat candidate name, email, phone, location, github, linkedin, or contact links)
      }
    - "skills": List of skills extracted EXACTLY as written by the candidate in their resume (especially from Technical Skills / Skills sections).
        * VERBATIM: Do NOT modify, summarize, normalize, or alter skill names. If the resume says "Python Basic", extract "Python Basic" verbatim (do NOT strip "Basic"). If the resume says "C Basic", extract "C Basic".
