@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { Compass, ShieldCheck, Target, ArrowRight, Award } from 'lucide-react';
+import { BackendActivator } from '@/components/common/BackendActivator';
 
 export default function Home() {
   return (
@@ -18,6 +19,9 @@ export default function Home() {
           </div>
         </div>
         <div className="flex items-center space-x-3">
+          {/* Real-time Backend Wake & Status Button */}
+          <BackendActivator variant="navbar-pill" />
+
           <Link
             href="/login"
             className="px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition"
@@ -45,9 +49,12 @@ export default function Home() {
           Discover Your Ideal Career with a Proven <span className="text-blue-600 dark:text-sky-400">AI Career Coach</span> & Digital Twin
         </h1>
 
-        <p className="text-base sm:text-lg text-slate-700 dark:text-slate-300 max-w-2xl leading-relaxed mb-10 font-normal">
+        <p className="text-base sm:text-lg text-slate-700 dark:text-slate-300 max-w-2xl leading-relaxed mb-8 font-normal">
           A trustworthy career intelligence platform that analyzes your natural strengths, verifies your skills with real evidence, optimizes your resume for ATS, builds custom roadmaps, and conducts interactive mock interviews.
         </p>
+
+        {/* Interactive Backend Wake & Health Card */}
+        <BackendActivator variant="hero-card" className="mb-10" />
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4 w-full sm:w-auto">
           <Link

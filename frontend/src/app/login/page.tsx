@@ -22,6 +22,7 @@ import {
   verifyOtpLogin,
   verifyOtpReset,
 } from '@/lib/api-client';
+import { BackendActivator } from '@/components/common/BackendActivator';
 
 type AuthMode = 'login' | 'otp-login' | 'forgot-password' | 'another-ways';
 
@@ -249,9 +250,12 @@ export default function LoginPage() {
           </div>
           <span className="font-bold text-lg text-[#17324D] dark:text-[#F1F5F9] tracking-tight">Career</span>
         </Link>
-        <span className="text-xs sm:text-sm font-medium text-[#64748B] dark:text-[#A8B3C2]">
-          Your Career, Your Future
-        </span>
+        <div className="flex items-center space-x-3">
+          <BackendActivator variant="navbar-pill" />
+          <span className="hidden sm:inline text-xs sm:text-sm font-medium text-[#64748B] dark:text-[#A8B3C2]">
+            Your Career, Your Future
+          </span>
+        </div>
       </header>
 
       {/* Center Auth Card */}
@@ -285,6 +289,11 @@ export default function LoginPage() {
                     <AlertCircle className="w-4 h-4 text-[#C75C5C] shrink-0 mt-0.5" />
                     <span className="flex-1 leading-relaxed">{error}</span>
                   </div>
+                  {error.toLowerCase().includes('not reachable') && (
+                    <div className="pt-1">
+                      <BackendActivator variant="standalone-button" className="w-full text-xs justify-center py-2" />
+                    </div>
+                  )}
                   {(error.toLowerCase().includes('domain') || error.toLowerCase().includes('firebase')) && (
                     <button
                       type="button"

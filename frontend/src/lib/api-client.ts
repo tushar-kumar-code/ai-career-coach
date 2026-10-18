@@ -225,6 +225,26 @@ export async function fetchHealthStatus(): Promise<HealthStatus> {
   }
 }
 
+export async function wakeAndPingBackend(): Promise<{
+  ok: boolean;
+  latencyMs: number;
+  data?: HealthStatus;
+  error?: string;
+}> {
+  const start = Date.now();
+  try {
+    const data = await request<HealthStatus>('/health', {
+      cache: 'no-store',
+      headers: { 'Cache-Control': 'no-cache' },
+    });
+    const latencyMs = Date.now() - start;
+    return { ok: true, latencyMs, data };
+  } catch (err: any) {
+    const latencyMs = Date.now() - start;
+    return { ok: false, latencyMs, error: err?.message || 'Server did not respond' };
+  }
+}
+
 // Assessment APIs
 export async function startAssessment(userLevel?: string): Promise<AssessmentSession> {
   return request<AssessmentSession>('/assessment/start', {
