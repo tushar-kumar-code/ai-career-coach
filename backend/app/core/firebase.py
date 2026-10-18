@@ -86,9 +86,7 @@ def verify_firebase_id_token(token: str) -> Dict[str, Any]:
         logger.debug(f"Firebase Admin SDK verify notice (trying public cert verifier): {admin_err}")
 
     # 2. Public Google OAuth2 / Firebase Certificate Verifier
-    project_id = (settings.FIREBASE_PROJECT_ID or "").strip()
-    if not project_id:
-        raise ValueError("FIREBASE_PROJECT_ID is not configured in backend environment")
+    project_id = (settings.FIREBASE_PROJECT_ID or "ai-career-coach-da37b").strip()
 
     from google.oauth2 import id_token as google_id_token
     from google.auth.transport import requests as google_requests

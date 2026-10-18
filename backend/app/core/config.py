@@ -56,10 +56,10 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
 
     # Firebase Configuration
-    FIREBASE_PROJECT_ID: str = ""
+    FIREBASE_PROJECT_ID: str = "ai-career-coach-da37b"
     FIREBASE_CREDENTIALS_PATH: str = ""
     FIREBASE_SERVICE_ACCOUNT_JSON: str = ""
-    FIREBASE_STORAGE_BUCKET: str = ""
+    FIREBASE_STORAGE_BUCKET: str = "ai-career-coach-da37b.firebasestorage.app"
 
     # AI Provider
     AI_PROVIDER: str = "groq"  # groq, gemini, openai, anthropic

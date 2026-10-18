@@ -21,7 +21,9 @@ services:
       - key: PYTHON_VERSION
         value: 3.11.9
       - key: SECRET_KEY
-        generateValue: true
+        value: ai_career_coach_stable_production_jwt_secret_key_2026_xyz
+      - key: FIREBASE_PROJECT_ID
+        value: ai-career-coach-da37b
       - key: BACKEND_CORS_ORIGINS
         value: "*"
       - key: AI_PROVIDER

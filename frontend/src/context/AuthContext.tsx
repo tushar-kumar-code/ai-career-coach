@@ -96,24 +96,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             localStorage.setItem('auth_user', JSON.stringify(me));
           }
         } catch (err: any) {
-          const errMsg = (err?.message || '').toLowerCase();
-          const isExplicitUnauthorized =
-            errMsg.includes('401') ||
-            errMsg.includes('unauthorized') ||
-            errMsg.includes('invalid or expired') ||
-            errMsg.includes('invalid token') ||
-            errMsg.includes('token expired');
-
-          // ONLY clear session if server explicitly rejected the token with 401 Unauthorized
-          // Never log out on network glitch, Render container spin-up delay, or offline mode
-          if (isExplicitUnauthorized) {
-            terminalLogger.auth('Saved session token explicitly expired or invalid (401). Logging out.');
-            clearAuthToken();
-            setUser(null);
-            setToken(null);
-          } else {
-            terminalLogger.auth('Backend in cold start or network delay during revalidation; retained local session.');
-          }
+          // Never log user out or clear session on page refresh/hard refresh!
+          // Retain local cached credentials so the user is never kicked back to /login.
+          terminalLogger.auth('Background session revalidation notice: retained local session.');
         }
       } else {
         setUser(null);
