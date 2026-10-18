@@ -54,43 +54,72 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (savedToken) {
         setToken(savedToken);
-        // Load cached user immediately for instant UI responsiveness
+        let restoredUser: UserAuthData | null = null;
+
+        // 1. Immediately restore cached user profile so UI doesn't flicker or redirect to /login
         if (cachedUserStr) {
           try {
             const parsed = JSON.parse(cachedUserStr);
-            if (parsed && parsed.email && parsed.email !== 'user@aicareercoach.ai') {
+            if (parsed && typeof parsed === 'object' && (parsed.id || parsed.email)) {
+              restoredUser = parsed;
               setUser(parsed);
-              terminalLogger.auth(`Session restored: ${parsed.email}`);
-            } else {
-              localStorage.removeItem('auth_user');
+              terminalLogger.auth(`Session restored from localStorage: ${parsed.email || parsed.id}`);
             }
-          } catch {}
+          } catch (e) {
+            console.warn('Notice parsing cached auth_user:', e);
+          }
         }
 
-        // Validate token with backend in the background
+        // 2. If token exists but user was not yet in cache, set a safe temporary session
+        // so route guards do NOT kick the user out to /login while background revalidation occurs
+        if (!restoredUser) {
+          const fallbackUser: UserAuthData = {
+            id: 'authenticated-user',
+            email: 'user@aicareercoach.ai',
+            full_name: 'Candidate',
+            is_active: true,
+            has_completed_assessment: true,
+            is_analyzed: true,
+          };
+          setUser(fallbackUser);
+          restoredUser = fallbackUser;
+        }
+
+        // Set loading false immediately — user is already authenticated locally
+        setIsLoading(false);
+
+        // 3. Background revalidation with backend (non-blocking)
         try {
           const me = await getMe();
-          if (me.email === 'user@aicareercoach.ai') {
-            const { auth } = await import('@/lib/firebase');
-            if (auth?.currentUser?.email) {
-              me.email = auth.currentUser.email;
-              me.full_name = auth.currentUser.displayName || auth.currentUser.email.split('@')[0];
-            }
+          if (me && (me.id || me.email)) {
+            setUser(me);
+            localStorage.setItem('auth_user', JSON.stringify(me));
           }
-          setUser(me);
-          localStorage.setItem('auth_user', JSON.stringify(me));
-        } catch {
-          // Token is invalid/expired — clear it
-          clearAuthToken();
-          setUser(null);
-          setToken(null);
+        } catch (err: any) {
+          const errMsg = (err?.message || '').toLowerCase();
+          const isExplicitUnauthorized =
+            errMsg.includes('401') ||
+            errMsg.includes('unauthorized') ||
+            errMsg.includes('invalid or expired') ||
+            errMsg.includes('invalid token') ||
+            errMsg.includes('token expired');
+
+          // ONLY clear session if server explicitly rejected the token with 401 Unauthorized
+          // Never log out on network glitch, Render container spin-up delay, or offline mode
+          if (isExplicitUnauthorized) {
+            terminalLogger.auth('Saved session token explicitly expired or invalid (401). Logging out.');
+            clearAuthToken();
+            setUser(null);
+            setToken(null);
+          } else {
+            terminalLogger.auth('Backend in cold start or network delay during revalidation; retained local session.');
+          }
         }
       } else {
         setUser(null);
         setToken(null);
+        setIsLoading(false);
       }
-
-      setIsLoading(false);
     };
 
     restoreSession();
@@ -127,6 +156,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch {}
 
       saveAuthToken(activeToken);
+      if (typeof window !== 'undefined' && res.user) {
+        localStorage.setItem('auth_user', JSON.stringify(res.user));
+      }
       setToken(activeToken);
       setUser(res.user);
       terminalLogger.auth(`User logged in successfully: ${res.user.email}`);
@@ -169,6 +201,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const res = await registerUser(email, password, fullName);
       const activeToken = firebaseToken || res.access_token;
       saveAuthToken(activeToken);
+      if (typeof window !== 'undefined' && res.user) {
+        localStorage.setItem('auth_user', JSON.stringify(res.user));
+      }
       setToken(activeToken);
       setUser(res.user);
       terminalLogger.auth(`New user registered successfully: ${res.user.email}`);
@@ -284,6 +319,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(true);
     try {
       const res = await demoLoginUser();
+      saveAuthToken(res.access_token);
+      if (typeof window !== 'undefined' && res.user) {
+        localStorage.setItem('auth_user', JSON.stringify(res.user));
+      }
       setToken(res.access_token);
       setUser(res.user);
       terminalLogger.auth(`Quick Demo Access signed in: ${res.user.email}`);

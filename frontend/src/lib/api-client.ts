@@ -80,20 +80,31 @@ export function getSavedAuthToken(): string | null {
 
 export async function getFreshAuthToken(): Promise<string | null> {
   if (typeof window === 'undefined') return null;
+  const saved = getSavedAuthToken();
   try {
     const { auth } = await import('./firebase');
-    if (!auth.currentUser && typeof auth.authStateReady === 'function') {
-      await auth.authStateReady();
-    }
     if (auth?.currentUser) {
       const freshToken = await auth.currentUser.getIdToken();
       if (freshToken) {
         saveAuthToken(freshToken);
         return freshToken;
       }
+    } else if (auth && typeof auth.authStateReady === 'function') {
+      // Race authStateReady against a 800ms timeout so requests never stall
+      await Promise.race([
+        auth.authStateReady(),
+        new Promise((resolve) => setTimeout(resolve, 800)),
+      ]);
+      if (auth.currentUser) {
+        const freshToken = await auth.currentUser.getIdToken();
+        if (freshToken) {
+          saveAuthToken(freshToken);
+          return freshToken;
+        }
+      }
     }
   } catch {}
-  return getSavedAuthToken();
+  return saved;
 }
 
 export function saveAuthToken(token: string) {
