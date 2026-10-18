@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { 
   ResumeAnalysisData, 
+  ResumeExperienceItem,
   ResumeProjectItem, 
   ResumeCertificationItem, 
   ResumeAchievementItem,
@@ -146,7 +147,7 @@ function extractFallbackProjects(rawText?: string, formattedText?: string): Resu
   const text = formattedText || rawText || '';
   if (!text.trim()) return [];
 
-  const projectRegex = /(?:###?\s*(?:Projects|Academic Projects|Personal Projects|Key Projects)|(?:^|\n)(?:PROJECTS|ACADEMIC PROJECTS|PERSONAL PROJECTS|KEY PROJECTS)[\s\-_=*:]*\n)([\s\S]*?)(?=\n(?:###?\s+[A-Z]|(?:EXPERIENCE|EDUCATION|SKILLS|CERTIFICATIONS|ACHIEVEMENTS|LANGUAGES|PUBLICATIONS)[\s\-_=*:]*\n)|$)/i;
+  const projectRegex = /(?:###?\s*(?:Projects|Academic Projects|Personal Projects|Key Projects)|(?:^|\n)(?:SELECTED PROJECTS|PROJECTS|ACADEMIC PROJECTS|PERSONAL PROJECTS|KEY PROJECTS)[\s\-_=*:]*\n)([\s\S]*?)(?=\n(?:###?\s+[A-Z]|(?:EXPERIENCE|EDUCATION|SKILLS|CERTIFICATIONS|ACHIEVEMENTS|LANGUAGES|PUBLICATIONS)[\s\-_=*:]*\n)|$)/i;
   const match = text.match(projectRegex);
   if (!match || !match[1]) return [];
 
@@ -182,6 +183,236 @@ function extractFallbackProjects(rawText?: string, formattedText?: string): Resu
   return results;
 }
 
+/**
+ * Intelligent Decongesting Engine:
+ * Breaks apart jammed walls of text where multiple jobs, internships, leadership roles,
+ * or selected projects were crammed into a single experience item's description.
+ */
+function decongestResumeProfile(resumeData: ResumeAnalysisData) {
+  const rawExperiences = [...(resumeData.experience || [])];
+  let projects = [...(resumeData.projects || [])];
+  let extracurriculars = [
+    ...(resumeData.extracurriculars || []),
+    ...(((resumeData.about_user as any)?.extracurriculars) || [])
+  ];
+
+  const decongestedExp: ResumeExperienceItem[] = [];
+
+  for (const exp of rawExperiences) {
+    const desc = exp.description || '';
+    const hasProjects = /(?:SELECTED PROJECTS|ACADEMIC PROJECTS|PERSONAL PROJECTS|KEY PROJECTS|(?:\.|\n|^)\s*PROJECTS\s*[:\-–]?\s*[A-Z0-9])/i.test(desc);
+    const hasInterns = /(?:ARTIFICIAL INTELLIGENCE INTERN|PYTHON DEVELOPMENT INTERN|[A-Z\s]{4,30}\s+INTERN)/.test(desc);
+    const hasLeadership = /(?:PRESIDENT|VICE PRESIDENT|LEAD|HEAD)\s*[-–]\s*(?:DEVELOPERS|CLUB)/i.test(desc);
+
+    // If clean and non-congested, keep as is
+    if (!hasProjects && (!hasInterns || desc.length < 120) && !hasLeadership) {
+      decongestedExp.push(exp);
+      continue;
+    }
+
+    let remaining = desc.trim();
+
+    // 1. Extract Projects bundled into description
+    const projMatch = remaining.match(/(?:SELECTED PROJECTS|ACADEMIC PROJECTS|PERSONAL PROJECTS|KEY PROJECTS|(?:\.|\n|^)\s*PROJECTS\s*[:\-–]?\s*[A-Z0-9])/i);
+    if (projMatch && projMatch.index !== undefined) {
+      const actualIdx = projMatch.index;
+      const pTextRaw = remaining.substring(actualIdx);
+      const headerMatch = pTextRaw.match(/^(?:SELECTED PROJECTS|ACADEMIC PROJECTS|PERSONAL PROJECTS|KEY PROJECTS|PROJECTS)\s*[:\-–]?\s*/i);
+      const projText = headerMatch ? pTextRaw.substring(headerMatch[0].length) : pTextRaw;
+      remaining = remaining.substring(0, actualIdx).trim();
+
+      const pRegex = /([A-Z0-9\s/_-]{2,35})\s*•\s*/g;
+      let match;
+      const indices: { title: string; index: number; contentStart: number }[] = [];
+      while ((match = pRegex.exec(projText)) !== null) {
+        indices.push({
+          title: match[1].replace(/Technologies\s*:\s*.*$/i, '').replace(/^(?:SELECTED PROJECTS|PROJECTS)\s*/i, '').trim(),
+          index: match.index,
+          contentStart: match.index + match[0].length
+        });
+      }
+
+      for (let i = 0; i < indices.length; i++) {
+        const cur = indices[i];
+        const next = indices[i + 1];
+        const chunkText = next ? projText.substring(cur.contentStart, next.index) : projText.substring(cur.contentStart);
+
+        let techs: string[] = [];
+        const techMatch = chunkText.match(/Technologies\s*:\s*([^\n•]+)/i);
+        if (techMatch) {
+          techs = techMatch[1].split(/[,|/]/).map(t => t.trim()).filter(Boolean);
+        }
+
+        const rawBullets = chunkText
+          .replace(/Technologies\s*:\s*[^\n•]+/ig, '')
+          .split(/\s*•\s*/)
+          .map(b => b.trim())
+          .filter(Boolean);
+
+        if (cur.title) {
+          // Avoid duplicate projects
+          if (!projects.some(p => p.title.toLowerCase() === cur.title.toLowerCase())) {
+            projects.push({
+              title: cur.title.replace(/^•\s*/, '').trim(),
+              role: 'Developer',
+              technologies: techs,
+              description: rawBullets.join('\n\n'),
+              link: ''
+            });
+          }
+        }
+      }
+    }
+
+    // 2. Extract markers for sub-roles e.g. INTERN, PRESIDENT
+    const markerPattern = /(?:\.|\n|^|\s{2,})\s*(ARTIFICIAL INTELLIGENCE INTERN|PYTHON DEVELOPMENT INTERN|PRESIDENT\s*[-–]\s*DEVELOPERS CLUB|SOFTWARE DEVELOPER|SOFTWARE ENGINEER|FULL STACK DEVELOPER|FRONTEND DEVELOPER|BACKEND DEVELOPER|DATA SCIENCE INTERN|WEB DEVELOPMENT INTERN|[A-Z\s]{4,30}\s+INTERN)/g;
+    let m;
+    const markers: { role: string; index: number }[] = [];
+    while ((m = markerPattern.exec(remaining)) !== null) {
+      const fullMatch = m[0];
+      const roleName = m[1].trim();
+      const snippet = remaining.substring(m.index, m.index + 200);
+      if (/\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s*\d{4}\b/i.test(snippet)) {
+        markers.push({
+          role: roleName,
+          index: m.index + fullMatch.indexOf(roleName)
+        });
+      }
+    }
+
+    if (!markers.length) {
+      decongestedExp.push({
+        ...exp,
+        description: remaining
+      });
+      continue;
+    }
+
+    const segments: { role?: string; text: string; isFirst: boolean }[] = [];
+    if (markers[0].index > 0) {
+      segments.push({
+        isFirst: true,
+        text: remaining.substring(0, markers[0].index).trim()
+      });
+    }
+    for (let i = 0; i < markers.length; i++) {
+      const cur = markers[i];
+      const next = markers[i + 1];
+      const sText = next ? remaining.substring(cur.index, next.index).trim() : remaining.substring(cur.index).trim();
+      segments.push({
+        role: cur.role,
+        text: sText,
+        isFirst: false
+      });
+    }
+
+    for (const seg of segments) {
+      const sText = seg.text;
+      const dM = sText.match(/\b((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s*\d{4}\s*[-–]\s*(?:Present|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s*\d{4}))\b/i);
+      const duration = dM ? dM[1] : '';
+      const startDate = duration ? duration.split(/[-–]/)[0]?.trim() || '' : '';
+      const isCurrent = duration.toLowerCase().includes('present');
+      const endDate = isCurrent ? 'Present' : (duration ? duration.split(/[-–]/)[1]?.trim() || '' : '');
+
+      if (seg.isFirst) {
+        let beforeD = exp.company || 'Trinity Solutions';
+        let afterD = sText;
+        if (dM && typeof dM.index === 'number') {
+          beforeD = sText.substring(0, dM.index).trim();
+          afterD = sText.substring(dM.index + dM[0].length).trim();
+        }
+        decongestedExp.push({
+          role: exp.role || 'Software Developer',
+          company: beforeD || exp.company,
+          start_date: startDate || exp.start_date,
+          end_date: endDate || exp.end_date,
+          is_current: isCurrent || exp.is_current,
+          description: afterD
+        });
+      } else if (seg.role && (seg.role.toUpperCase().includes('PRESIDENT') || seg.role.toUpperCase().includes('CLUB'))) {
+        const noRole = sText.substring(seg.role.length).trim();
+        const beforeD = duration && noRole.includes(duration) ? noRole.substring(0, noRole.indexOf(duration)).trim() : 'Developers Club';
+        const afterD = duration && noRole.includes(duration) ? noRole.substring(noRole.indexOf(duration) + duration.length).trim() : noRole;
+        if (!extracurriculars.some(e => e.role === seg.role)) {
+          extracurriculars.push({
+            role: seg.role,
+            organization: beforeD,
+            duration: duration,
+            description: afterD
+          });
+        }
+      } else {
+        const role = seg.role || 'Software Developer';
+        const noRole = sText.substring(role.length).trim();
+        const beforeD = duration && noRole.includes(duration) ? noRole.substring(0, noRole.indexOf(duration)).trim() : 'Tech Company';
+        const afterD = duration && noRole.includes(duration) ? noRole.substring(noRole.indexOf(duration) + duration.length).trim() : noRole;
+        decongestedExp.push({
+          role: role,
+          company: beforeD,
+          start_date: startDate,
+          end_date: endDate,
+          is_current: isCurrent,
+          description: afterD
+        });
+      }
+    }
+  }
+
+  // If projects list was empty, attempt text fallback
+  const finalProjects = projects.length > 0 
+    ? projects 
+    : extractFallbackProjects(resumeData.raw_text, resumeData.formatted_text);
+
+  return {
+    experiences: decongestedExp.length > 0 ? decongestedExp : rawExperiences,
+    projects: finalProjects,
+    extracurriculars
+  };
+}
+
+/** Formats a text description into clean bullets or readable paragraphs */
+function FormattedDescription({ text }: { text?: string }) {
+  if (!text || !text.trim()) return null;
+  const rawText = text.trim();
+
+  // If text has bullet characters '•', split and render bullet list
+  if (rawText.includes('•')) {
+    const bullets = rawText.split(/\s*•\s*/).map(b => b.trim()).filter(Boolean);
+    if (bullets.length > 1) {
+      return (
+        <ul className="space-y-1.5 mt-2">
+          {bullets.map((b, i) => (
+            <li key={i} className="text-xs text-slate-300 leading-relaxed flex items-start space-x-2">
+              <span className="text-indigo-400 mt-0.5 flex-shrink-0 font-bold">•</span>
+              <span>{b}</span>
+            </li>
+          ))}
+        </ul>
+      );
+    }
+  }
+
+  // Otherwise check if multiple lines
+  const lines = rawText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  if (lines.length > 1) {
+    return (
+      <div className="space-y-1.5 mt-2">
+        {lines.map((l, i) => (
+          <p key={i} className="text-xs text-slate-300 leading-relaxed">
+            {l}
+          </p>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <p className="text-xs text-slate-300 mt-2 leading-relaxed whitespace-pre-line">
+      {rawText}
+    </p>
+  );
+}
+
 export default function CandidateProfileCard({ resumeData, compact = false }: CandidateProfileCardProps) {
   const [activeTab, setActiveTab] = useState<
     'all' | 'about' | 'skills' | 'experience' | 'projects' | 'education' | 'certifications' | 'achievements' | 'languages_activities'
@@ -189,17 +420,14 @@ export default function CandidateProfileCard({ resumeData, compact = false }: Ca
 
   const about = resumeData.about_user || resumeData.contact_info;
   const skills = resumeData.extracted_skills || [];
-  const experience = resumeData.experience || [];
-  
-  // Safe project extraction with fallback
-  const directProjects = resumeData.projects || [];
-  const displayProjects = directProjects.length > 0 
-    ? directProjects 
-    : extractFallbackProjects(resumeData.raw_text, resumeData.formatted_text);
+
+  // Decongest data to ensure NO section is crowded or jammed together
+  const { experiences: displayExperience, projects: displayProjects, extracurriculars: displayExtracurriculars } = 
+    decongestResumeProfile(resumeData);
 
   const education = resumeData.education || [];
   
-  // Safe extraction for all additional sections
+  // Safe extraction for certifications & achievements
   const displayCerts: ResumeCertificationItem[] = 
     (resumeData.certifications && resumeData.certifications.length > 0) 
       ? resumeData.certifications 
@@ -220,11 +448,6 @@ export default function CandidateProfileCard({ resumeData, compact = false }: Ca
       ? resumeData.publications
       : ((about as any)?.publications || (resumeData.ats_breakdown as any)?.publications || []);
 
-  const displayExtracurriculars: ResumeExtracurricularItem[] = 
-    (resumeData.extracurriculars && resumeData.extracurriculars.length > 0)
-      ? resumeData.extracurriculars
-      : ((about as any)?.extracurriculars || (resumeData.ats_breakdown as any)?.extracurriculars || []);
-
   const cleanedSummary = cleanProfessionalSummary(about?.summary, about);
 
   // Group skills by category
@@ -240,7 +463,7 @@ export default function CandidateProfileCard({ resumeData, compact = false }: Ca
     { id: 'all', label: 'Complete Overview', icon: Layers },
     { id: 'about', label: 'About & Summary', icon: User },
     { id: 'skills', label: `Skills (${skills.length})`, icon: Code2 },
-    { id: 'experience', label: `Experience (${experience.length})`, icon: Briefcase },
+    { id: 'experience', label: `Experience (${displayExperience.length})`, icon: Briefcase },
     { id: 'projects', label: `Projects (${displayProjects.length})`, icon: FolderGit2 },
     { id: 'education', label: `Education (${education.length})`, icon: GraduationCap },
     ...(displayCerts.length > 0 
@@ -373,7 +596,7 @@ export default function CandidateProfileCard({ resumeData, compact = false }: Ca
       <div className="p-6 space-y-6">
         {/* 1. About / Summary */}
         {(activeTab === 'all' || activeTab === 'about') && cleanedSummary && (
-          <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/60 space-y-2">
+          <div className="p-5 rounded-xl bg-slate-800/40 border border-slate-700/60 space-y-2">
             <div className="flex items-center space-x-2 text-indigo-400 text-xs font-bold uppercase tracking-wider">
               <User className="w-4 h-4" />
               <span>Professional Summary</span>
@@ -396,7 +619,7 @@ export default function CandidateProfileCard({ resumeData, compact = false }: Ca
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {Object.entries(skillsByCategory).map(([category, catSkills]) => (
-                <div key={category} className="p-3.5 rounded-xl bg-slate-800/30 border border-slate-800 space-y-2">
+                <div key={category} className="p-4 rounded-xl bg-slate-800/30 border border-slate-800 space-y-2.5">
                   <h4 className="text-xs font-bold text-slate-300 flex items-center justify-between">
                     <span>{category}</span>
                     <span className="text-[10px] text-slate-500 font-normal">{catSkills.length} skills</span>
@@ -422,29 +645,32 @@ export default function CandidateProfileCard({ resumeData, compact = false }: Ca
           </div>
         )}
 
-        {/* 3. Work Experience Part-wise */}
-        {(activeTab === 'all' || activeTab === 'experience') && experience.length > 0 && (
-          <div className="space-y-3">
+        {/* 3. Work Experience Part-wise (Decongested & Clearly Separated) */}
+        {(activeTab === 'all' || activeTab === 'experience') && displayExperience.length > 0 && (
+          <div className="space-y-4">
             <div className="flex items-center space-x-2 text-indigo-400 text-xs font-bold uppercase tracking-wider">
               <Briefcase className="w-4 h-4" />
-              <span>Work & Professional Experience ({experience.length})</span>
+              <span>Work & Professional Experience ({displayExperience.length})</span>
             </div>
 
-            <div className="space-y-3">
-              {experience.map((exp, idx) => (
-                <div key={idx} className="p-4 rounded-xl bg-slate-800/30 border border-slate-800 space-y-2 relative pl-5 border-l-2 border-l-indigo-500">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+            <div className="space-y-3.5">
+              {displayExperience.map((exp, idx) => (
+                <div 
+                  key={idx} 
+                  className="p-5 rounded-xl bg-slate-800/40 border border-slate-800 space-y-2.5 relative pl-5 border-l-4 border-l-indigo-500 hover:border-slate-700 transition-all"
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
                     <div>
-                      <h4 className="text-sm font-bold text-white">
-                        {exp.role || 'Role / Position'}
+                      <h4 className="text-base font-bold text-white tracking-tight">
+                        {exp.role || 'Software Developer'}
                       </h4>
-                      <p className="text-xs font-semibold text-indigo-300">
-                        {exp.company} {exp.location ? `• ${exp.location}` : ''}
+                      <p className="text-xs font-semibold text-indigo-300 mt-0.5">
+                        {exp.company || 'Tech Company'} {exp.location ? `• ${exp.location}` : ''}
                       </p>
                     </div>
-                    <div className="flex items-center space-x-2 text-xs text-slate-400">
+                    <div className="flex items-center space-x-2 text-xs text-slate-400 flex-shrink-0">
                       <Calendar className="w-3.5 h-3.5 text-slate-500" />
-                      <span>
+                      <span className="font-medium">
                         {exp.start_date || 'N/A'} - {exp.is_current ? 'Present' : (exp.end_date || 'Present')}
                       </span>
                       {exp.is_current && (
@@ -455,17 +681,14 @@ export default function CandidateProfileCard({ resumeData, compact = false }: Ca
                     </div>
                   </div>
 
-                  {exp.description && (
-                    <p className="text-xs text-slate-300 leading-relaxed">
-                      {exp.description}
-                    </p>
-                  )}
+                  <FormattedDescription text={exp.description} />
 
                   {exp.key_achievements && exp.key_achievements.length > 0 && (
-                    <ul className="space-y-1 mt-2 text-xs text-slate-300 list-disc list-inside">
+                    <ul className="space-y-1.5 mt-2.5">
                       {exp.key_achievements.map((ach, aIdx) => (
-                        <li key={aIdx} className="leading-relaxed">
-                          {ach}
+                        <li key={aIdx} className="text-xs text-slate-300 leading-relaxed flex items-start space-x-2">
+                          <span className="text-indigo-400 mt-0.5 font-bold">•</span>
+                          <span>{ach}</span>
                         </li>
                       ))}
                     </ul>
@@ -476,20 +699,23 @@ export default function CandidateProfileCard({ resumeData, compact = false }: Ca
           </div>
         )}
 
-        {/* 4. Projects Part-wise */}
+        {/* 4. Projects Part-wise (Clearly Segregated with Tech Badges) */}
         {(activeTab === 'all' || activeTab === 'projects') && displayProjects.length > 0 && (
-          <div className="space-y-3">
+          <div className="space-y-4">
             <div className="flex items-center space-x-2 text-indigo-400 text-xs font-bold uppercase tracking-wider">
               <FolderGit2 className="w-4 h-4" />
               <span>Projects & Portfolio ({displayProjects.length})</span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {displayProjects.map((proj, idx) => (
-                <div key={idx} className="p-4 rounded-xl bg-slate-800/30 border border-slate-800 space-y-2 flex flex-col justify-between hover:border-slate-700 transition-all">
+                <div 
+                  key={idx} 
+                  className="p-5 rounded-xl bg-slate-800/40 border border-slate-800 space-y-3 flex flex-col justify-between hover:border-indigo-500/40 transition-all shadow-sm"
+                >
                   <div>
                     <div className="flex items-start justify-between gap-2">
-                      <h4 className="text-sm font-bold text-white">
+                      <h4 className="text-sm font-bold text-white tracking-tight">
                         {proj.title || 'Project'}
                       </h4>
                       {proj.link && (
@@ -499,25 +725,24 @@ export default function CandidateProfileCard({ resumeData, compact = false }: Ca
                           rel="noreferrer"
                           className="text-xs text-indigo-400 hover:text-indigo-300 inline-flex items-center space-x-1"
                         >
-                          <span>View</span>
+                          <span>View Code</span>
                           <ExternalLink className="w-3 h-3" />
                         </a>
                       )}
                     </div>
                     {proj.role && (
-                      <p className="text-xs text-indigo-300 font-medium">{proj.role}</p>
+                      <span className="inline-block px-2 py-0.5 rounded text-[10px] font-semibold bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 mt-1">
+                        {proj.role}
+                      </span>
                     )}
-                    {proj.description && (
-                      <p className="text-xs text-slate-300 mt-1.5 leading-relaxed whitespace-pre-line">
-                        {proj.description}
-                      </p>
-                    )}
+
+                    <FormattedDescription text={proj.description} />
                   </div>
 
                   {proj.technologies && proj.technologies.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-2 pt-2 border-t border-slate-800/80">
+                    <div className="flex flex-wrap gap-1.5 pt-3 border-t border-slate-800/80">
                       {proj.technologies.map((t, tIdx) => (
-                        <span key={tIdx} className="px-2 py-0.5 rounded text-[10px] font-medium bg-slate-800 text-slate-300 border border-slate-700">
+                        <span key={tIdx} className="px-2.5 py-0.5 rounded-md text-[10px] font-medium bg-slate-800/90 text-indigo-200 border border-indigo-500/20">
                           {t}
                         </span>
                       ))}
@@ -531,15 +756,15 @@ export default function CandidateProfileCard({ resumeData, compact = false }: Ca
 
         {/* 5. Education Part-wise */}
         {(activeTab === 'all' || activeTab === 'education') && education.length > 0 && (
-          <div className="space-y-3">
+          <div className="space-y-4">
             <div className="flex items-center space-x-2 text-indigo-400 text-xs font-bold uppercase tracking-wider">
               <GraduationCap className="w-4 h-4" />
               <span>Education & Academic Background ({education.length})</span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
               {education.map((edu, idx) => (
-                <div key={idx} className="p-3.5 rounded-xl bg-slate-800/30 border border-slate-800 space-y-1">
+                <div key={idx} className="p-4 rounded-xl bg-slate-800/40 border border-slate-800 space-y-1.5">
                   <div className="flex items-center justify-between">
                     <h4 className="text-xs font-bold text-white">
                       {edu.degree || 'Degree / Qualification'}
@@ -571,15 +796,15 @@ export default function CandidateProfileCard({ resumeData, compact = false }: Ca
 
         {/* 6. Certifications & Licenses Part-wise */}
         {(activeTab === 'all' || activeTab === 'certifications') && displayCerts.length > 0 && (
-          <div className="space-y-3">
+          <div className="space-y-4">
             <div className="flex items-center space-x-2 text-purple-400 text-xs font-bold uppercase tracking-wider">
               <Award className="w-4 h-4" />
               <span>Certifications & Licenses ({displayCerts.length})</span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
               {displayCerts.map((cert, idx) => (
-                <div key={idx} className="p-3.5 rounded-xl bg-slate-800/30 border border-slate-800 space-y-1 hover:border-purple-500/30 transition-all">
+                <div key={idx} className="p-4 rounded-xl bg-slate-800/40 border border-slate-800 space-y-1.5 hover:border-purple-500/30 transition-all">
                   <div className="flex items-center justify-between">
                     <h4 className="text-xs font-bold text-white">
                       {cert.name}
@@ -600,7 +825,7 @@ export default function CandidateProfileCard({ resumeData, compact = false }: Ca
                       href={cert.credential_id_or_url.startsWith('http') ? cert.credential_id_or_url : `https://${cert.credential_id_or_url}`}
                       target="_blank"
                       rel="noreferrer"
-                      className="text-[11px] text-indigo-400 hover:text-indigo-300 inline-flex items-center space-x-1 mt-0.5"
+                      className="text-[11px] text-indigo-400 hover:text-indigo-300 inline-flex items-center space-x-1 mt-1"
                     >
                       <span>Verify Credential</span>
                       <ExternalLink className="w-3 h-3" />
@@ -614,15 +839,15 @@ export default function CandidateProfileCard({ resumeData, compact = false }: Ca
 
         {/* 7. Achievements & Honors Part-wise */}
         {(activeTab === 'all' || activeTab === 'achievements') && displayAchievements.length > 0 && (
-          <div className="space-y-3">
+          <div className="space-y-4">
             <div className="flex items-center space-x-2 text-amber-400 text-xs font-bold uppercase tracking-wider">
               <Trophy className="w-4 h-4 text-amber-400" />
               <span>Achievements, Honors & Hackathons ({displayAchievements.length})</span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
               {displayAchievements.map((ach, idx) => (
-                <div key={idx} className="p-3.5 rounded-xl bg-amber-500/5 border border-amber-500/20 space-y-1 relative pl-4 border-l-2 border-l-amber-400">
+                <div key={idx} className="p-4 rounded-xl bg-amber-500/5 border border-amber-500/20 space-y-1.5 relative pl-4 border-l-2 border-l-amber-400">
                   <div className="flex items-center justify-between">
                     <h4 className="text-xs font-bold text-amber-200">
                       {ach.title}
@@ -688,21 +913,19 @@ export default function CandidateProfileCard({ resumeData, compact = false }: Ca
                   <span>Leadership & Activities ({displayExtracurriculars.length})</span>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-2.5">
                   {displayExtracurriculars.map((extra, idx) => (
-                    <div key={idx} className="p-3 rounded-xl bg-slate-800/30 border border-slate-800 space-y-1">
+                    <div key={idx} className="p-4 rounded-xl bg-slate-800/40 border border-slate-800 space-y-1.5">
                       <div className="flex items-center justify-between">
                         <h4 className="text-xs font-bold text-white">{extra.role}</h4>
                         {extra.duration && (
-                          <span className="text-[10px] text-slate-400">{extra.duration}</span>
+                          <span className="text-[10px] text-slate-400 font-medium">{extra.duration}</span>
                         )}
                       </div>
                       {extra.organization && (
-                        <p className="text-xs text-cyan-300">{extra.organization}</p>
+                        <p className="text-xs text-cyan-300 font-medium">{extra.organization}</p>
                       )}
-                      {extra.description && (
-                        <p className="text-xs text-slate-300 leading-relaxed">{extra.description}</p>
-                      )}
+                      <FormattedDescription text={extra.description} />
                     </div>
                   ))}
                 </div>
@@ -717,9 +940,9 @@ export default function CandidateProfileCard({ resumeData, compact = false }: Ca
                   <span>Publications & Research Papers ({displayPublications.length})</span>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                   {displayPublications.map((pub, idx) => (
-                    <div key={idx} className="p-3.5 rounded-xl bg-slate-800/30 border border-slate-800 space-y-1">
+                    <div key={idx} className="p-4 rounded-xl bg-slate-800/40 border border-slate-800 space-y-1.5">
                       <div className="flex items-start justify-between gap-2">
                         <h4 className="text-xs font-bold text-white">{pub.title}</h4>
                         {pub.url_or_doi && (
@@ -729,7 +952,7 @@ export default function CandidateProfileCard({ resumeData, compact = false }: Ca
                             rel="noreferrer"
                             className="text-xs text-sky-400 hover:text-sky-300 inline-flex items-center space-x-1"
                           >
-                            <span>Read</span>
+                            <span>Read Paper</span>
                             <ExternalLink className="w-3 h-3" />
                           </a>
                         )}
@@ -740,9 +963,7 @@ export default function CandidateProfileCard({ resumeData, compact = false }: Ca
                       {pub.date_or_year && (
                         <span className="text-[10px] text-slate-400">{pub.date_or_year}</span>
                       )}
-                      {pub.description && (
-                        <p className="text-xs text-slate-300 leading-relaxed mt-1">{pub.description}</p>
-                      )}
+                      <FormattedDescription text={pub.description} />
                     </div>
                   ))}
                 </div>

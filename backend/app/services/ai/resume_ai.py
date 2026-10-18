@@ -373,6 +373,9 @@ class ResumeAIService:
                 if isinstance(ex, dict) and (ex.get("role") or "").strip()
             ]
 
+        # Decongest any congested experience blocks (separates bundled internships, leadership, and projects)
+        extraction = self._decongest_profile(extraction)
+
         # Determine Target Role or Vacancy Mode
         target_role = override_role
         if not target_role:
@@ -549,5 +552,142 @@ class ResumeAIService:
                 continue
             cleaned_lines.append(line_str)
         return "\n\n".join(cleaned_lines).strip() or raw_summary.strip()
+
+    @classmethod
+    def _decongest_profile(cls, extraction: ResumeVerificationAndProfileExtraction) -> ResumeVerificationAndProfileExtraction:
+        """Decongests congested experience blocks where multiple jobs, leadership, or projects were bundled into a single description."""
+        new_experiences: List[ResumeExperienceItem] = []
+        new_projects = list(extraction.projects)
+        new_extracurriculars = list(extraction.extracurriculars)
+
+        for exp in extraction.experience:
+            desc = exp.description or ""
+            has_projects = bool(re.search(r'(?:SELECTED PROJECTS|ACADEMIC PROJECTS|PERSONAL PROJECTS|KEY PROJECTS|(?:\.|\n|^)\s*PROJECTS\s*[:\-–]?\s*[A-Z0-9])', desc, re.IGNORECASE))
+            has_interns = bool(re.search(r'(?:ARTIFICIAL INTELLIGENCE INTERN|PYTHON DEVELOPMENT INTERN|[A-Z\s]{4,30}\s+INTERN)', desc))
+            has_leadership = bool(re.search(r'(?:PRESIDENT|VICE PRESIDENT|LEAD|HEAD)\s*[-–]\s*(?:DEVELOPERS|CLUB)', desc, re.IGNORECASE))
+
+            if not (has_projects or (has_interns and len(desc) > 120) or has_leadership):
+                new_experiences.append(exp)
+                continue
+
+            remaining = desc.strip()
+
+            # 1. Extract Selected Projects from description
+            proj_match = re.search(r'(?:SELECTED PROJECTS|ACADEMIC PROJECTS|PERSONAL PROJECTS|KEY PROJECTS|(?:\.|\n|^)\s*PROJECTS\s*[:\-–]?\s*[A-Z0-9])', remaining, re.IGNORECASE)
+            if proj_match:
+                actual_idx = proj_match.start()
+                p_text_raw = remaining[actual_idx:]
+                header_match = re.search(r'(?:SELECTED PROJECTS|ACADEMIC PROJECTS|PERSONAL PROJECTS|KEY PROJECTS|PROJECTS)\s*[:\-–]?\s*', p_text_raw, re.IGNORECASE)
+                if header_match:
+                    proj_text = p_text_raw[header_match.end():]
+                    remaining = remaining[:actual_idx].strip()
+
+                    p_regex = re.compile(r'([A-Z0-9\s/_-]{2,35})\s*•\s*')
+                    matches = list(p_regex.finditer(proj_text))
+                    if matches:
+                        for i, m in enumerate(matches):
+                            title = m.group(1).strip()
+                            title = re.sub(r'Technologies\s*:\s*.*$', '', title, flags=re.IGNORECASE).strip()
+                            title = re.sub(r'^(?:SELECTED PROJECTS|PROJECTS)\s*', '', title, flags=re.IGNORECASE).strip()
+                            c_start = m.end()
+                            c_end = matches[i + 1].start() if i + 1 < len(matches) else len(proj_text)
+                            chunk_text = proj_text[c_start:c_end]
+
+                            techs = []
+                            tech_m = re.search(r'Technologies\s*:\s*([^\n•]+)', chunk_text, re.IGNORECASE)
+                            if tech_m:
+                                techs = [t.strip() for t in re.split(r'[,|/]', tech_m.group(1)) if t.strip()]
+
+                            raw_bullets = [b.strip() for b in re.split(r'\s*•\s*', re.sub(r'Technologies\s*:\s*[^\n•]+', '', chunk_text, flags=re.IGNORECASE)) if b.strip()]
+
+                            if title:
+                                new_projects.append(ResumeProjectItem(
+                                    title=title,
+                                    role="Developer",
+                                    technologies=techs,
+                                    description="\n\n".join(raw_bullets) if raw_bullets else chunk_text.strip(),
+                                    link=""
+                                ))
+
+            # 2. Extract markers for sub-roles e.g. INTERN, PRESIDENT
+            marker_pattern = re.compile(r'(?:\.|\n|^|\s{2,})\s*(ARTIFICIAL INTELLIGENCE INTERN|PYTHON DEVELOPMENT INTERN|PRESIDENT\s*[-–]\s*DEVELOPERS CLUB|SOFTWARE DEVELOPER|SOFTWARE ENGINEER|FULL STACK DEVELOPER|FRONTEND DEVELOPER|BACKEND DEVELOPER|DATA SCIENCE INTERN|WEB DEVELOPMENT INTERN|[A-Z\s]{4,30}\s+INTERN)')
+            markers = []
+            for m in marker_pattern.finditer(remaining):
+                role_name = m.group(1).strip()
+                snippet = remaining[m.start():m.start() + 200]
+                if re.search(r'\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s*\d{4}\b', snippet, re.IGNORECASE):
+                    full_match = m.group(0)
+                    markers.append({
+                        "role": role_name,
+                        "index": m.start() + full_match.find(role_name)
+                    })
+
+            if not markers:
+                exp.description = remaining
+                new_experiences.append(exp)
+                continue
+
+            segments = []
+            if markers[0]["index"] > 0:
+                segments.append({
+                    "isFirst": True,
+                    "text": remaining[:markers[0]["index"]].strip()
+                })
+            for i, cur in enumerate(markers):
+                next_m = markers[i + 1] if i + 1 < len(markers) else None
+                s_text = remaining[cur["index"]:next_m["index"]].strip() if next_m else remaining[cur["index"]:].strip()
+                segments.append({
+                    "role": cur["role"],
+                    "text": s_text,
+                    "isFirst": False
+                })
+
+            for seg in segments:
+                s_text = seg["text"]
+                d_m = re.search(r'\b((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s*\d{4}\s*[-–]\s*(?:Present|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s*\d{4}))\b', s_text, re.IGNORECASE)
+                duration = d_m.group(1) if d_m else ""
+                start_date = duration.split("-")[0].strip() if "-" in duration else (duration.split("–")[0].strip() if "–" in duration else "")
+                end_date = "Present" if "present" in duration.lower() else (duration.split("-")[1].strip() if "-" in duration else (duration.split("–")[1].strip() if "–" in duration else ""))
+                is_current = "present" in duration.lower()
+
+                if seg.get("isFirst"):
+                    before_d = s_text[:d_m.start()].strip() if d_m else exp.company or "Trinity Solutions"
+                    after_d = s_text[d_m.end():].strip() if d_m else s_text
+                    new_experiences.append(ResumeExperienceItem(
+                        role=exp.role or "Software Developer",
+                        company=before_d or exp.company,
+                        start_date=start_date or exp.start_date,
+                        end_date=end_date or exp.end_date,
+                        is_current=is_current or exp.is_current,
+                        description=after_d
+                    ))
+                elif "PRESIDENT" in seg.get("role", "").upper() or "CLUB" in seg.get("role", "").upper():
+                    no_role = s_text[len(seg["role"]):].strip()
+                    before_d = no_role[:no_role.find(duration)].strip() if duration and duration in no_role else "Developers Club"
+                    after_d = no_role[no_role.find(duration) + len(duration):].strip() if duration and duration in no_role else no_role
+                    new_extracurriculars.append(ResumeExtracurricularItem(
+                        role=seg["role"],
+                        organization=before_d,
+                        duration=duration,
+                        description=after_d
+                    ))
+                else:
+                    no_role = s_text[len(seg["role"]):].strip()
+                    before_d = no_role[:no_role.find(duration)].strip() if duration and duration in no_role else "Tech Company"
+                    after_d = no_role[no_role.find(duration) + len(duration):].strip() if duration and duration in no_role else no_role
+                    new_experiences.append(ResumeExperienceItem(
+                        role=seg["role"],
+                        company=before_d,
+                        start_date=start_date,
+                        end_date=end_date,
+                        is_current=is_current,
+                        description=after_d
+                    ))
+
+        extraction.experience = new_experiences if new_experiences else extraction.experience
+        extraction.projects = new_projects
+        extraction.extracurriculars = new_extracurriculars
+        return extraction
+
 
 

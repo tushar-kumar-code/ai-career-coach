@@ -104,18 +104,23 @@ Your task is TWO-FOLD:
        * VERBATIM: Do NOT modify, summarize, normalize, or alter skill names. If the resume says "Python Basic", extract "Python Basic" verbatim (do NOT strip "Basic"). If the resume says "C Basic", extract "C Basic".
        * NO FAKE PERCENTAGES: Do NOT fabricate artificial proficiency percentages. Set "proficiency_estimated": null if not explicitly written in the resume.
    - "experience": List of work experiences:
-       - role (job title / position)
-       - company (company name)
+       * STRICT SEGREGATION RULE: NEVER combine or dump multiple jobs, internships, leadership roles, or projects into a single item or description!
+       * Every job or internship (e.g., "Software Developer at Trinity Solutions", "Artificial Intelligence Intern at Edunet Foundation", "Python Development Intern at Octanet Services") MUST be its OWN separate object in the `experience` list.
+       * Leadership / student club positions (e.g. "President - Developers Club", "Lead Organizer") MUST be placed in `extracurriculars`, NOT in `experience`.
+       * Projects (e.g. "Hypoth AI", "SilentTalk AI", "CampusCare AI") MUST NEVER be placed inside an experience item's description! They MUST be placed in `projects`.
+       - role (job title / position, e.g. "Software Developer", "Artificial Intelligence Intern")
+       - company (company name, e.g. "Trinity Solutions", "Edunet Foundation")
        - location (city/state)
-       - start_date (e.g., "Jan 2022")
-       - end_date (e.g., "Present" or "Dec 2023")
+       - start_date (e.g., "Apr 2026", "Aug 2025")
+       - end_date (e.g., "Present", "Sep 2025")
        - is_current (true if current job)
-       - description (summary of role)
+       - description (clean summary of ONLY this specific role's duties without other jobs or projects)
        - key_achievements (list of distinct bullet achievements)
-   - "projects": List of projects (CRITICAL: Look for sections titled "Projects", "Academic Projects", "Personal Projects", "Capstone Projects", "Key Projects", "Coursework Projects", or "Mini Projects"):
-       - title (project name, e.g. "AI Career Coach", "E-Commerce App")
-       - role (candidate's role, e.g. "Full Stack Developer", "Sole Contributor")
-       - technologies (array of tech stack, e.g. ["React", "FastAPI", "PostgreSQL", "TailwindCSS"])
+   - "projects": List of projects (CRITICAL: Look for sections titled "Projects", "Selected Projects", "Academic Projects", "Personal Projects", "Capstone Projects", "Key Projects"):
+       * Each project (e.g. "Hypoth AI", "SilentTalk AI", "CampusCare AI") MUST be its own separate object in `projects`!
+       - title (project name, e.g. "Hypoth AI", "SilentTalk AI", "CampusCare AI")
+       - role (candidate's role, e.g. "Developer", "Creator")
+       - technologies (array of tech stack, e.g. ["Python", "FastAPI", "LLaMA-3", "Firebase"])
        - description (clear overview of project features, implementation, and impact)
        - link (live URL, GitHub repository, or demo link if present)
    - "education": List of degrees & schooling:
