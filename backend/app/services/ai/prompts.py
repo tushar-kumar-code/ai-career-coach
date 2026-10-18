@@ -91,7 +91,7 @@ Your task is TWO-FOLD:
    Extract and trace all resume information cleanly into structured parts:
    - "about_user": {
        "name": full candidate name,
-       "headline": short professional title (e.g., "Full Stack Developer", "Data Analyst"),
+       "headline": short professional title or designation (e.g., "Full Stack Developer", "Data Analyst", "Computer Science Student"),
        "email": candidate email address,
        "phone": contact phone number,
        "location": city / state / country,
@@ -104,7 +104,7 @@ Your task is TWO-FOLD:
        * VERBATIM: Do NOT modify, summarize, normalize, or alter skill names. If the resume says "Python Basic", extract "Python Basic" verbatim (do NOT strip "Basic"). If the resume says "C Basic", extract "C Basic".
        * NO FAKE PERCENTAGES: Do NOT fabricate artificial proficiency percentages. Set "proficiency_estimated": null if not explicitly written in the resume.
    - "experience": List of work experiences:
-       - role (job title)
+       - role (job title / position)
        - company (company name)
        - location (city/state)
        - start_date (e.g., "Jan 2022")
@@ -112,24 +112,43 @@ Your task is TWO-FOLD:
        - is_current (true if current job)
        - description (summary of role)
        - key_achievements (list of distinct bullet achievements)
-   - "projects": List of projects:
-       - title (project name)
-       - role (candidate's role on project)
-       - technologies (array of tech used)
-       - description (detailed overview)
-       - link (project or code repository URL if found)
-   - "education": List of degrees:
-       - degree (e.g. "B.Tech in Computer Science")
-       - institution (college/university name)
-       - field_of_study (e.g. "Computer Engineering")
+   - "projects": List of projects (CRITICAL: Look for sections titled "Projects", "Academic Projects", "Personal Projects", "Capstone Projects", "Key Projects", "Coursework Projects", or "Mini Projects"):
+       - title (project name, e.g. "AI Career Coach", "E-Commerce App")
+       - role (candidate's role, e.g. "Full Stack Developer", "Sole Contributor")
+       - technologies (array of tech stack, e.g. ["React", "FastAPI", "PostgreSQL", "TailwindCSS"])
+       - description (clear overview of project features, implementation, and impact)
+       - link (live URL, GitHub repository, or demo link if present)
+   - "education": List of degrees & schooling:
+       - degree (e.g. "B.Tech in Computer Science", "Senior Secondary (12th)")
+       - institution (college / university / school name)
+       - field_of_study (e.g. "Computer Engineering", "Science")
        - start_year (e.g. "2020")
        - end_year (e.g. "2024")
-       - grade (e.g. "8.6 CGPA" or "3.8 GPA")
-   - "certifications": List of certifications:
-       - name (certification title)
-       - issuer (e.g. "AWS", "Google", "Coursera")
-       - issue_date (e.g. "2023")
-       - credential_id_or_url (link or credential ID if present)
+       - grade (e.g. "8.6 CGPA", "85%", or "3.8 GPA")
+   - "certifications": List of certifications and licenses:
+       - name (certification or course title, e.g. "AWS Certified Cloud Practitioner", "Machine Learning Specialization")
+       - issuer (issuing organization, e.g. "Amazon Web Services", "Coursera", "Google", "HackerRank")
+       - issue_date (date or year issued, e.g. "2023")
+       - credential_id_or_url (credential link or certificate ID if present)
+   - "achievements": List of honors, awards, hackathons, and competitions:
+       - title (achievement title, e.g. "1st Runner Up - Smart India Hackathon", "CodeChef 4-Star Coder", "Top 5% in LeetCode Weekly")
+       - issuer_or_event (event or platform name, e.g. "SIH 2023", "LeetCode", "University Hackathon")
+       - year (year, e.g. "2023")
+       - description (brief context or details of the achievement)
+   - "publications": List of research papers, patents, or publications:
+       - title (paper or article title)
+       - authors_or_journal (journal, conference, or publisher name)
+       - date_or_year (publication date or year)
+       - url_or_doi (URL or DOI link if present)
+       - description (brief overview of research)
+   - "languages": List of natural languages known:
+       - language (e.g. "English", "Hindi", "Spanish", "German")
+       - proficiency (e.g. "Native", "Fluent", "Professional Working", "Intermediate", "Elementary")
+   - "extracurriculars": List of leadership, clubs, volunteering, and societies:
+       - role (e.g. "Core Team Member", "President", "Volunteer Lead")
+       - organization (club, NGO, society, or chapter name)
+       - duration (e.g. "2022 - 2023")
+       - description (brief details of responsibilities and contributions)
 
 DO NOT fabricate experiences, companies, or dates. Extract only facts directly stated or clearly implied in the text.
 """

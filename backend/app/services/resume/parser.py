@@ -12,6 +12,11 @@ class ResumeParser:
         experience = self._parse_experience(sections.get("experience", ""))
         education = self._parse_education(sections.get("education", ""))
         projects = self._parse_projects(sections.get("projects", ""))
+        certifications = self._parse_certifications(sections.get("certifications", ""))
+        achievements = self._parse_achievements(sections.get("achievements", ""))
+        languages = self._parse_languages(sections.get("languages", ""))
+        publications = self._parse_publications(sections.get("publications", ""))
+        extracurriculars = self._parse_extracurriculars(sections.get("extracurriculars", ""))
 
         return {
             "contact_info": contact_info,
@@ -20,8 +25,11 @@ class ResumeParser:
             "experience": experience,
             "education": education,
             "projects": projects,
-            "certifications": sections.get("certifications", []),
-            "achievements": sections.get("achievements", [])
+            "certifications": certifications,
+            "achievements": achievements,
+            "languages": languages,
+            "publications": publications,
+            "extracurriculars": extracurriculars
         }
 
     def _extract_contact_info(self, text: str) -> Dict[str, Any]:
@@ -47,13 +55,16 @@ class ResumeParser:
 
     def _segment_sections(self, text: str) -> Dict[str, Any]:
         section_patterns = {
-            "summary": r'(?:summary|profile|about me|objective|professional summary)',
-            "experience": r'(?:experience|work history|employment|experience history|professional experience)',
-            "education": r'(?:education|academic background|qualifications|academic history)',
-            "projects": r'(?:projects|personal projects|key projects|academic projects)',
-            "skills": r'(?:skills|technical skills|technologies|core competencies|key skills|it skills|technical expertise|skills & abilities)',
-            "certifications": r'(?:certifications|licenses|courses|certifications & licenses)',
-            "achievements": r'(?:achievements|honors|awards)'
+            "summary": r'(?:summary|profile|about me|objective|professional summary|career objective)',
+            "experience": r'(?:experience|work history|employment|experience history|professional experience|internships?|work experience)',
+            "education": r'(?:education|academic background|qualifications|academic history|educational details|academics)',
+            "projects": r'(?:projects|personal projects|key projects|academic projects|capstone projects?|major projects?|mini projects?|coursework projects?|selected projects)',
+            "skills": r'(?:skills|technical skills|technologies|core competencies|key skills|it skills|technical expertise|skills & abilities|technical proficiencies)',
+            "certifications": r'(?:certifications|licenses|courses|certificates|certifications & licenses|trainings? & certifications?|certifications & courses)',
+            "achievements": r'(?:achievements|honors|awards|key achievements|honors & awards|accomplishments|hackathons|recognitions)',
+            "languages": r'(?:languages|languages known|languages spoken)',
+            "publications": r'(?:publications|research papers?|patents?|papers? published|journals)',
+            "extracurriculars": r'(?:extracurricular(?:s| activities)?|co-curricular(?: activities)?|leadership(?: & activities)?|volunteering|volunteer work|activities)'
         }
 
         # Simple section splitter based on common headers
@@ -210,16 +221,162 @@ class ResumeParser:
         return edu_list
 
     def _parse_projects(self, proj_text: str) -> List[Dict[str, Any]]:
-        if not proj_text:
+        if not proj_text or not proj_text.strip():
             return []
+        
+        # Split by double newlines first
         blocks = [b.strip() for b in proj_text.split("\n\n") if b.strip()]
+        
+        # If single block but multiple lines, look for bullet or numbered project headers
+        if len(blocks) <= 1:
+            raw_lines = [l.strip() for l in proj_text.splitlines() if l.strip()]
+            candidate_blocks = []
+            current_b = []
+            for line in raw_lines:
+                # Detect project header: numbered like "1. ", "Project 1:", or bullet followed by title/tech
+                is_header = (
+                    re.match(r'^(?:[0-9]+[\.\)]|•|\*|▪|-)\s+[A-Z0-9]', line) or
+                    re.search(r'\(.*?(?:React|Python|Java|Node|Flutter|HTML|CSS|AWS|SQL|AI|ML).*?\)', line, re.IGNORECASE) or
+                    re.match(r'^(?:project|title)\s*:\s*', line, re.IGNORECASE)
+                )
+                if is_header and current_b and len(current_b) >= 2:
+                    candidate_blocks.append("\n".join(current_b))
+                    current_b = [line]
+                else:
+                    current_b.append(line)
+            if current_b:
+                candidate_blocks.append("\n".join(current_b))
+            if len(candidate_blocks) > 1:
+                blocks = candidate_blocks
+
         proj_list = []
-        for block in blocks[:5]:
-            lines = block.splitlines()
-            title = lines[0] if lines else "Project"
+        for block in blocks[:8]:
+            lines = [l.strip() for l in block.splitlines() if l.strip()]
+            if not lines:
+                continue
+            first_line = lines[0]
+            # Strip leading bullet/numbering
+            clean_title = re.sub(r'^(?:[0-9]+[\.\)]|•|\*|▪|-)\s*', '', first_line).strip()
+            
+            # Extract technologies from parentheses or brackets e.g., "AI Chatbot (React, FastAPI, Gemini)"
+            tech_match = re.search(r'[\(\[]([^\)\]]+)[\)\]]', clean_title)
+            techs = []
+            if tech_match:
+                tech_str = tech_match.group(1)
+                techs = [t.strip() for t in re.split(r'[,|/]', tech_str) if len(t.strip()) < 30]
+                clean_title = re.sub(r'\s*[\(\[][^\)\]]+[\)\]]', '', clean_title).strip()
+            
+            # Extract link if in block
+            link_match = re.search(r'https?://[^\s\)]+', block)
+            proj_link = link_match.group(0) if link_match else ""
+
             proj_list.append({
-                "title": title,
-                "name": title,
-                "description": "\n".join(lines[1:]) if len(lines) > 1 else block
+                "title": clean_title if clean_title else "Project",
+                "name": clean_title if clean_title else "Project",
+                "role": "Developer",
+                "technologies": techs,
+                "description": "\n".join(lines[1:]) if len(lines) > 1 else clean_title,
+                "link": proj_link
             })
         return proj_list
+
+    def _parse_certifications(self, cert_text: str) -> List[Dict[str, Any]]:
+        if not cert_text or not cert_text.strip():
+            return []
+        lines = [l.strip() for l in cert_text.splitlines() if l.strip()]
+        cert_list = []
+        for line in lines[:8]:
+            clean_line = re.sub(r'^(?:[0-9]+[\.\)]|•|\*|▪|-)\s*', '', line).strip()
+            if not clean_line or len(clean_line) < 3:
+                continue
+            parts = re.split(r'\s*[-–|]\s*|\s+by\s+|\s+from\s+', clean_line, maxsplit=2)
+            name = parts[0].strip() if parts else clean_line
+            issuer = parts[1].strip() if len(parts) > 1 else ""
+            date_match = re.search(r'\b(?:19|20)\d{2}\b', clean_line)
+            issue_date = date_match.group(0) if date_match else ""
+            link_match = re.search(r'https?://[^\s\)]+', clean_line)
+            
+            cert_list.append({
+                "name": name,
+                "issuer": issuer,
+                "issue_date": issue_date,
+                "credential_id_or_url": link_match.group(0) if link_match else ""
+            })
+        return cert_list
+
+    def _parse_achievements(self, ach_text: str) -> List[Dict[str, Any]]:
+        if not ach_text or not ach_text.strip():
+            return []
+        lines = [l.strip() for l in ach_text.splitlines() if l.strip()]
+        ach_list = []
+        for line in lines[:8]:
+            clean_line = re.sub(r'^(?:[0-9]+[\.\)]|•|\*|▪|-)\s*', '', line).strip()
+            if not clean_line or len(clean_line) < 4:
+                continue
+            year_match = re.search(r'\b(?:19|20)\d{2}\b', clean_line)
+            ach_list.append({
+                "title": clean_line[:80].strip(),
+                "issuer_or_event": "",
+                "year": year_match.group(0) if year_match else "",
+                "description": clean_line
+            })
+        return ach_list
+
+    def _parse_languages(self, lang_text: str) -> List[Dict[str, Any]]:
+        if not lang_text or not lang_text.strip():
+            return []
+        tokens = re.split(r'[,|;\n•·*▪►]+', lang_text)
+        known_langs = ["english", "hindi", "spanish", "french", "german", "mandarin", "japanese", "bengali", "marathi", "tamil", "telugu", "gujarati", "kannada", "punjabi", "urdu", "russian", "arabic"]
+        lang_list = []
+        for t in tokens:
+            item = re.sub(r'^(?:[0-9]+[\.\)]|•|\*|▪|-)\s*', '', t).strip()
+            if not item:
+                continue
+            # Extract proficiency if in brackets, e.g. "English (Fluent)"
+            prof_match = re.search(r'\((.*?)\)', item)
+            prof = prof_match.group(1).strip() if prof_match else "Proficient"
+            clean_l = re.sub(r'\(.*?\)', '', item).strip()
+            if clean_l and (clean_l.lower() in known_langs or len(clean_l.split()) <= 2):
+                lang_list.append({
+                    "language": clean_l.capitalize(),
+                    "proficiency": prof
+                })
+        return lang_list
+
+    def _parse_publications(self, pub_text: str) -> List[Dict[str, Any]]:
+        if not pub_text or not pub_text.strip():
+            return []
+        lines = [l.strip() for l in pub_text.splitlines() if l.strip()]
+        pub_list = []
+        for line in lines[:5]:
+            clean_line = re.sub(r'^(?:[0-9]+[\.\)]|•|\*|▪|-)\s*', '', line).strip()
+            if not clean_line:
+                continue
+            date_match = re.search(r'\b(?:19|20)\d{2}\b', clean_line)
+            link_match = re.search(r'https?://[^\s\)]+', clean_line)
+            pub_list.append({
+                "title": clean_line[:100],
+                "authors_or_journal": "",
+                "date_or_year": date_match.group(0) if date_match else "",
+                "url_or_doi": link_match.group(0) if link_match else "",
+                "description": clean_line
+            })
+        return pub_list
+
+    def _parse_extracurriculars(self, extra_text: str) -> List[Dict[str, Any]]:
+        if not extra_text or not extra_text.strip():
+            return []
+        lines = [l.strip() for l in extra_text.splitlines() if l.strip()]
+        extra_list = []
+        for line in lines[:5]:
+            clean_line = re.sub(r'^(?:[0-9]+[\.\)]|•|\*|▪|-)\s*', '', line).strip()
+            if not clean_line or len(clean_line) < 4:
+                continue
+            date_match = re.search(r'\b(?:19|20)\d{2}\b', clean_line)
+            extra_list.append({
+                "role": clean_line[:60],
+                "organization": "",
+                "duration": date_match.group(0) if date_match else "",
+                "description": clean_line
+            })
+        return extra_list

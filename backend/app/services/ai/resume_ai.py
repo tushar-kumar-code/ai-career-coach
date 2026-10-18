@@ -27,7 +27,11 @@ from app.schemas.resume import (
     ResumeProjectItem,
     ResumeEducationItem,
     ResumeCertificationItem,
-    ResumeSkillItem
+    ResumeSkillItem,
+    ResumeAchievementItem,
+    ResumePublicationItem,
+    ResumeLanguageItem,
+    ResumeExtracurricularItem
 )
 
 logger = logging.getLogger(__name__)
@@ -167,6 +171,60 @@ class ResumeAIService:
                         grade=ed.get("grade", "")
                     ))
 
+        cert_items = [
+            ResumeCertificationItem(
+                name=c.get("name") or "Certification",
+                issuer=c.get("issuer", ""),
+                issue_date=c.get("issue_date", ""),
+                credential_id_or_url=c.get("credential_id_or_url", "")
+            )
+            for c in parsed.get("certifications", [])
+            if isinstance(c, dict) and (c.get("name") or "").strip()
+        ]
+
+        ach_items = [
+            ResumeAchievementItem(
+                title=a.get("title") or "Achievement",
+                issuer_or_event=a.get("issuer_or_event", ""),
+                year=a.get("year", ""),
+                description=a.get("description", "")
+            )
+            for a in parsed.get("achievements", [])
+            if isinstance(a, dict) and (a.get("title") or "").strip()
+        ]
+
+        lang_items = [
+            ResumeLanguageItem(
+                language=l.get("language") or "Language",
+                proficiency=l.get("proficiency", "Proficient")
+            )
+            for l in parsed.get("languages", [])
+            if isinstance(l, dict) and (l.get("language") or "").strip()
+        ]
+
+        pub_items = [
+            ResumePublicationItem(
+                title=pub.get("title") or "Publication",
+                authors_or_journal=pub.get("authors_or_journal", ""),
+                date_or_year=pub.get("date_or_year", ""),
+                url_or_doi=pub.get("url_or_doi", ""),
+                description=pub.get("description", "")
+            )
+            for pub in parsed.get("publications", [])
+            if isinstance(pub, dict) and (pub.get("title") or "").strip()
+        ]
+
+        extra_items = [
+            ResumeExtracurricularItem(
+                role=ex.get("role") or "Member",
+                organization=ex.get("organization", ""),
+                duration=ex.get("duration", ""),
+                description=ex.get("description", "")
+            )
+            for ex in parsed.get("extracurriculars", [])
+            if isinstance(ex, dict) and (ex.get("role") or "").strip()
+        ]
+
         return ResumeVerificationAndProfileExtraction(
             is_resume=True,
             confidence_score=75,
@@ -176,7 +234,11 @@ class ResumeAIService:
             experience=exp_items,
             projects=proj_items,
             education=edu_items,
-            certifications=[]
+            certifications=cert_items,
+            achievements=ach_items,
+            publications=pub_items,
+            languages=lang_items,
+            extracurriculars=extra_items
         )
 
     async def format_resume_text_with_groq(self, raw_text: str) -> str:
@@ -237,6 +299,79 @@ class ResumeAIService:
 
         # 2. Parse structured section content for deterministic ATS calculations
         parsed = self.parser.parse(raw_text)
+
+        # Fallback recovery: Ensure no section is lost if Groq AI under-extracted projects, certs, etc.
+        if not extraction.projects and parsed.get("projects"):
+            extraction.projects = [
+                ResumeProjectItem(
+                    title=p.get("title") or "Project",
+                    role=p.get("role") or "Developer",
+                    technologies=p.get("technologies") or [],
+                    description=p.get("description", ""),
+                    link=p.get("link", "")
+                )
+                for p in parsed.get("projects", [])
+                if isinstance(p, dict) and (p.get("title") or "").strip()
+            ]
+
+        if not extraction.certifications and parsed.get("certifications"):
+            extraction.certifications = [
+                ResumeCertificationItem(
+                    name=c.get("name") or "Certification",
+                    issuer=c.get("issuer", ""),
+                    issue_date=c.get("issue_date", ""),
+                    credential_id_or_url=c.get("credential_id_or_url", "")
+                )
+                for c in parsed.get("certifications", [])
+                if isinstance(c, dict) and (c.get("name") or "").strip()
+            ]
+
+        if not extraction.achievements and parsed.get("achievements"):
+            extraction.achievements = [
+                ResumeAchievementItem(
+                    title=a.get("title") or "Achievement",
+                    issuer_or_event=a.get("issuer_or_event", ""),
+                    year=a.get("year", ""),
+                    description=a.get("description", "")
+                )
+                for a in parsed.get("achievements", [])
+                if isinstance(a, dict) and (a.get("title") or "").strip()
+            ]
+
+        if not extraction.languages and parsed.get("languages"):
+            extraction.languages = [
+                ResumeLanguageItem(
+                    language=l.get("language") or "Language",
+                    proficiency=l.get("proficiency", "Proficient")
+                )
+                for l in parsed.get("languages", [])
+                if isinstance(l, dict) and (l.get("language") or "").strip()
+            ]
+
+        if not extraction.publications and parsed.get("publications"):
+            extraction.publications = [
+                ResumePublicationItem(
+                    title=pub.get("title") or "Publication",
+                    authors_or_journal=pub.get("authors_or_journal", ""),
+                    date_or_year=pub.get("date_or_year", ""),
+                    url_or_doi=pub.get("url_or_doi", ""),
+                    description=pub.get("description", "")
+                )
+                for pub in parsed.get("publications", [])
+                if isinstance(pub, dict) and (pub.get("title") or "").strip()
+            ]
+
+        if not extraction.extracurriculars and parsed.get("extracurriculars"):
+            extraction.extracurriculars = [
+                ResumeExtracurricularItem(
+                    role=ex.get("role") or "Member",
+                    organization=ex.get("organization", ""),
+                    duration=ex.get("duration", ""),
+                    description=ex.get("description", "")
+                )
+                for ex in parsed.get("extracurriculars", [])
+                if isinstance(ex, dict) and (ex.get("role") or "").strip()
+            ]
 
         # Determine Target Role or Vacancy Mode
         target_role = override_role
@@ -370,7 +505,11 @@ class ResumeAIService:
             experience=extraction.experience,
             projects=extraction.projects,
             education=extraction.education,
-            certifications=extraction.certifications
+            certifications=extraction.certifications,
+            achievements=extraction.achievements,
+            publications=extraction.publications,
+            languages=extraction.languages,
+            extracurriculars=extraction.extracurriculars
         )
 
     @staticmethod

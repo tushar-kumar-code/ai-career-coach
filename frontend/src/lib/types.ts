@@ -235,6 +235,33 @@ export interface ResumeCertificationItem {
   credential_id_or_url?: string;
 }
 
+export interface ResumeAchievementItem {
+  title: string;
+  issuer_or_event?: string;
+  year?: string;
+  description?: string;
+}
+
+export interface ResumePublicationItem {
+  title: string;
+  authors_or_journal?: string;
+  date_or_year?: string;
+  url_or_doi?: string;
+  description?: string;
+}
+
+export interface ResumeLanguageItem {
+  language: string;
+  proficiency?: string;
+}
+
+export interface ResumeExtracurricularItem {
+  role: string;
+  organization?: string;
+  duration?: string;
+  description?: string;
+}
+
 export interface ExtractedSkill {
   name: string;
   category: string;
@@ -266,6 +293,10 @@ export interface ResumeAnalysisData {
   projects?: ResumeProjectItem[];
   education?: ResumeEducationItem[];
   certifications?: ResumeCertificationItem[];
+  achievements?: ResumeAchievementItem[];
+  publications?: ResumePublicationItem[];
+  languages?: ResumeLanguageItem[];
+  extracurriculars?: ResumeExtracurricularItem[];
 }
 
 // ----------------------------------------------------

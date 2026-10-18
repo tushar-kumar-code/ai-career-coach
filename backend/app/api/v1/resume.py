@@ -68,6 +68,26 @@ async def upload_resume(
     logger.info("🗑️ [RAM DISCARD] Raw resume file content and text immediately wiped from RAM memory.")
 
     # 4. Save Resume Record in SQL Database (ZERO resume files or text stored, only extracted profile structure)
+    contact_info_dict = analysis.about_user.model_dump() if analysis.about_user else analysis.contact_info.model_dump()
+    cert_list = [c.model_dump() for c in analysis.certifications]
+    ach_list = [a.model_dump() for a in analysis.achievements]
+    pub_list = [p.model_dump() for p in analysis.publications]
+    lang_list = [l.model_dump() for l in analysis.languages]
+    extra_list = [ex.model_dump() for ex in analysis.extracurriculars]
+
+    contact_info_dict["certifications"] = cert_list
+    contact_info_dict["achievements"] = ach_list
+    contact_info_dict["publications"] = pub_list
+    contact_info_dict["languages"] = lang_list
+    contact_info_dict["extracurriculars"] = extra_list
+
+    ats_breakdown_dict = analysis.ats_breakdown.model_dump()
+    ats_breakdown_dict["certifications"] = cert_list
+    ats_breakdown_dict["achievements"] = ach_list
+    ats_breakdown_dict["publications"] = pub_list
+    ats_breakdown_dict["languages"] = lang_list
+    ats_breakdown_dict["extracurriculars"] = extra_list
+
     resume = Resume(
         id=resume_id,
         user_id=user_id,
@@ -85,9 +105,9 @@ async def upload_resume(
         target_match_percentage=analysis.target_match.match_percentage,
         matching_skills=analysis.target_match.matching_skills,
         missing_skills=analysis.target_match.missing_skills,
-        ats_breakdown_json=analysis.ats_breakdown.model_dump(),
+        ats_breakdown_json=ats_breakdown_dict,
         formatting_risk_flags=analysis.formatting_risk_flags,
-        parsed_contact_info=analysis.about_user.model_dump() if analysis.about_user else analysis.contact_info.model_dump(),
+        parsed_contact_info=contact_info_dict,
         parsed_skills=[s.model_dump() for s in analysis.extracted_skills],
         parsed_experience=[e.model_dump() for e in analysis.experience],
         parsed_education=[ed.model_dump() for ed in analysis.education],
@@ -100,12 +120,16 @@ async def upload_resume(
 
     # 5. Persist Structured Candidate Profile & Analysis Metrics to Firestore (ZERO resume file stored)
     candidate_profile_dict = {
-        "about_user": analysis.about_user.model_dump() if analysis.about_user else analysis.contact_info.model_dump(),
+        "about_user": contact_info_dict,
         "skills": [s.model_dump() for s in analysis.extracted_skills],
         "experience": [e.model_dump() for e in analysis.experience],
         "projects": [p.model_dump() for p in analysis.projects],
         "education": [ed.model_dump() for ed in analysis.education],
-        "certifications": [c.model_dump() for c in analysis.certifications],
+        "certifications": cert_list,
+        "achievements": ach_list,
+        "publications": pub_list,
+        "languages": lang_list,
+        "extracurriculars": extra_list,
         "ats_score": analysis.ats_score,
         "filename": filename,
         "resume_id": resume_id
@@ -129,7 +153,7 @@ async def upload_resume(
             "target_match_percentage": analysis.target_match.match_percentage,
             "matching_skills": analysis.target_match.matching_skills,
             "missing_skills": analysis.target_match.missing_skills,
-            "ats_breakdown_json": analysis.ats_breakdown.model_dump(),
+            "ats_breakdown_json": ats_breakdown_dict,
             "formatting_risk_flags": analysis.formatting_risk_flags,
             "parsed_contact_info": candidate_profile_dict["about_user"],
             "parsed_skills": [s.model_dump() for s in analysis.extracted_skills],
@@ -137,6 +161,10 @@ async def upload_resume(
             "parsed_projects": candidate_profile_dict["projects"],
             "parsed_education": candidate_profile_dict["education"],
             "parsed_certifications": candidate_profile_dict["certifications"],
+            "parsed_achievements": candidate_profile_dict["achievements"],
+            "parsed_publications": candidate_profile_dict["publications"],
+            "parsed_languages": candidate_profile_dict["languages"],
+            "parsed_extracurriculars": candidate_profile_dict["extracurriculars"],
             "about_user": candidate_profile_dict["about_user"],
             "improvement_suggestions": [imp.model_dump() for imp in analysis.improvement_suggestions],
         }
@@ -404,7 +432,11 @@ async def get_resume_analysis(
                 experience=fs_resume.get("parsed_experience") or [],
                 projects=fs_resume.get("parsed_projects") or [],
                 education=fs_resume.get("parsed_education") or [],
-                certifications=fs_resume.get("parsed_certifications") or []
+                certifications=fs_resume.get("parsed_certifications") or [],
+                achievements=fs_resume.get("parsed_achievements") or [],
+                publications=fs_resume.get("parsed_publications") or [],
+                languages=fs_resume.get("parsed_languages") or [],
+                extracurriculars=fs_resume.get("parsed_extracurriculars") or []
             )
             return APIResponse(
                 success=True,
@@ -434,6 +466,14 @@ async def get_resume_analysis(
         )
 
     contact_data = resume.parsed_contact_info or {"name": "Candidate"}
+    ats_dict = resume.ats_breakdown_json or {}
+    certs = contact_data.get("certifications") or ats_dict.get("certifications") or []
+    achievements = contact_data.get("achievements") or ats_dict.get("achievements") or []
+    publications = contact_data.get("publications") or ats_dict.get("publications") or []
+    languages = contact_data.get("languages") or ats_dict.get("languages") or []
+    extracurriculars = contact_data.get("extracurriculars") or ats_dict.get("extracurriculars") or []
+    projects = resume.parsed_projects or contact_data.get("projects") or ats_dict.get("projects") or []
+
     target_name = resume.target_career_name
     is_general = not target_name or target_name in ["None Selected (General Mode)", "none", "None"]
 
@@ -463,9 +503,13 @@ async def get_resume_analysis(
         raw_text=None,
         about_user=contact_data,
         experience=resume.parsed_experience or [],
-        projects=resume.parsed_projects or [],
+        projects=projects,
         education=resume.parsed_education or [],
-        certifications=[]
+        certifications=certs,
+        achievements=achievements,
+        publications=publications,
+        languages=languages,
+        extracurriculars=extracurriculars
     )
 
     return APIResponse(
@@ -512,9 +556,13 @@ async def match_job_description(
     contact_info = (resume.parsed_contact_info if resume else fs_resume.get("about_user")) or {}
     raw_skills = (resume.parsed_skills if resume else fs_resume.get("parsed_skills")) or []
     experience = (resume.parsed_experience if resume else fs_resume.get("parsed_experience")) or []
-    projects = (resume.parsed_projects if resume else fs_resume.get("parsed_projects")) or []
+    projects = (resume.parsed_projects if resume else fs_resume.get("parsed_projects")) or contact_info.get("projects") or []
     education = (resume.parsed_education if resume else fs_resume.get("parsed_education")) or []
-    certifications = (fs_resume.get("parsed_certifications") if fs_resume else []) or []
+    certifications = (fs_resume.get("parsed_certifications") if fs_resume else []) or contact_info.get("certifications") or []
+    achievements = (fs_resume.get("parsed_achievements") if fs_resume else []) or contact_info.get("achievements") or []
+    publications = (fs_resume.get("parsed_publications") if fs_resume else []) or contact_info.get("publications") or []
+    languages = (fs_resume.get("parsed_languages") if fs_resume else []) or contact_info.get("languages") or []
+    extracurriculars = (fs_resume.get("parsed_extracurriculars") if fs_resume else []) or contact_info.get("extracurriculars") or []
 
     skill_names = [s.get("name") if isinstance(s, dict) else str(s) for s in raw_skills if s]
 
@@ -611,7 +659,11 @@ async def match_job_description(
         experience=experience,
         projects=projects,
         education=education,
-        certifications=certifications
+        certifications=certifications,
+        achievements=achievements,
+        publications=publications,
+        languages=languages,
+        extracurriculars=extracurriculars
     )
 
     return APIResponse(
@@ -630,7 +682,7 @@ async def get_candidate_profile(
     db: AsyncSession = Depends(get_db),
     user_id: str = Depends(get_current_user_id)
 ):
-    """Returns candidate profile (About User, Skills, Experience, Projects, Education) extracted from resume."""
+    """Returns candidate profile (About User, Skills, Experience, Projects, Education, Certs, Achievements, etc.) extracted from resume."""
     # 1. Check user profile in Firestore
     try:
         user_doc = await UserRepository.get_user(user_id)
@@ -654,6 +706,10 @@ async def get_candidate_profile(
                 "projects": fs_resume.get("parsed_projects") or [],
                 "education": fs_resume.get("parsed_education") or [],
                 "certifications": fs_resume.get("parsed_certifications") or [],
+                "achievements": fs_resume.get("parsed_achievements") or [],
+                "publications": fs_resume.get("parsed_publications") or [],
+                "languages": fs_resume.get("parsed_languages") or [],
+                "extracurriculars": fs_resume.get("parsed_extracurriculars") or [],
                 "ats_score": fs_resume.get("overall_ats_score") or 0,
                 "filename": fs_resume.get("filename") or "Resume"
             }
@@ -677,13 +733,26 @@ async def get_candidate_profile(
             data=None
         )
 
+    contact_data = resume.parsed_contact_info or {"name": "Candidate"}
+    ats_dict = resume.ats_breakdown_json or {}
+    certs = contact_data.get("certifications") or ats_dict.get("certifications") or []
+    achievements = contact_data.get("achievements") or ats_dict.get("achievements") or []
+    publications = contact_data.get("publications") or ats_dict.get("publications") or []
+    languages = contact_data.get("languages") or ats_dict.get("languages") or []
+    extracurriculars = contact_data.get("extracurriculars") or ats_dict.get("extracurriculars") or []
+    projects = resume.parsed_projects or contact_data.get("projects") or ats_dict.get("projects") or []
+
     profile_data = {
-        "about_user": resume.parsed_contact_info or {"name": "Candidate"},
+        "about_user": contact_data,
         "skills": resume.parsed_skills or [],
         "experience": resume.parsed_experience or [],
-        "projects": resume.parsed_projects or [],
+        "projects": projects,
         "education": resume.parsed_education or [],
-        "certifications": [],
+        "certifications": certs,
+        "achievements": achievements,
+        "publications": publications,
+        "languages": languages,
+        "extracurriculars": extracurriculars,
         "ats_score": resume.overall_ats_score,
         "filename": resume.filename
     }

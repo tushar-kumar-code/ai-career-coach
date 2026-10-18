@@ -55,6 +55,33 @@ class ResumeSkillItem(BaseModel):
     proficiency_estimated: Optional[int] = Field(default=None, ge=0, le=100)
 
 
+class ResumeAchievementItem(BaseModel):
+    title: str = ""
+    issuer_or_event: str = ""
+    year: str = ""
+    description: str = ""
+
+
+class ResumePublicationItem(BaseModel):
+    title: str = ""
+    authors_or_journal: str = ""
+    date_or_year: str = ""
+    url_or_doi: str = ""
+    description: str = ""
+
+
+class ResumeLanguageItem(BaseModel):
+    language: str = ""
+    proficiency: str = ""  # Native, Fluent, Professional, Intermediate, Elementary
+
+
+class ResumeExtracurricularItem(BaseModel):
+    role: str = ""
+    organization: str = ""
+    duration: str = ""
+    description: str = ""
+
+
 class ResumeVerificationAndProfileExtraction(BaseModel):
     is_resume: bool = Field(
         ...,
@@ -76,6 +103,10 @@ class ResumeVerificationAndProfileExtraction(BaseModel):
     projects: List[ResumeProjectItem] = Field(default_factory=list)
     education: List[ResumeEducationItem] = Field(default_factory=list)
     certifications: List[ResumeCertificationItem] = Field(default_factory=list)
+    achievements: List[ResumeAchievementItem] = Field(default_factory=list)
+    publications: List[ResumePublicationItem] = Field(default_factory=list)
+    languages: List[ResumeLanguageItem] = Field(default_factory=list)
+    extracurriculars: List[ResumeExtracurricularItem] = Field(default_factory=list)
 
 
 class ExtractedSkillSchema(BaseModel):
@@ -162,6 +193,10 @@ class ResumeAnalysisResponse(BaseModel):
     projects: List[ResumeProjectItem] = Field(default_factory=list)
     education: List[ResumeEducationItem] = Field(default_factory=list)
     certifications: List[ResumeCertificationItem] = Field(default_factory=list)
+    achievements: List[ResumeAchievementItem] = Field(default_factory=list)
+    publications: List[ResumePublicationItem] = Field(default_factory=list)
+    languages: List[ResumeLanguageItem] = Field(default_factory=list)
+    extracurriculars: List[ResumeExtracurricularItem] = Field(default_factory=list)
     # Mode & context
     scoring_mode: str = "general"  # target_role | job_description | general
     job_description_snippet: Optional[str] = None
