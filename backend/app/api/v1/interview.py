@@ -420,6 +420,20 @@ async def complete_interview_session(
         questions_data=q_data_list
     )
 
+    # Synchronize interview performance into User Profile & Digital Twin
+    try:
+        from app.services.roadmap.progress_sync import ProfileProgressSyncService
+        progress_sync_service = ProfileProgressSyncService()
+        await progress_sync_service.sync_interview_to_profile(
+            db=db,
+            user_id=user_id,
+            target_role=session.target_role,
+            overall_score=overall_score,
+            category_scores=category_scores
+        )
+    except Exception as e:
+        logger.warning(f"Error syncing interview to user profile: {e}")
+
     await db.commit()
     await db.refresh(session)
 

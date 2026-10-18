@@ -29,10 +29,10 @@ achievement_engine = AchievementEngine()
 class DigitalTwinService:
     """Orchestrates computation and persistence of the Career Digital Twin."""
 
-    async def get_or_compute(self, db: AsyncSession, user_id: str) -> Dict:
+    async def get_or_compute(self, db: AsyncSession, user_id: str, force: bool = False) -> Dict:
         """
         Returns the full Career Digital Twin.
-        If today''s twin already exists and is recent (<1h), returns cached.
+        If today's twin already exists and is recent (<5m), returns cached.
         Otherwise recomputes from live data and upserts.
         """
         today = datetime.date.today()
@@ -47,12 +47,13 @@ class DigitalTwinService:
         profile_res = await db.execute(select(UserProfile).where(UserProfile.user_id == user_id))
         profile = profile_res.scalar_one_or_none()
 
-        if existing:
+        if existing and not force:
             age_minutes = (now - existing.last_computed_at).total_seconds() / 60
             target_changed = bool(profile and profile.target_career != existing.target_career)
-            if age_minutes < 60 and not target_changed:
-                # Return cached within last hour
-                return self._to_dict(existing)
+            profile_score_changed = bool(profile and profile.job_readiness_score != existing.overall_readiness_score)
+            if age_minutes < 5 and not target_changed and not profile_score_changed:
+                # Return cached within last 5 minutes if no performance change
+                return self._to_dict(existing, profile)
 
         # --- Compute all sub-components ---
 
@@ -162,12 +163,12 @@ class DigitalTwinService:
         await db.commit()
 
         # Build full response dict
-        result = self._to_dict(existing)
+        result = self._to_dict(existing, profile)
         result["achievements"] = achievements
         result["gaps"] = gaps
         return result
 
-    def _to_dict(self, twin: CareerDigitalTwin) -> Dict:
+    def _to_dict(self, twin: CareerDigitalTwin, profile: Optional[UserProfile] = None) -> Dict:
         return {
             "user_id": twin.user_id,
             "overall_readiness_score": twin.overall_readiness_score,
@@ -188,6 +189,9 @@ class DigitalTwinService:
             "critical_missing_skills": twin.critical_missing_skills or [],
             "next_action": twin.next_action or {},
             "evidence_summary": twin.evidence_summary or {},
+            "evidence_points": profile.evidence_points if profile else [],
+            "skills_matrix": profile.skills_matrix if profile else {},
             "last_computed_at": twin.last_computed_at.isoformat() if twin.last_computed_at else None,
             "snapshot_date": str(twin.snapshot_date) if twin.snapshot_date else None,
         }
+

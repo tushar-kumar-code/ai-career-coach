@@ -804,6 +804,8 @@ export interface CareerDigitalTwinData {
   snapshot_date?: string;
   achievements?: UserAchievementData[];
   gaps?: GapAnalysisData;
+  evidence_points?: string[];
+  skills_matrix?: Record<string, any>;
 }
 
 export interface ReadinessScoreData {

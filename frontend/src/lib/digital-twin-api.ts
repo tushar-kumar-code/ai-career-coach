@@ -44,9 +44,16 @@ import type {
 const DT_BASE = '/digital-twin';
 
 /** Get the full Career Digital Twin profile (all sub-scores, gaps, next action). */
-export async function getDigitalTwinProfile(): Promise<CareerDigitalTwinData> {
-  return request<CareerDigitalTwinData>(`${DT_BASE}/profile`, { cache: 'no-store' });
+export async function getDigitalTwinProfile(force = false): Promise<CareerDigitalTwinData> {
+  const url = force ? `${DT_BASE}/profile?force=true` : `${DT_BASE}/profile`;
+  return request<CareerDigitalTwinData>(url, { cache: 'no-store' });
 }
+
+/** Recalculate Career Digital Twin and User Profile from live performance data. */
+export async function recalculateDigitalTwinProfile(): Promise<CareerDigitalTwinData> {
+  return request<CareerDigitalTwinData>(`${DT_BASE}/recalculate`, { method: 'POST' });
+}
+
 
 /** Get the current career readiness scores only (lightweight). */
 export async function getReadinessScore(): Promise<ReadinessScoreData> {

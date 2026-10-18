@@ -43,13 +43,14 @@ weekly_report_engine = WeeklyReportEngine()
 async def get_digital_twin_profile(
     db: AsyncSession = Depends(get_db),
     user_id: str = Depends(get_current_user_id),
+    force: bool = False,
 ):
     """
     Returns the complete Career Digital Twin.
-    Auto-computes from live data; caches for 1 hour; saves daily snapshot.
+    Auto-computes from live data; caches for 5 minutes; supports ?force=true.
     """
     try:
-        result = await twin_service.get_or_compute(db, user_id)
+        result = await twin_service.get_or_compute(db, user_id, force=force)
         # Sync to Firestore DigitalTwinRepository
         try:
             await DigitalTwinRepository.save_digital_twin(user_id, result)
@@ -63,6 +64,36 @@ async def get_digital_twin_profile(
         )
     except Exception as e:
         logger.error(f"Digital twin profile error for {user_id}: {e}")
+        return APIResponse(success=False, message=str(e), data=None)
+
+
+@router.post(
+    "/recalculate",
+    response_model=APIResponse,
+    summary="Force recalculate Career Digital Twin and User Profile from latest live evidence",
+)
+async def recalculate_digital_twin_profile(
+    db: AsyncSession = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+):
+    """
+    Bypasses cache and recalculates Career Digital Twin immediately from all latest
+    practice drills, level tests, mock interviews, and roadmap progress.
+    """
+    try:
+        result = await twin_service.get_or_compute(db, user_id, force=True)
+        try:
+            await DigitalTwinRepository.save_digital_twin(user_id, result)
+        except Exception as err:
+            logger.warning(f"Firestore digital twin save warning: {err}")
+
+        return APIResponse(
+            success=True,
+            message="Career Digital Twin recalculated successfully from live performance.",
+            data=result,
+        )
+    except Exception as e:
+        logger.error(f"Digital twin recalculate error for {user_id}: {e}")
         return APIResponse(success=False, message=str(e), data=None)
 
 

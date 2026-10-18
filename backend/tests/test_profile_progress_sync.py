@@ -100,3 +100,92 @@ async def test_roadmap_task_completion_syncs_to_profile_and_ai_chat():
         assert "Backend Engineer" in system_instruction
         assert "Build Multi-Stage Docker Container for FastAPI" in system_instruction
         assert "Docker" in system_instruction
+
+
+@pytest.mark.asyncio
+async def test_level_test_and_drill_sync_to_profile():
+    """Verify that level tests, drills, and interviews update user profile & evidence dynamically."""
+    sync_service = ProfileProgressSyncService()
+
+    async with TestAsyncSessionLocal() as session:
+        user_id = "test-perf-user-002"
+
+        user = User(id=user_id, email="perfuser@example.com", full_name="Priya Patel")
+        profile = UserProfile(
+            user_id=user_id,
+            target_career="Frontend Developer",
+            job_readiness_score=20,
+            skills_matrix={},
+            evidence_points=[]
+        )
+        session.add(user)
+        session.add(profile)
+
+        roadmap = Roadmap(
+            id="rm-perf-002",
+            user_id=user_id,
+            target_role="Frontend Developer",
+            overall_progress_percent=40,
+            is_active=True,
+            phases=[
+                {
+                    "phase_number": 1,
+                    "title": "Phase 1: Modern React & TypeScript",
+                    "skills": ["React", "TypeScript"],
+                    "tasks": []
+                }
+            ]
+        )
+        session.add(roadmap)
+        await session.commit()
+
+        # 1. Level Test Sync
+        test_sync = await sync_service.sync_level_test_to_profile(
+            db=session,
+            user_id=user_id,
+            roadmap=roadmap,
+            phase_number=1,
+            test_score=85,
+            passed=True,
+            stars=3,
+            xp_reward=150
+        )
+        assert test_sync["passed"] is True
+        assert test_sync["test_score"] == 85
+
+        await session.refresh(profile)
+        assert len(profile.evidence_points) > 0
+        assert any("Level Test" in ev for ev in profile.evidence_points)
+        assert "recent_level_tests" in profile.skills_matrix
+        assert profile.skills_matrix["recent_level_tests"][0]["score"] == 85
+
+        # 2. Practice Drill Sync
+        drill_sync = await sync_service.sync_practice_drill_to_profile(
+            db=session,
+            user_id=user_id,
+            topic="React Hooks",
+            is_correct=True,
+            score=100
+        )
+        assert drill_sync["is_correct"] is True
+
+        await session.refresh(profile)
+        assert any("React Hooks" in ev for ev in profile.evidence_points)
+        assert "recent_practice_drills" in profile.skills_matrix
+        assert profile.skills_matrix["recent_practice_drills"][0]["score"] == 100
+
+        # 3. Interview Sync
+        interview_sync = await sync_service.sync_interview_to_profile(
+            db=session,
+            user_id=user_id,
+            target_role="Frontend Developer",
+            overall_score=82,
+            category_scores={"technical": 85, "communication": 80}
+        )
+        assert interview_sync["overall_score"] == 82
+
+        await session.refresh(profile)
+        assert any("Interview" in ev for ev in profile.evidence_points)
+        assert "recent_interviews" in profile.skills_matrix
+        assert profile.skills_matrix["recent_interviews"][0]["overall_score"] == 82
+

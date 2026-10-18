@@ -692,6 +692,21 @@ async def submit_level_test(
     flag_modified(roadmap, "phases")
     await db.commit()
 
+    # Automatically synchronize level test results into User Profile, Skill Matrix & Digital Twin
+    try:
+        await progress_sync_service.sync_level_test_to_profile(
+            db=db,
+            user_id=user_id,
+            roadmap=roadmap,
+            phase_number=target_phase.get("phase_number", target_idx + 1),
+            test_score=eval_res.score_percent,
+            passed=eval_res.passed,
+            stars=eval_res.stars_awarded,
+            xp_reward=eval_res.xp_earned
+        )
+    except Exception as e:
+        logger.warning(f"Error syncing level test to user profile: {e}")
+
     # Firestore sync
     try:
         serialized = _serialize_roadmap(roadmap)
@@ -701,7 +716,7 @@ async def submit_level_test(
 
     return APIResponse(
         success=True,
-        message="Level test evaluated",
+        message="Level test evaluated and profile updated",
         data=eval_res
     )
 

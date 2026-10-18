@@ -810,6 +810,7 @@ export async function evaluatePracticeDrillQuestion(payload: {
   correct_answer: string;
   explanation: string;
   user_answer: string;
+  topic?: string;
 }): Promise<DrillEvaluationData> {
   return request<DrillEvaluationData>('/practice/drill/evaluate', {
     method: 'POST',

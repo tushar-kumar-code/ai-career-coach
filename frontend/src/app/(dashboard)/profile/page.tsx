@@ -3,10 +3,11 @@
 import { useState, useEffect } from 'react';
 import {
   Sparkles, Award, FileText, CheckCircle2, AlertTriangle, ShieldCheck,
-  Target, Briefcase, Mic, MapPin, Zap, ArrowRight, Loader2, Star, TrendingUp
+  Target, Briefcase, Mic, MapPin, Zap, ArrowRight, Loader2, Star, TrendingUp,
+  RefreshCw, Check, Activity, BookOpen, Flame
 } from 'lucide-react';
 import Link from 'next/link';
-import { getDigitalTwinProfile } from '@/lib/digital-twin-api';
+import { getDigitalTwinProfile, recalculateDigitalTwinProfile } from '@/lib/digital-twin-api';
 import { getSkillProfile, getAssessmentResult } from '@/lib/api-client';
 import CareerHubTabs from '@/components/common/CareerHubTabs';
 import SkillActionBadge from '@/components/common/SkillActionBadge';
@@ -18,6 +19,8 @@ import {
 
 export default function DigitalTwinProfilePage() {
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [twin, setTwin] = useState<CareerDigitalTwinData | null>(null);
   const [skillsProfile, setSkillsProfile] = useState<SkillProfileData | null>(null);
   const [assessmentData, setAssessmentData] = useState<AssessmentResultData | null>(null);
@@ -42,6 +45,26 @@ export default function DigitalTwinProfilePage() {
     loadAll();
   }, []);
 
+  const handleSyncProfile = async () => {
+    setSyncing(true);
+    try {
+      const updatedTwin = await recalculateDigitalTwinProfile();
+      setTwin(updatedTwin);
+      const [sData, aData] = await Promise.allSettled([
+        getSkillProfile(),
+        getAssessmentResult()
+      ]);
+      if (sData.status === 'fulfilled') setSkillsProfile(sData.value);
+      if (aData.status === 'fulfilled') setAssessmentData(aData.value);
+      setSyncMessage('Profile synced with latest activity!');
+      setTimeout(() => setSyncMessage(null), 3500);
+    } catch (err) {
+      console.error('Failed to sync digital twin profile:', err);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
@@ -61,6 +84,11 @@ export default function DigitalTwinProfilePage() {
   const gaps = twin?.priority_gaps || [];
   const criticalSkills = twin?.critical_missing_skills || [];
   const achievements = twin?.achievements || [];
+  const evidencePoints = twin?.evidence_points || [];
+  const matrix = twin?.skills_matrix || {};
+  const recentTests = matrix.recent_level_tests || [];
+  const recentDrills = matrix.recent_practice_drills || [];
+  const recentInterviews = matrix.recent_interviews || [];
 
   return (
     <div className="space-y-8 max-w-6xl mx-auto pb-12">
@@ -75,13 +103,27 @@ export default function DigitalTwinProfilePage() {
               <Sparkles className="w-6 h-6" />
             </div>
             <div>
-              <h1 className="text-2xl font-extrabold text-white">Career Digital Twin</h1>
+              <div className="flex items-center space-x-2">
+                <h1 className="text-2xl font-extrabold text-white">Career Digital Twin</h1>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold border border-emerald-500/30 flex items-center gap-1">
+                  <Activity className="w-2.5 h-2.5 animate-pulse" /> Live Performance Sync
+                </span>
+              </div>
               <p className="text-xs text-slate-400">
-                Unified live profile combining Career Discovery, Resume ATS, Skill Matrix, Roadmap, Job Matches & Interview signals.
+                Unified live profile automatically evolving based on your Practice Drills, Level Tests, Roadmap Tasks & Mock Interviews.
               </p>
             </div>
           </div>
           <div className="flex items-center space-x-3">
+            <button
+              onClick={handleSyncProfile}
+              disabled={syncing}
+              className="px-3.5 py-2 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 flex items-center space-x-2 text-xs font-semibold transition"
+              title="Recalculate Career Profile with latest performance evidence"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin text-indigo-400' : ''}`} />
+              <span>{syncing ? 'Syncing...' : 'Sync Profile'}</span>
+            </button>
             <div className="px-4 py-2 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center space-x-3">
               <div>
                 <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Readiness Score</p>
@@ -96,7 +138,14 @@ export default function DigitalTwinProfilePage() {
             </div>
           </div>
         </div>
+        {syncMessage && (
+          <div className="mt-3 px-3 py-1.5 rounded-lg bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 text-xs flex items-center space-x-1.5 animate-fadeIn">
+            <Check className="w-3.5 h-3.5 text-emerald-400" />
+            <span>{syncMessage}</span>
+          </div>
+        )}
       </div>
+
 
       {/* Target & Archetype Overview */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -302,6 +351,120 @@ export default function DigitalTwinProfilePage() {
           </div>
         </div>
       )}
+
+      {/* Live Performance Evolution & Evidence Feed */}
+      <div className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-4">
+          <div className="flex items-center space-x-2">
+            <Activity className="w-5 h-5 text-indigo-400" />
+            <div>
+              <h3 className="text-base font-bold text-white">Live Performance Evolution Feed</h3>
+              <p className="text-xs text-slate-400">
+                Your profile updates in real time as you complete roadmap milestones, drills, and mock interviews.
+              </p>
+            </div>
+          </div>
+          <span className="text-[11px] px-2.5 py-1 rounded-full bg-indigo-500/10 text-indigo-300 font-semibold border border-indigo-500/20 self-start sm:self-auto">
+            Dynamic Evidence Tracking
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Verified Evidence Points */}
+          <div className="space-y-3">
+            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+              <span>Verifiable Career Evidence ({evidencePoints.length})</span>
+            </span>
+            {evidencePoints.length > 0 ? (
+              <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                {evidencePoints.map((ev, idx) => (
+                  <div key={idx} className="p-3 rounded-xl bg-slate-950/70 border border-slate-800/80 flex items-start space-x-2.5 text-xs text-slate-200">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                    <span className="leading-relaxed">{ev}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-5 rounded-xl bg-slate-950/40 border border-slate-800/60 text-center space-y-2">
+                <p className="text-xs text-slate-500 italic">No formal evidence logged yet.</p>
+                <div className="flex justify-center gap-2 pt-1">
+                  <Link href="/practice" className="text-xs px-3 py-1.5 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 font-medium">
+                    Start Practice Drills
+                  </Link>
+                  <Link href="/roadmap" className="text-xs px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium">
+                    Roadmap Tests
+                  </Link>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Recent Tests, Practice & Interview Milestones */}
+          <div className="space-y-3">
+            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+              <Flame className="w-4 h-4 text-amber-400" />
+              <span>Recent Activity Milestones</span>
+            </span>
+
+            <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+              {recentTests.length > 0 && recentTests.slice(0, 3).map((test: any, i: number) => (
+                <div key={`test-${i}`} className="p-3 rounded-xl bg-slate-950/70 border border-slate-800/80 flex items-center justify-between text-xs">
+                  <div className="space-y-0.5">
+                    <div className="flex items-center space-x-1.5">
+                      <BookOpen className="w-3.5 h-3.5 text-blue-400" />
+                      <span className="font-semibold text-white">{test.phase_title || `Level ${test.phase_number}`}</span>
+                    </div>
+                    <p className="text-[10px] text-slate-400">Roadmap Level Assessment</p>
+                  </div>
+                  <div className="text-right">
+                    <span className={`px-2 py-0.5 rounded font-bold ${test.passed ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}`}>
+                      {test.score}% {test.stars ? `(${test.stars}★)` : ''}
+                    </span>
+                  </div>
+                </div>
+              ))}
+
+              {recentDrills.length > 0 && recentDrills.slice(0, 3).map((drill: any, i: number) => (
+                <div key={`drill-${i}`} className="p-3 rounded-xl bg-slate-950/70 border border-slate-800/80 flex items-center justify-between text-xs">
+                  <div className="space-y-0.5">
+                    <div className="flex items-center space-x-1.5">
+                      <Zap className="w-3.5 h-3.5 text-amber-400" />
+                      <span className="font-semibold text-white">{drill.topic}</span>
+                    </div>
+                    <p className="text-[10px] text-slate-400">Interactive Practice Drill</p>
+                  </div>
+                  <span className={`px-2 py-0.5 rounded font-bold ${drill.is_correct ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                    {drill.is_correct ? '100% Correct' : 'Reviewed'}
+                  </span>
+                </div>
+              ))}
+
+              {recentInterviews.length > 0 && recentInterviews.slice(0, 2).map((iv: any, i: number) => (
+                <div key={`iv-${i}`} className="p-3 rounded-xl bg-slate-950/70 border border-slate-800/80 flex items-center justify-between text-xs">
+                  <div className="space-y-0.5">
+                    <div className="flex items-center space-x-1.5">
+                      <Mic className="w-3.5 h-3.5 text-pink-400" />
+                      <span className="font-semibold text-white">{iv.target_role || 'Mock Interview'}</span>
+                    </div>
+                    <p className="text-[10px] text-slate-400">Adaptive Mock Technical Interview</p>
+                  </div>
+                  <span className="px-2 py-0.5 rounded bg-pink-500/20 text-pink-400 font-bold">
+                    {iv.overall_score}%
+                  </span>
+                </div>
+              ))}
+
+              {recentTests.length === 0 && recentDrills.length === 0 && recentInterviews.length === 0 && (
+                <div className="p-5 rounded-xl bg-slate-950/40 border border-slate-800/60 text-center space-y-1">
+                  <p className="text-xs text-slate-500 italic">No recent drills or tests yet.</p>
+                  <p className="text-[11px] text-slate-400">Complete practice questions to watch your profile level up live!</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

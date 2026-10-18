@@ -294,7 +294,8 @@ function SkillPracticeEngine() {
         options: currQ.options,
         correct_answer: currQ.correct_answer,
         explanation: currQ.explanation,
-        user_answer: selectedOption
+        user_answer: selectedOption,
+        topic: currQ.topic || drillTopic
       });
       setDrillEvaluations((prev) => ({
         ...prev,

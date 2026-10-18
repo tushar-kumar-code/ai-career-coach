@@ -22,10 +22,12 @@ from app.schemas.roadmap import (
     LevelTestSubmitResponse
 )
 from app.services.firestore.roadmap_repo import RoadmapRepository
+from app.services.roadmap.progress_sync import ProfileProgressSyncService
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 level_test_engine = LevelTestEngine()
+progress_sync_service = ProfileProgressSyncService()
 
 
 # Schemas for Skill Practice Engine
@@ -87,6 +89,7 @@ class DrillEvaluateRequest(BaseModel):
     correct_answer: str
     explanation: str
     user_answer: str
+    topic: Optional[str] = "Software Engineering"
 
 
 class DrillEvaluateResponse(BaseModel):
@@ -369,7 +372,9 @@ REQUIREMENTS:
     summary="Evaluate an interactive question answer with ground truth precision"
 )
 async def evaluate_drill_question(
-    req: DrillEvaluateRequest
+    req: DrillEvaluateRequest,
+    db: AsyncSession = Depends(get_db),
+    user_id: str = Depends(get_current_user_id)
 ):
     user_ans = (req.user_answer or "").strip()
     correct_ans = (req.correct_answer or "").strip()
@@ -399,9 +404,22 @@ async def evaluate_drill_question(
         )
         takeaway = f"Learning Focus: {req.explanation}"
 
+    # Synchronize performance to user profile and digital twin
+    if user_id and db:
+        try:
+            await progress_sync_service.sync_practice_drill_to_profile(
+                db=db,
+                user_id=user_id,
+                topic=req.topic or "Software Engineering",
+                is_correct=is_correct,
+                score=score
+            )
+        except Exception as e:
+            logger.warning(f"Error syncing practice drill to profile: {e}")
+
     return APIResponse(
         success=True,
-        message="Question evaluated successfully",
+        message="Question evaluated and profile updated",
         data=DrillEvaluateResponse(
             question_id=req.question_id,
             is_correct=is_correct,
