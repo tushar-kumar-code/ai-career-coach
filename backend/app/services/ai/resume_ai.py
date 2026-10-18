@@ -390,7 +390,13 @@ class ResumeAIService:
             lower = line_str.lower()
             if name and (lower == name or lower.startswith(f"{name} -") or lower.startswith(f"{name} |")):
                 continue
-            if headline and (lower == headline or lower.startswith(f"{headline} |")):
+            if headline and (lower == headline or lower.startswith(f"{headline} |") or lower.startswith(f"{headline} -")):
+                continue
+            # Filter standalone role/designation titles (e.g. Software Engineer, Full Stack Developer, etc.)
+            role_pattern = r"^(aspiring|junior|senior|lead|entry[-\s]?level|associate)?\s*(software|web|full[-\s]?stack|frontend|backend|mobile|android|ios|devops|cloud|data|ai|ml|machine[-\s]?learning|deep[-\s]?learning|python|java|react|node|c\+\+|system|systems|qa|test|testing|cyber|security|network|database|computer[-\s]?science)?\s*(engineer|developer|programmer|architect|specialist|analyst|scientist|student|intern|fresher|consultant|professional|coder)s?$"
+            if re.match(role_pattern, line_str, re.IGNORECASE):
+                continue
+            if len(line_str.split()) <= 4 and re.search(r"\b(engineer|developer|programmer|architect|specialist|analyst|scientist|student|intern|fresher)\b", line_str, re.IGNORECASE) and not re.search(r"[.,;!?]", line_str):
                 continue
             if ("http://" in lower or "https://" in lower or "github.com" in lower or "linkedin.com" in lower or (email and email in lower)):
                 if "|" in lower or "github" in lower or "linkedin" in lower or len(line_str.split()) < 15:
@@ -404,4 +410,5 @@ class ResumeAIService:
                 continue
             cleaned_lines.append(line_str)
         return "\n\n".join(cleaned_lines).strip() or raw_summary.strip()
+
 

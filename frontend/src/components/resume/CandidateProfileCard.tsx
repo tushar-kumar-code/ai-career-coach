@@ -63,7 +63,16 @@ export function cleanProfessionalSummary(
     }
 
     // 2. Skip Headline / Role
-    if (headline && (lower === headline || lower.startsWith(headline + ' |'))) {
+    if (headline && (lower === headline || lower.startsWith(headline + ' |') || lower.startsWith(headline + ' -'))) {
+      continue;
+    }
+
+    // 2b. Skip Standalone Role / Designation Titles (e.g. Software Engineer, Developer, etc.)
+    const isRoleTitle =
+      /^(aspiring|junior|senior|lead|entry[-\s]?level|associate)?\s*(software|web|full[-\s]?stack|frontend|backend|mobile|android|ios|devops|cloud|data|ai|ml|machine[-\s]?learning|deep[-\s]?learning|python|java|react|node|c\+\+|system|systems|qa|test|testing|cyber|security|network|database|computer[-\s]?science)?\s*(engineer|developer|programmer|architect|specialist|analyst|scientist|student|intern|fresher|consultant|professional|coder)s?$/i.test(line) ||
+      (/^[a-zA-Z\s/-]{2,45}$/.test(line) && line.split(/\s+/).length <= 4 && /(engineer|developer|programmer|architect|specialist|analyst|scientist|student|intern|fresher)/i.test(line) && !/[.,;!?]/.test(line));
+
+    if (isRoleTitle) {
       continue;
     }
 
