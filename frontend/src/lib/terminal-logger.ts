@@ -5,10 +5,22 @@
  * 2. FastAPI backend terminal (/api/v1/client-log)
  */
 
-const RAW_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api/v1';
-const BACKEND_API_BASE = RAW_URL.endsWith('/api/v1')
-  ? RAW_URL.replace(/\/+$/, '')
-  : `${RAW_URL.replace(/\/+$/, '')}/api/v1`;
+function getBackendLogUrl(): string {
+  let raw = (process.env.NEXT_PUBLIC_API_URL || '').trim();
+  if (!raw || raw.includes('<') || raw.includes('>') || raw.includes('backend-render-url')) {
+    if (typeof window !== 'undefined' && window.location.hostname.includes('onrender.com')) {
+      raw = 'https://ai-career-coach-backend-qkha.onrender.com/api/v1';
+    } else {
+      raw = 'http://127.0.0.1:8000/api/v1';
+    }
+  }
+  if (!raw.startsWith('http://') && !raw.startsWith('https://')) {
+    raw = `https://${raw}`;
+  }
+  return raw.endsWith('/api/v1') ? raw.replace(/\/+$/, '') : `${raw.replace(/\/+$/, '')}/api/v1`;
+}
+
+const BACKEND_API_BASE = getBackendLogUrl();
 
 export interface TerminalLogPayload {
   level?: 'info' | 'action' | 'navigation' | 'api' | 'auth' | 'warn' | 'error';

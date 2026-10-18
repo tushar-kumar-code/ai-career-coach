@@ -70,15 +70,23 @@ export default function SkillsPage() {
         } catch (e) {}
       }
     }
-    loadProfile();
+    loadProfile(false);
+
+    // 2. Auto-sync on window focus or returning to tab
+    const handleFocus = () => {
+      loadProfile(false);
+    };
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
   }, []);
 
-  const loadProfile = async () => {
-    // Only show full-screen loader if there is no profile yet
-    setProfile((prev) => {
-      if (!prev) setLoading(true);
-      return prev;
-    });
+  const loadProfile = async (showLoader = true) => {
+    if (showLoader) {
+      setProfile((prev) => {
+        if (!prev) setLoading(true);
+        return prev;
+      });
+    }
 
     try {
       const data = await getSkillProfile();
@@ -180,14 +188,21 @@ export default function SkillsPage() {
             Target Career: <strong className="text-white font-semibold">{profile?.target_career || 'Software Developer'}</strong>
           </p>
         </div>
-        <button
-          onClick={handleRecalculate}
-          disabled={recalculating}
-          className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-lg shadow-indigo-500/25 transition-all flex items-center space-x-2 shrink-0 disabled:opacity-50"
-        >
-          <RefreshCw className={`w-4 h-4 ${recalculating ? 'animate-spin' : ''}`} />
-          <span>{recalculating ? 'Syncing...' : 'Recalculate Profile'}</span>
-        </button>
+        <div className="flex items-center space-x-3">
+          <span className="hidden sm:inline-flex items-center space-x-1.5 text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-full font-medium">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span>Live Auto-Calculated</span>
+          </span>
+          <button
+            onClick={handleRecalculate}
+            disabled={recalculating}
+            className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 text-xs font-semibold shadow transition-all flex items-center space-x-2 shrink-0 disabled:opacity-50"
+            title="Force refresh live evidence sync"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${recalculating ? 'animate-spin text-indigo-400' : ''}`} />
+            <span>{recalculating ? 'Syncing...' : 'Sync Profile'}</span>
+          </button>
+        </div>
       </div>
 
       {/* Summary Cards Row */}
@@ -351,6 +366,7 @@ export default function SkillsPage() {
                 key={idx}
                 skillName={gap.skill_name}
                 priority={gap.priority}
+                source="Skill Matrix"
                 variant="row"
                 onAdded={(name, msg) => {
                   setFocusFeedback({

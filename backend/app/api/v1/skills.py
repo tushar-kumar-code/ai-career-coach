@@ -106,25 +106,34 @@ async def get_skill_profile(
     db: AsyncSession = Depends(get_db),
     user_id: str = Depends(get_current_user_id)
 ):
-    # 1. Fetch user skills, or ingest from evidence if not yet populated
-    stmt = select(Skill).where(Skill.user_id == user_id)
-    res = await db.execute(stmt)
-    user_skills = res.scalars().all()
-
-    if not user_skills:
-        user_skills = await ingestion_engine.ingest_user_skills(db, user_id)
+    # 1. Ingest/sync user skills dynamically across all evidence sources (Resume, Assessment, Roadmap)
+    user_skills = await ingestion_engine.ingest_user_skills(db, user_id)
 
     # 2. Calculate gaps & priorities across current target career
     target_career, strong_skills, skills_to_improve, missing_gaps, recommended_next = await gap_engine.calculate_skill_gaps(
         db, user_id, user_skills
     )
 
-    # If profile has no matched strong skills but has skills, auto-refresh ingestion
-    if len(strong_skills) == 0 and len(user_skills) > 0 and any(s.proficiency_percent >= 60 for s in user_skills):
-        user_skills = await ingestion_engine.ingest_user_skills(db, user_id)
-        target_career, strong_skills, skills_to_improve, missing_gaps, recommended_next = await gap_engine.calculate_skill_gaps(
-            db, user_id, user_skills
-        )
+    # 3. Synchronize updated skill matrix to Firestore
+    for s in user_skills:
+        try:
+            await SkillsRepository.save_skill(user_id, s.id, {
+                "id": s.id,
+                "skill_name": s.skill_name,
+                "normalized_name": s.normalized_name,
+                "category": s.category,
+                "proficiency_percent": s.proficiency_percent,
+                "proficiency_level": s.proficiency_level,
+                "confidence_score": s.confidence_score,
+                "confidence_status": s.confidence_status,
+                "target_required_level": s.target_required_level,
+                "gap_status": s.gap_status,
+                "priority": s.priority,
+                "priority_reason": s.priority_reason,
+                "evidence_sources": s.evidence_sources or []
+            })
+        except Exception:
+            pass
 
     verified_cnt = sum(1 for s in user_skills if s.confidence_status == "Verified")
     supported_cnt = sum(1 for s in user_skills if s.confidence_status == "Supported")

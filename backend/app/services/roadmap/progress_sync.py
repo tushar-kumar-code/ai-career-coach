@@ -78,14 +78,16 @@ class ProfileProgressSyncService:
         # Fallback to phase skills or task title
         if not learned_skills_raw and target_phase and target_phase.get("skills"):
             learned_skills_raw.extend(target_phase.get("skills")[:3])
-        if not learned_skills_raw and target_task:
-            learned_skills_raw.append(task_title)
 
-        # Normalize and deduplicate skills
+        from app.services.skill.ingestion_engine import is_valid_profile_skill
+
+        # Normalize and filter to only legitimate skills
         learned_skills: List[str] = []
         for s in learned_skills_raw:
+            if not s or not is_valid_profile_skill(str(s)):
+                continue
             norm = self.normalizer.normalize(str(s))
-            if norm and norm not in learned_skills:
+            if norm and is_valid_profile_skill(norm) and norm not in learned_skills:
                 learned_skills.append(norm)
 
         updated_skills_summary: List[Dict[str, Any]] = []

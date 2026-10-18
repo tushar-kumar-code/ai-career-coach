@@ -334,7 +334,7 @@ export default function JobsPage() {
                               </span>
                             ))}
                             {item.missing_skills.map((sk) => (
-                              <SkillActionBadge key={sk} skillName={sk} />
+                              <SkillActionBadge key={sk} skillName={sk} source="Job Engine" />
                             ))}
                           </div>
                         </div>

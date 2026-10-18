@@ -31,3 +31,29 @@ class Roadmap(Base, TimestampMixin):
     completed_project_ids = Column(JSON, default=list, nullable=False)
 
     user = relationship("User", backref="roadmaps")
+
+
+class RoadmapSkillRequest(Base, TimestampMixin):
+    """Pending skill ingestion request submitted from Skill Matrix, Job Engine, or Profile."""
+    __tablename__ = "roadmap_skill_requests"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    roadmap_id = Column(String, nullable=True, index=True)
+    skill_name = Column(String, nullable=False)
+    source = Column(String, default="Skill Matrix")  # "Skill Matrix", "Job Engine", "Profile", "Resume Analysis"
+    status = Column(String, default="pending")  # "pending", "accepted", "rejected"
+    priority = Column(String, default="Medium")
+
+    # Placement recommendation details
+    suggested_phase_number = Column(Integer, default=1)
+    suggested_phase_title = Column(String, nullable=True)
+    suggested_task_title = Column(String, nullable=True)
+    placement_reason = Column(String, nullable=True)
+    difficulty_level = Column(String, default="Intermediate")
+    estimated_minutes = Column(Integer, default=35)
+    topics_to_learn = Column(JSON, default=list)
+    practice_goal = Column(String, nullable=True)
+    task_payload = Column(JSON, nullable=True)
+
+    user = relationship("User", backref="roadmap_skill_requests")

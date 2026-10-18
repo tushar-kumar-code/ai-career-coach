@@ -69,7 +69,7 @@ Agar aap manually dono services create karna chahte hain:
 - **Plan:** `Free`
 - **Environment Variables:**
   - `NODE_VERSION`: `20`
-  - `NEXT_PUBLIC_API_URL`: `https://ai-career-coach-backend.onrender.com` *(Aapke backend service ki Render URL)*
+  - `NEXT_PUBLIC_API_URL`: `https://ai-career-coach-backend-qkha.onrender.com/api/v1`
 
 ---
 

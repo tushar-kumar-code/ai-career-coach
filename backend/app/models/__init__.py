@@ -1,11 +1,11 @@
-﻿from app.core.database import Base
+from app.core.database import Base
 from app.models.base import TimestampMixin
 from app.models.user import User
 from app.models.profile import UserProfile
 from app.models.assessment import AssessmentResponse
 from app.models.resume import Resume
 from app.models.skill import Skill
-from app.models.roadmap import Roadmap
+from app.models.roadmap import Roadmap, RoadmapSkillRequest
 from app.models.interview import InterviewSession
 from app.models.career_catalog import CareerRole
 from app.models.question import Question
@@ -24,6 +24,7 @@ __all__ = [
     "Resume",
     "Skill",
     "Roadmap",
+    "RoadmapSkillRequest",
     "InterviewSession",
     "CareerRole",
     "Question",

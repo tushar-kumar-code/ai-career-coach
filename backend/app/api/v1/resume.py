@@ -24,6 +24,7 @@ from app.services.ai.resume_ai import ResumeAIService
 from app.services.firestore.resume_repo import ResumeRepository
 from app.services.firestore.skills_repo import SkillsRepository
 from app.services.firestore.user_repo import UserRepository
+from app.services.skill.normalizer import SkillNormalizer
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -146,33 +147,56 @@ async def upload_resume(
 
     # 6. Persist Skills to Firestore & SQL Skill Table & Update UserProfile with Candidate Profile
     for sk in analysis.extracted_skills:
+        norm_name = SkillNormalizer.normalize(sk.name)
+        if not norm_name:
+            continue
+        prof_pct = sk.proficiency_estimated or 60
+        prof_lvl = "Advanced" if prof_pct >= 80 else ("Intermediate" if prof_pct >= 60 else "Beginner")
+
         try:
             await SkillsRepository.upsert_skill_by_name(
                 user_id,
-                sk.name,
+                norm_name,
                 {
                     "category": sk.category,
-                    "proficiency_percent": sk.proficiency_estimated,
-                    "is_verified": True,
+                    "proficiency_percent": prof_pct,
+                    "proficiency_level": prof_lvl,
+                    "confidence_status": "Claimed",
                     "evidence_sources": ["Resume Extraction"]
                 }
             )
         except Exception as e:
-            logger.warning(f"Firestore skill upsert warning for {sk.name}: {e}")
+            logger.warning(f"Firestore skill upsert warning for {norm_name}: {e}")
 
-        s_stmt = select(Skill).where(Skill.user_id == user_id, Skill.skill_name == sk.name)
+        s_stmt = select(Skill).where(
+            Skill.user_id == user_id,
+            (Skill.normalized_name == norm_name) | (Skill.skill_name.ilike(norm_name))
+        )
         s_res = await db.execute(s_stmt)
         existing_skill = s_res.scalars().first()
         if not existing_skill:
             new_skill = Skill(
                 user_id=user_id,
-                skill_name=sk.name,
+                skill_name=norm_name,
+                normalized_name=norm_name,
                 category=sk.category,
-                proficiency_percent=sk.proficiency_estimated,
-                is_verified=True,
+                proficiency_percent=prof_pct,
+                proficiency_level=prof_lvl,
+                confidence_score=45,
+                confidence_status="Claimed",
+                is_verified=False,
                 evidence_sources=["Resume Extraction"]
             )
             db.add(new_skill)
+        else:
+            existing_skill.normalized_name = norm_name
+            existing_skill.skill_name = norm_name
+            if prof_pct > (existing_skill.proficiency_percent or 0):
+                existing_skill.proficiency_percent = prof_pct
+                existing_skill.proficiency_level = prof_lvl
+            sources = list(set((existing_skill.evidence_sources or []) + ["Resume Extraction"]))
+            existing_skill.evidence_sources = sources
+            db.add(existing_skill)
 
     composite_score = int((analysis.ats_score * 0.4) + (analysis.target_match.match_percentage * 0.6))
     try:

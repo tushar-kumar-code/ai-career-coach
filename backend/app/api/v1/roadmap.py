@@ -8,7 +8,7 @@ from sqlalchemy import select
 
 from app.core.database import get_db
 from app.core.security import get_current_user_id
-from app.models.roadmap import Roadmap
+from app.models.roadmap import Roadmap, RoadmapSkillRequest
 from app.models.skill import Skill
 from app.models.profile import UserProfile
 from app.models.interview import InterviewSession
@@ -28,7 +28,12 @@ from app.schemas.roadmap import (
     FocusSkillResponse,
     LevelTestResponse,
     LevelTestSubmitRequest,
-    LevelTestSubmitResponse
+    LevelTestSubmitResponse,
+    CreateRoadmapSkillRequestSchema,
+    AcceptRoadmapSkillRequestSchema,
+    RoadmapSkillRequestResponse,
+    RoadmapAssistantRequest,
+    RoadmapAssistantResponse
 )
 
 import logging
@@ -38,7 +43,9 @@ from app.services.skill.gap_engine import SkillGapEngine
 from app.services.roadmap.roadmap_engine import RoadmapEngine
 from app.services.roadmap.progress_sync import ProfileProgressSyncService
 from app.services.firestore.roadmap_repo import RoadmapRepository
+from app.services.firestore.user_repo import UserRepository
 from app.services.roadmap.level_test_engine import LevelTestEngine
+from app.services.ai.roadmap_ai import RoadmapAIService
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -47,6 +54,7 @@ gap_engine = SkillGapEngine()
 roadmap_engine = RoadmapEngine()
 progress_sync_service = ProfileProgressSyncService()
 level_test_engine = LevelTestEngine()
+roadmap_ai_service = RoadmapAIService()
 
 
 @router.post(
@@ -62,8 +70,39 @@ async def generate_roadmap(
     # 1. Ingest/get user skills
     u_skills = await ingestion_engine.ingest_user_skills(db, user_id)
     
-    # 2. Calculate skill gaps & target career
-    target_career, _, _, missing_gaps, _ = await gap_engine.calculate_skill_gaps(db, user_id, u_skills)
+    # 2. Sync selected domain and calculate skill gaps
+    target_career = payload.target_role
+    if target_career:
+        try:
+            p_stmt = select(UserProfile).where(UserProfile.user_id == user_id)
+            p_res = await db.execute(p_stmt)
+            user_prof = p_res.scalars().first()
+            if user_prof and user_prof.target_career != target_career:
+                user_prof.target_career = target_career
+                db.add(user_prof)
+                await db.commit()
+        except Exception as e:
+            logger.warning(f"Could not sync profile target_career: {e}")
+
+    target_career, _, _, missing_gaps, _ = await gap_engine.calculate_skill_gaps(
+        db, user_id, u_skills, target_role_override=target_career
+    )
+
+    career_goal = payload.career_goal or "Entry-level Job"
+
+    # Query recent weakness areas from interview sessions if available (Layer A & H)
+    weak_areas = []
+    try:
+        int_stmt = select(InterviewSession).where(InterviewSession.user_id == user_id).order_by(InterviewSession.created_at.desc()).limit(3)
+        int_res = await db.execute(int_stmt)
+        for sess in int_res.scalars().all():
+            if sess.weakness_areas:
+                if isinstance(sess.weakness_areas, list):
+                    weak_areas.extend(sess.weakness_areas)
+                elif isinstance(sess.weakness_areas, str):
+                    weak_areas.append(sess.weakness_areas)
+    except Exception as e:
+        logger.warning(f"Could not load interview weaknesses: {e}")
 
     # 3. Generate Roadmap
     roadmap = await roadmap_engine.generate_roadmap(
@@ -78,7 +117,10 @@ async def generate_roadmap(
         learning_style=payload.preferred_learning_style,
         preserve_progress=True,
         track_pace=payload.track_pace,
-        target_phases_count=payload.target_phases_count
+        target_phases_count=payload.target_phases_count,
+        career_goal=career_goal,
+        weak_areas=weak_areas,
+        domain_requirement=payload.domain_requirement
     )
 
     resp_data = _serialize_roadmap(roadmap)
@@ -224,7 +266,10 @@ async def get_today_focus(
             check_quiz_options=t.get("check_quiz_options"),
             check_quiz_answer=t.get("check_quiz_answer"),
             is_priority=t.get("is_priority", False),
-            priority_reason=t.get("priority_reason")
+            priority_reason=t.get("priority_reason"),
+            expected_outcome=t.get("expected_outcome"),
+            verification_method=t.get("verification_method"),
+            next_step=t.get("next_step")
         )
         for t in focus_dict["today_tasks"]
     ]
@@ -239,7 +284,13 @@ async def get_today_focus(
             current_phase_title=focus_dict.get("current_phase_title"),
             today_tasks=today_tasks_schemas,
             recommended_minutes=focus_dict["recommended_minutes"],
-            why_it_matters=focus_dict.get("why_it_matters")
+            why_it_matters=focus_dict.get("why_it_matters"),
+            is_level_test_recommended=focus_dict.get("is_level_test_recommended", False),
+            next_step=focus_dict.get("next_step"),
+            completion_status=focus_dict.get("completion_status", "in_progress"),
+            learner_level=focus_dict.get("learner_level", "Beginner"),
+            starting_point_note=focus_dict.get("starting_point_note"),
+            career_goal=focus_dict.get("career_goal")
         )
     )
 
@@ -296,6 +347,61 @@ async def get_task_learning_content(
             check_quiz_answer=task_data.get("check_quiz_answer") or f"A) {skill_topic} is a foundational skill that most {target_role} job descriptions require.",
             why_it_matters=task_data.get("why_it_matters", f"Essential for {target_role} readiness."),
             task_type=task_data.get("task_type", "Learn")
+        )
+    )
+
+
+@router.post(
+    "/assistant",
+    response_model=APIResponse[RoadmapAssistantResponse],
+    summary="Chat with dedicated Groq AI Roadmap Assistant solely about the learning roadmap"
+)
+async def chat_roadmap_assistant(
+    req: RoadmapAssistantRequest,
+    db: AsyncSession = Depends(get_db),
+    user_id: str = Depends(get_current_user_id)
+):
+    if not req.message or not req.message.strip():
+        raise HTTPException(status_code=400, detail="Message cannot be empty")
+
+    stmt = select(Roadmap).where(Roadmap.user_id == user_id, Roadmap.is_active == True)
+    res = await db.execute(stmt)
+    roadmap = res.scalars().first()
+
+    if not roadmap:
+        raise HTTPException(status_code=404, detail="No active roadmap found. Please generate a roadmap first.")
+
+    roadmap_dict = {
+        "target_role": roadmap.target_role,
+        "user_level": roadmap.user_level,
+        "overall_progress_percent": roadmap.overall_progress_percent,
+        "hours_per_day": roadmap.hours_per_day,
+        "days_per_week": roadmap.days_per_week,
+        "phases": roadmap.phases or [],
+        "completed_task_ids": roadmap.completed_task_ids or []
+    }
+
+    ai_reply = await roadmap_ai_service.chat_with_roadmap_assistant(
+        user_message=req.message,
+        roadmap_data=roadmap_dict,
+        history=req.history,
+        current_phase_id=req.current_phase_id,
+        current_task_id=req.current_task_id
+    )
+
+    suggested = [
+        "What should I do today on my roadmap?",
+        "Explain the active concept in simple words",
+        "How should I practice for this level?"
+    ]
+
+    return APIResponse(
+        success=True,
+        message="Roadmap Assistant reply generated",
+        data=RoadmapAssistantResponse(
+            response=ai_reply,
+            provider="Groq AI",
+            suggested_actions=suggested
         )
     )
 
@@ -668,6 +774,23 @@ async def recalculate_roadmap(
     u_skills = await ingestion_engine.ingest_user_skills(db, user_id)
     target_career, _, _, missing_gaps, _ = await gap_engine.calculate_skill_gaps(db, user_id, u_skills)
 
+    career_goal = getattr(roadmap, "career_goal", None) or (
+        roadmap.phases[0].get("career_goal") if roadmap and roadmap.phases and isinstance(roadmap.phases[0], dict) else "Entry-level Job"
+    )
+
+    weak_areas = []
+    try:
+        int_stmt = select(InterviewSession).where(InterviewSession.user_id == user_id).order_by(InterviewSession.created_at.desc()).limit(3)
+        int_res = await db.execute(int_stmt)
+        for sess in int_res.scalars().all():
+            if sess.weakness_areas:
+                if isinstance(sess.weakness_areas, list):
+                    weak_areas.extend(sess.weakness_areas)
+                elif isinstance(sess.weakness_areas, str):
+                    weak_areas.append(sess.weakness_areas)
+    except Exception as e:
+        logger.warning(f"Could not load interview weaknesses: {e}")
+
     updated_roadmap = await roadmap_engine.generate_roadmap(
         db=db,
         user_id=user_id,
@@ -678,7 +801,9 @@ async def recalculate_roadmap(
         hours_per_day=h_day,
         days_per_week=d_week,
         learning_style=style,
-        preserve_progress=True
+        preserve_progress=True,
+        career_goal=career_goal,
+        weak_areas=weak_areas
     )
 
     try:
@@ -707,8 +832,27 @@ async def update_preferences(
     res = await db.execute(stmt)
     roadmap = res.scalars().first()
 
+    target_career = payload.target_role
+    if target_career:
+        try:
+            p_stmt = select(UserProfile).where(UserProfile.user_id == user_id)
+            p_res = await db.execute(p_stmt)
+            user_prof = p_res.scalars().first()
+            if user_prof and user_prof.target_career != target_career:
+                user_prof.target_career = target_career
+                db.add(user_prof)
+                await db.commit()
+        except Exception as e:
+            logger.warning(f"Could not sync profile target_career: {e}")
+
     u_skills = await ingestion_engine.ingest_user_skills(db, user_id)
-    target_career, _, _, missing_gaps, _ = await gap_engine.calculate_skill_gaps(db, user_id, u_skills)
+    target_career, _, _, missing_gaps, _ = await gap_engine.calculate_skill_gaps(
+        db, user_id, u_skills, target_role_override=target_career
+    )
+
+    career_goal = payload.career_goal or getattr(roadmap, "career_goal", None) or (
+        roadmap.phases[0].get("career_goal") if roadmap and roadmap.phases and isinstance(roadmap.phases[0], dict) else "Entry-level Job"
+    )
 
     updated_roadmap = await roadmap_engine.generate_roadmap(
         db=db,
@@ -722,7 +866,9 @@ async def update_preferences(
         learning_style=payload.preferred_learning_style,
         preserve_progress=True,
         track_pace=payload.track_pace,
-        target_phases_count=payload.target_phases_count
+        target_phases_count=payload.target_phases_count,
+        career_goal=career_goal,
+        domain_requirement=payload.domain_requirement
     )
 
     try:
@@ -807,6 +953,341 @@ async def add_custom_phase(
         success=True,
         message=f"Custom level '{payload.title}' added to your roadmap",
         data=_serialize_roadmap(roadmap)
+    )
+
+
+def determine_skill_placement(skill_name: str, phases: List[dict], target_role: str = "Software Developer") -> dict:
+    """
+    Intelligently determines the most suitable Roadmap Phase / Level and placement rationale
+    for a learning skill requested from Skill Matrix or Job Engine so the roadmap flow remains smooth.
+    """
+    s_lower = skill_name.strip().lower()
+
+    # Foundational / Prerequisites -> Level 1 (Spawn Point / Foundation)
+    foundational_keywords = [
+        "git", "oop", "object oriented", "data structure", "algorithm", "problem solving",
+        "systems thinking", "clean code", "linux", "bash", "shell", "python basic",
+        "java basic", "c++", "c language", "html", "css", "javascript basic", "sql basic",
+        "command line", "debugging", "version control", "programming basic"
+    ]
+    # Core Frameworks & Development -> Level 2 or 3 (Starter Camp / Skill Forest)
+    core_dev_keywords = [
+        "react", "next.js", "nextjs", "vue", "angular", "node", "express", "fastapi",
+        "django", "flask", "spring", "rest", "api", "graphql", "database", "sql",
+        "postgres", "postgresql", "mysql", "mongodb", "redis", "orm", "prisma",
+        "tailwind", "typescript", "testing", "unit test", "jest", "pytest", "state management",
+        "redux", "zustand", "authentication", "jwt", "oauth"
+    ]
+    # Advanced Architecture / Production / DevOps -> Level 4+ (Challenge Cave / Boss Battle)
+    advanced_keywords = [
+        "docker", "container", "kubernetes", "k8s", "microservice", "system design",
+        "aws", "cloud", "azure", "gcp", "ci/cd", "devops", "kafka", "rabbitmq",
+        "message queue", "scalability", "distributed", "load balancer", "security",
+        "penetration", "performance optimization", "terraform", "monitoring", "grafana"
+    ]
+
+    total_phases = len(phases) if phases else 1
+    suggested_num = 1
+    reason = ""
+    difficulty = "Beginner"
+
+    is_foundational = any(kw in s_lower for kw in foundational_keywords)
+    is_advanced = any(kw in s_lower for kw in advanced_keywords)
+    is_core = any(kw in s_lower for kw in core_dev_keywords)
+
+    if is_foundational:
+        suggested_num = 1
+        reason = f"{skill_name} is a foundational prerequisite. Mastering this in Level 1 ensures solid fundamentals before complex project implementation."
+        difficulty = "Beginner"
+    elif is_advanced:
+        suggested_num = min(total_phases, max(2, total_phases - 1)) if total_phases >= 3 else total_phases
+        reason = f"{skill_name} is an advanced architecture & production competency. Best mastered in later phases alongside capstone engineering."
+        difficulty = "Advanced"
+    elif is_core:
+        suggested_num = min(total_phases, 2) if total_phases >= 2 else 1
+        reason = f"{skill_name} is a core development framework/tool. Placed in Level {suggested_num} for hands-on application building."
+        difficulty = "Intermediate"
+    else:
+        active_phase_num = 1
+        for idx, p in enumerate(phases):
+            tasks = p.get("tasks", [])
+            if any(not t.get("is_completed") for t in tasks):
+                active_phase_num = p.get("phase_number", idx + 1)
+                break
+        suggested_num = active_phase_num
+        reason = f"{skill_name} will be integrated into your currently active level (Level {suggested_num}) for immediate practice."
+        difficulty = "Intermediate"
+
+    phase_title = f"Level {suggested_num}"
+    for p in phases:
+        if p.get("phase_number") == suggested_num:
+            lvl_name = p.get("level_name") or p.get("title") or f"Level {suggested_num}"
+            phase_title = f"Level {suggested_num}: {lvl_name}"
+            break
+
+    topics = [
+        f"{skill_name} Core Syntax & Fundamental Concepts",
+        f"{skill_name} Idiomatic Patterns & Real-World Use Cases",
+        f"{skill_name} Hands-on Implementation & Best Practices"
+    ]
+    practice_goal = f"Implement a functional, tested module demonstrating {skill_name} principles."
+
+    new_task_id = f"task_req_{uuid.uuid4().hex[:8]}"
+    task_payload = {
+        "id": new_task_id,
+        "title": f"Master {skill_name} Fundamentals & Hands-on Implementation",
+        "description": f"Targeted hands-on module for {skill_name} relevant to {target_role}.",
+        "estimated_minutes": 35,
+        "task_type": "Practice",
+        "skill": skill_name,
+        "why_it_matters": f"Directly addresses skill gap identified from {target_role} requirements.",
+        "is_completed": False,
+        "completed_at": None,
+        "topics_to_learn": topics,
+        "learning_focus": f"Focus on understanding core mechanics, clean code, and practical application with {skill_name}.",
+        "practice_goal": practice_goal,
+        "difficulty_level": difficulty,
+        "concept_explanation": f"Core principles and industry standards for using {skill_name} in {target_role} workflows.",
+        "practice_exercise": f"Write a clean, functional implementation utilizing {skill_name}.",
+        "check_quiz_question": f"What is the key advantage of applying {skill_name} in modern software engineering?",
+        "check_quiz_options": [
+            f"A) Improves code quality, scalability, and system reliability",
+            f"B) Purely theoretical concept with no practical usage",
+            f"C) Deprecated in contemporary development"
+        ],
+        "check_quiz_answer": f"A) Improves code quality, scalability, and system reliability",
+        "is_priority": True,
+        "priority_reason": f"Ingested from user request: {skill_name}"
+    }
+
+    return {
+        "suggested_phase_number": suggested_num,
+        "suggested_phase_title": phase_title,
+        "suggested_task_title": task_payload["title"],
+        "placement_reason": reason,
+        "difficulty_level": difficulty,
+        "estimated_minutes": 35,
+        "topics_to_learn": topics,
+        "practice_goal": practice_goal,
+        "task_payload": task_payload
+    }
+
+
+@router.post(
+    "/requests",
+    response_model=APIResponse[RoadmapSkillRequestResponse],
+    summary="Submit a skill request to be reviewed and accepted in Roadmap"
+)
+async def create_skill_request(
+    req: CreateRoadmapSkillRequestSchema,
+    db: AsyncSession = Depends(get_db),
+    user_id: str = Depends(get_current_user_id)
+):
+    skill_clean = req.skill_name.strip()
+    if not skill_clean:
+        raise HTTPException(status_code=400, detail="Skill name is required")
+
+    stmt = select(Roadmap).where(Roadmap.user_id == user_id, Roadmap.is_active == True)
+    res = await db.execute(stmt)
+    roadmap = res.scalars().first()
+
+    phases = copy.deepcopy(roadmap.phases or []) if roadmap else []
+    target_role = roadmap.target_role if roadmap else "Software Developer"
+
+    placement_info = determine_skill_placement(skill_clean, phases, target_role)
+
+    # Check if a pending request already exists for this skill
+    exist_stmt = select(RoadmapSkillRequest).where(
+        RoadmapSkillRequest.user_id == user_id,
+        RoadmapSkillRequest.skill_name.ilike(skill_clean),
+        RoadmapSkillRequest.status == "pending"
+    )
+    exist_res = await db.execute(exist_stmt)
+    existing_req = exist_res.scalars().first()
+
+    if existing_req:
+        return APIResponse(
+            success=True,
+            message=f"Request for '{skill_clean}' is already pending review in Roadmap & Tasks.",
+            data=RoadmapSkillRequestResponse.model_validate(existing_req)
+        )
+
+    new_request = RoadmapSkillRequest(
+        user_id=user_id,
+        roadmap_id=roadmap.id if roadmap else None,
+        skill_name=skill_clean,
+        source=req.source or "Skill Matrix",
+        priority=req.priority or "Medium",
+        status="pending",
+        suggested_phase_number=placement_info["suggested_phase_number"],
+        suggested_phase_title=placement_info["suggested_phase_title"],
+        suggested_task_title=placement_info["suggested_task_title"],
+        placement_reason=placement_info["placement_reason"],
+        difficulty_level=placement_info["difficulty_level"],
+        estimated_minutes=placement_info["estimated_minutes"],
+        topics_to_learn=placement_info["topics_to_learn"],
+        practice_goal=placement_info["practice_goal"],
+        task_payload=placement_info["task_payload"]
+    )
+    db.add(new_request)
+    await db.commit()
+    await db.refresh(new_request)
+
+    return APIResponse(
+        success=True,
+        message=f"Request for '{skill_clean}' sent to Roadmap & Tasks! You can review and accept it into {placement_info['suggested_phase_title']}.",
+        data=RoadmapSkillRequestResponse.model_validate(new_request)
+    )
+
+
+@router.get(
+    "/requests",
+    response_model=APIResponse[List[RoadmapSkillRequestResponse]],
+    summary="Get pending roadmap skill requests"
+)
+async def get_skill_requests(
+    status: Optional[str] = "pending",
+    db: AsyncSession = Depends(get_db),
+    user_id: str = Depends(get_current_user_id)
+):
+    stmt = select(RoadmapSkillRequest).where(RoadmapSkillRequest.user_id == user_id)
+    if status and status != "all":
+        stmt = stmt.where(RoadmapSkillRequest.status == status)
+    stmt = stmt.order_by(RoadmapSkillRequest.created_at.desc())
+    res = await db.execute(stmt)
+    requests = res.scalars().all()
+    return APIResponse(
+        success=True,
+        message=f"Found {len(requests)} skill requests",
+        data=[RoadmapSkillRequestResponse.model_validate(r) for r in requests]
+    )
+
+
+@router.post(
+    "/requests/{request_id}/accept",
+    response_model=APIResponse[dict],
+    summary="Accept a skill request and place into roadmap at suitable position"
+)
+async def accept_skill_request(
+    request_id: str,
+    req_body: Optional[AcceptRoadmapSkillRequestSchema] = None,
+    db: AsyncSession = Depends(get_db),
+    user_id: str = Depends(get_current_user_id)
+):
+    stmt = select(RoadmapSkillRequest).where(
+        RoadmapSkillRequest.id == request_id,
+        RoadmapSkillRequest.user_id == user_id
+    )
+    res = await db.execute(stmt)
+    skill_req = res.scalars().first()
+    if not skill_req:
+        raise HTTPException(status_code=404, detail="Skill request not found")
+
+    if skill_req.status != "pending":
+        raise HTTPException(status_code=400, detail=f"Request is already {skill_req.status}")
+
+    r_stmt = select(Roadmap).where(Roadmap.user_id == user_id, Roadmap.is_active == True)
+    r_res = await db.execute(r_stmt)
+    roadmap = r_res.scalars().first()
+
+    if not roadmap:
+        raise HTTPException(status_code=404, detail="Active roadmap not found")
+
+    phases = copy.deepcopy(roadmap.phases or [])
+    if not phases:
+        raise HTTPException(status_code=400, detail="Roadmap has no phases to accept task into")
+
+    target_phase_num = (req_body.target_phase_number if req_body and req_body.target_phase_number else skill_req.suggested_phase_number) or 1
+
+    target_idx = -1
+    for idx, p in enumerate(phases):
+        if p.get("phase_number") == target_phase_num:
+            target_idx = idx
+            break
+    if target_idx == -1:
+        target_idx = min(len(phases) - 1, max(0, target_phase_num - 1))
+
+    task_payload = copy.deepcopy(skill_req.task_payload) if skill_req.task_payload else {
+        "id": f"task_req_{uuid.uuid4().hex[:8]}",
+        "title": skill_req.suggested_task_title or f"Master {skill_req.skill_name} Hands-on Implementation",
+        "description": f"Hands-on learning module for {skill_req.skill_name}",
+        "estimated_minutes": skill_req.estimated_minutes or 35,
+        "task_type": "Practice",
+        "skill": skill_req.skill_name,
+        "why_it_matters": skill_req.placement_reason or "Targeted skill addition",
+        "is_completed": False,
+        "completed_at": None,
+        "topics_to_learn": skill_req.topics_to_learn or [f"{skill_req.skill_name} Fundamentals"],
+        "learning_focus": f"Master practical application of {skill_req.skill_name}",
+        "practice_goal": skill_req.practice_goal or f"Hands-on project with {skill_req.skill_name}",
+        "difficulty_level": skill_req.difficulty_level or "Intermediate",
+        "is_priority": True,
+        "priority_reason": f"Accepted from {skill_req.source}"
+    }
+
+    # Ensure suitable placement:
+    # Placed at the top (index 0) of the target phase tasks for clean, friction-free progression!
+    phases[target_idx].setdefault("tasks", []).insert(0, task_payload)
+    phase_skills = phases[target_idx].setdefault("skills", [])
+    if skill_req.skill_name not in phase_skills:
+        phase_skills.append(skill_req.skill_name)
+
+    roadmap.phases = phases
+    flag_modified(roadmap, "phases")
+
+    skill_req.status = "accepted"
+    await db.commit()
+    await db.refresh(roadmap)
+
+    # Sync to Firestore
+    serialized = _serialize_roadmap(roadmap)
+    try:
+        await RoadmapRepository.save_roadmap(user_id, roadmap.id, serialized.model_dump())
+    except Exception as e:
+        logger.warning(f"Firestore update roadmap notice in accept_skill_request: {e}")
+
+    placed_level_name = phases[target_idx].get("level_name") or phases[target_idx].get("title") or f"Level {target_phase_num}"
+
+    return APIResponse(
+        success=True,
+        message=f"'{skill_req.skill_name}' successfully added to {placed_level_name} at optimal position!",
+        data={
+            "request_id": skill_req.id,
+            "status": "accepted",
+            "phase_number": target_phase_num,
+            "phase_title": placed_level_name,
+            "task_id": task_payload.get("id"),
+            "task_title": task_payload.get("title")
+        }
+    )
+
+
+@router.post(
+    "/requests/{request_id}/reject",
+    response_model=APIResponse[dict],
+    summary="Reject a skill request"
+)
+async def reject_skill_request(
+    request_id: str,
+    db: AsyncSession = Depends(get_db),
+    user_id: str = Depends(get_current_user_id)
+):
+    stmt = select(RoadmapSkillRequest).where(
+        RoadmapSkillRequest.id == request_id,
+        RoadmapSkillRequest.user_id == user_id
+    )
+    res = await db.execute(stmt)
+    skill_req = res.scalars().first()
+    if not skill_req:
+        raise HTTPException(status_code=404, detail="Skill request not found")
+
+    skill_req.status = "rejected"
+    await db.commit()
+
+    return APIResponse(
+        success=True,
+        message=f"Request for '{skill_req.skill_name}' dismissed.",
+        data={"request_id": skill_req.id, "status": "rejected"}
     )
 
 
@@ -1061,10 +1542,35 @@ def _serialize_roadmap(r: Roadmap) -> RoadmapResponse:
     total_xp = sum(p.get("xp_reward", 100) for p in enriched_phases if p.get("test_passed")) + len(r.completed_task_ids or []) * 20
     adventurer_level = max(1, (total_xp // 250) + 1)
 
+    # Personalization & schedule metadata (Layer D & F)
+    career_goal = getattr(r, "career_goal", None) or (
+        raw_phases[0].get("career_goal") if raw_phases and isinstance(raw_phases[0], dict) else None
+    ) or "Entry-level Job"
+
+    total_estimated_minutes = sum(
+        sum(t.get("estimated_minutes", 30) for t in p.get("tasks", []))
+        for p in raw_phases
+    )
+
+    schedule_notes = getattr(r, "schedule_notes", None) or (
+        raw_phases[0].get("schedule_notes") if raw_phases and isinstance(raw_phases[0], dict) else None
+    )
+    if not schedule_notes:
+        weekly_mins = (r.hours_per_day or 1) * (r.days_per_week or 5) * 60
+        if weekly_mins < 180:
+            schedule_notes = f"Notice: {r.hours_per_day}h/day for {r.days_per_week} days/week (~{weekly_mins // 60}h weekly) provides a steady pace across ~{r.total_estimated_weeks} weeks."
+        elif r.total_estimated_weeks and r.total_estimated_weeks > 20:
+            schedule_notes = f"In-depth curriculum estimated at ~{r.total_estimated_weeks} weeks. Keep consistent daily momentum to achieve milestones."
+        else:
+            schedule_notes = f"Realistic completion timeline based on your {r.hours_per_day}h/day, {r.days_per_week} days/week commitment."
+
     return RoadmapResponse(
         id=r.id,
         user_id=r.user_id,
         target_role=r.target_role,
+        career_goal=career_goal,
+        schedule_notes=schedule_notes,
+        total_estimated_minutes=total_estimated_minutes,
         user_level=getattr(r, "user_level", "Beginner") or "Beginner",
         overall_progress_percent=r.overall_progress_percent,
         is_active=r.is_active,

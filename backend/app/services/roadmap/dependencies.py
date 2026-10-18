@@ -15,6 +15,13 @@ SKILL_DEPENDENCY_TREE: Dict[str, List[str]] = {
     "Tailwind CSS": ["CSS", "HTML"],
     "Web Performance": ["JavaScript", "HTML", "CSS"],
 
+    # Mobile Development
+    "Flutter": ["Dart", "Programming Fundamentals & Logic"],
+    "React Native": ["React", "JavaScript"],
+    "Dart": ["Programming Fundamentals & Logic"],
+    "Android Development": ["Java", "OOP"],
+    "iOS Development": ["Swift", "OOP"],
+
     # Backend & API Engineering
     "FastAPI": ["Python", "REST APIs"],
     "Node.js": ["JavaScript"],
@@ -24,6 +31,17 @@ SKILL_DEPENDENCY_TREE: Dict[str, List[str]] = {
     "Redis": ["PostgreSQL", "SQL"],
     "Async Programming": ["Python"],
     "Microservices": ["FastAPI", "Docker", "REST APIs"],
+    "Java": ["Programming Fundamentals & Logic"],
+    "Spring Boot": ["Java", "OOP", "REST APIs", "SQL"],
+    "Django": ["Python", "SQL", "REST APIs"],
+    "Flask": ["Python", "REST APIs"],
+    "C#": ["OOP", "Programming Fundamentals & Logic"],
+    ".NET": ["C#", "OOP", "SQL"],
+    "C++": ["Programming Fundamentals & Logic"],
+    "Go": ["Programming Fundamentals & Logic"],
+    "Rust": ["Programming Fundamentals & Logic"],
+    "GraphQL": ["REST APIs", "JavaScript"],
+    "SQL": ["Databases"],
 
     # Data Analytics & Science
     "Pandas": ["Python"],
@@ -33,31 +51,69 @@ SKILL_DEPENDENCY_TREE: Dict[str, List[str]] = {
     "PowerBI": ["Data Visualization", "SQL"],
     "Statistics": ["Python"],
     "Scikit-Learn": ["Python", "Pandas", "NumPy"],
+    "Airflow": ["Python", "SQL", "Docker"],
+    "Kafka": ["Docker", "Distributed Systems"],
 
     # AI & ML Engineering
+    "Machine Learning": ["Python", "NumPy", "Statistics"],
+    "Deep Learning": ["Machine Learning", "PyTorch"],
     "PyTorch": ["Python", "NumPy", "Statistics"],
     "TensorFlow": ["Python", "NumPy"],
-    "LLMs": ["Python", "PyTorch"],
-    "Vector Databases": ["LLMs", "Python"],
-    "MLOps": ["Docker", "Python", "PyTorch"],
+    "LLMs": ["Python", "Deep Learning"],
+    "Vector Databases": ["Python"],
+    "MLOps": ["Docker", "Python", "Machine Learning"],
+
+    # Generative AI & AI Agents
+    "Prompt Engineering": ["LLMs"],
+    "Embeddings & Vector Search": ["Python", "Vector Databases"],
+    "Retrieval-Augmented Generation (RAG)": ["Prompt Engineering", "Embeddings & Vector Search"],
+    "Advanced RAG": ["Retrieval-Augmented Generation (RAG)"],
+    "Function Calling & Tool Use": ["Prompt Engineering", "REST APIs"],
+    "AI Agents": ["Retrieval-Augmented Generation (RAG)", "Function Calling & Tool Use", "Python"],
+    "LangGraph": ["AI Agents", "Python"],
+    "Multi-Agent Systems": ["AI Agents", "LangGraph"],
+    "Agent Evaluation & Guardrails": ["Multi-Agent Systems", "AI Agents"],
 
     # Cloud & DevOps
     "AWS": ["Linux", "Networking Protocols"],
     "GCP": ["Linux", "Networking Protocols"],
+    "Azure": ["Linux", "Networking Protocols"],
     "Docker": ["Linux"],
     "Kubernetes": ["Docker", "Linux"],
     "Terraform": ["AWS", "Cloud"],
     "CI/CD Pipelines": ["Git", "Docker"],
+    "Linux": ["Developer Setup & Git Basics"],
+    "Git": ["Developer Setup & Git Basics"],
 
     # Software Engineering & CS Fundamentals
     "OOP": ["Data Structures"],
     "REST APIs": ["OOP", "Git"],
     "Testing": ["JavaScript", "Python"],
+    "Unit Testing": ["Python", "JavaScript"],
+    "Integration Testing": ["Unit Testing", "REST APIs"],
     "System Design": ["REST APIs", "SQL", "PostgreSQL"],
+    "Distributed Systems": ["System Design", "Microservices"],
+    "Data Structures": ["Programming Fundamentals & Logic"],
+    "Algorithms": ["Data Structures"],
+    "Problem Solving": ["Data Structures", "Programming Fundamentals & Logic"],
+    "Clean Code": ["OOP", "Programming Fundamentals & Logic"],
 
-    # Cybersecurity
-    "Vulnerability Testing": ["Linux", "Networking Protocols"],
-    "Incident Response": ["Networking Protocols", "Linux"]
+    # Cybersecurity & AI Security
+    "Cybersecurity Fundamentals": ["Linux", "Networking Protocols"],
+    "AI Threat Modeling": ["Cybersecurity Fundamentals", "LLMs"],
+    "OWASP LLM Top 10": ["AI Threat Modeling", "Application Security"],
+    "Prompt Injection & Defense": ["Prompt Engineering", "OWASP LLM Top 10"],
+    "Data Poisoning & Model Privacy": ["Machine Learning", "Cybersecurity Fundamentals"],
+    "AI Red Teaming & Guardrails": ["Prompt Injection & Defense", "AI Threat Modeling"],
+    "AI Security Auditing": ["AI Red Teaming & Guardrails", "OWASP LLM Top 10"],
+    "Vulnerability Testing": ["Linux", "Networking Protocols", "Cybersecurity Fundamentals"],
+    "Incident Response": ["Networking Protocols", "Linux"],
+    "Penetration Testing": ["Linux", "Networking Protocols", "Cybersecurity Fundamentals"],
+    "Application Security": ["REST APIs", "Web Performance"]
+}
+
+_DEPENDENCY_LOOKUP: Dict[str, List[str]] = {
+    k.strip().lower(): v for k, v in SKILL_DEPENDENCY_TREE.items()
 }
 
 
@@ -73,10 +129,11 @@ class SkillDependencyEngine:
         visited: Set[str] = set()
 
         def _traverse(s: str):
-            direct_prereqs = SKILL_DEPENDENCY_TREE.get(s, [])
+            s_clean = s.strip().lower()
+            direct_prereqs = _DEPENDENCY_LOOKUP.get(s_clean, SKILL_DEPENDENCY_TREE.get(s, []))
             for p in direct_prereqs:
                 norm_p = self.normalizer.normalize(p)
-                if norm_p not in visited and norm_p != norm_name:
+                if norm_p not in visited and norm_p.lower() != norm_name.lower():
                     visited.add(norm_p)
                     _traverse(norm_p)
 
@@ -93,7 +150,7 @@ class SkillDependencyEngine:
         adj: Dict[str, List[str]] = {s: [] for s in unique_skills}
 
         for s in unique_skills:
-            prereqs = SKILL_DEPENDENCY_TREE.get(s, [])
+            prereqs = _DEPENDENCY_LOOKUP.get(s.strip().lower(), SKILL_DEPENDENCY_TREE.get(s, []))
             for p in prereqs:
                 norm_p = self.normalizer.normalize(p)
                 if norm_p in in_degree and norm_p != s:

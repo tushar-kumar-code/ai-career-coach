@@ -49,7 +49,12 @@ import {
   EyeOff,
   Plus,
   Settings2,
-  Sliders
+  Sliders,
+  Inbox,
+  GitPullRequest,
+  Bot,
+  Send,
+  MessageSquare
 } from 'lucide-react';
 import { 
   getCurrentRoadmap, 
@@ -61,13 +66,18 @@ import {
   updateRoadmapPreferences,
   addCustomRoadmapPhase,
   generateLevelTest,
-  submitLevelTest
+  submitLevelTest,
+  getRoadmapSkillRequests,
+  acceptRoadmapSkillRequest,
+  rejectRoadmapSkillRequest,
+  askRoadmapAssistant
 } from '@/lib/api-client';
 import { 
   RoadmapData, 
   DailyTasksData, 
   RoadmapPhase, 
   RoadmapTask,
+  RoadmapSkillRequest,
   LevelTestResponse,
   LevelTestQuestion,
   LevelTestSubmitResponse
@@ -82,6 +92,19 @@ const STANDARD_LEVEL_NAMES = [
   { name: 'Boss Battle', theme: 'Production Capstone Project', icon: 'boss' },
   { name: 'Interview Arena', theme: 'Technical Mock Interview & System Design', icon: 'swords' },
   { name: 'Mastery Island', theme: 'Placement Verification & Career Launch', icon: 'island' }
+];
+
+const POPULAR_DOMAINS = [
+  'Full Stack Developer',
+  'Frontend Developer',
+  'Backend Developer',
+  'AI & Machine Learning Engineer',
+  'Data Scientist & Analyst',
+  'DevOps & Cloud Engineer',
+  'Cybersecurity Specialist',
+  'Mobile App Developer (Flutter/React Native)',
+  'UI/UX & Product Designer',
+  'Other / Custom Domain'
 ];
 
 /**
@@ -228,13 +251,34 @@ export default function RoadmapPage() {
   const [testTimeRemaining, setTestTimeRemaining] = useState(600); // 10 minutes timer
   const [copiedCode, setCopiedCode] = useState(false);
 
-  // Confetti canvas ref
+  // Confetti canvas ref & Chat scroll ref
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const chatMessagesEndRef = useRef<HTMLDivElement | null>(null);
 
   // Accordion & Syllabus states
   const [openPhaseId, setOpenPhaseId] = useState<string>('phase-1');
   const [showPreferences, setShowPreferences] = useState(false);
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
+  const [expandedTaskIds, setExpandedTaskIds] = useState<Record<string, boolean>>({});
+  const [completedSubtopics, setCompletedSubtopics] = useState<Record<string, Record<number, boolean>>>({});
+
+  // Dedicated Groq AI Roadmap Assistant State
+  const [showRoadmapAssistant, setShowRoadmapAssistant] = useState(false);
+  const [assistantMessages, setAssistantMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string; time: string }>>([
+    {
+      role: 'assistant',
+      content: "Namaste! Main aapka dedicated Groq AI Roadmap Coach hoon 🎯. Main sirf aapke career roadmap, phases, tasks aur syllabus concepts me madad karta hoon. Roadmap ke baare me koi bhi sawaal ya doubt poochhein!",
+      time: "Just now"
+    }
+  ]);
+  const [assistantInput, setAssistantInput] = useState('');
+  const [assistantLoading, setAssistantLoading] = useState(false);
+
+  useEffect(() => {
+    if (showRoadmapAssistant) {
+      chatMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [assistantMessages, showRoadmapAssistant]);
 
   // Setup form states
   const [userLevel, setUserLevel] = useState('Beginner');
@@ -242,11 +286,22 @@ export default function RoadmapPage() {
   const [daysPerWeek, setDaysPerWeek] = useState(5);
   const [learningStyle, setLearningStyle] = useState('Hands-on');
   const [trackPace, setTrackPace] = useState<'Express' | 'Standard' | 'Comprehensive'>('Standard');
+  const [selectedDomain, setSelectedDomain] = useState<string>('');
+  const [customDomainInput, setCustomDomainInput] = useState<string>('');
+  const [levelMode, setLevelMode] = useState<'ai_recommended' | 'express' | 'standard' | 'comprehensive' | 'custom'>('ai_recommended');
+  const [customLevelCount, setCustomLevelCount] = useState<number>(5);
+  const [domainRequirement, setDomainRequirement] = useState<string>('');
   const [showAddCustomModal, setShowAddCustomModal] = useState(false);
   const [customPhaseTitle, setCustomPhaseTitle] = useState('');
   const [customPhaseDesc, setCustomPhaseDesc] = useState('');
   const [customPhaseTopics, setCustomPhaseTopics] = useState('');
   const [customPhaseLoading, setCustomPhaseLoading] = useState(false);
+
+  // Pending skill ingestion requests (From Skill Matrix, Job Engine, Profile)
+  const [skillRequests, setSkillRequests] = useState<RoadmapSkillRequest[]>([]);
+  const [selectedPhaseOverrides, setSelectedPhaseOverrides] = useState<Record<string, number>>({});
+  const [requestActionId, setRequestActionId] = useState<string | null>(null);
+  const [requestFeedback, setRequestFeedback] = useState<{ id: string; msg: string; type: 'success' | 'info' } | null>(null);
 
   useEffect(() => {
     loadRoadmapData();
@@ -329,18 +384,25 @@ export default function RoadmapPage() {
   async function loadRoadmapData() {
     setLoading(true);
     try {
-      const [rData, tData] = await Promise.all([
+      const [rData, tData, reqsData] = await Promise.all([
         getCurrentRoadmap(),
-        getTodayTasks().catch(() => null)
+        getTodayTasks().catch(() => null),
+        getRoadmapSkillRequests('pending').catch(() => [])
       ]);
       setRoadmap(rData);
       setTodayData(tData);
+      setSkillRequests(reqsData || []);
       if (rData) {
         setUserLevel(rData.user_level || 'Beginner');
         setHoursPerDay(rData.hours_per_day || 1);
         setDaysPerWeek(rData.days_per_week || 5);
         setLearningStyle(rData.preferred_learning_style || 'Hands-on');
+        if (rData.target_role) {
+          setSelectedDomain(rData.target_role);
+          setCustomDomainInput(rData.target_role);
+        }
         if (rData.phases && rData.phases.length > 0) {
+          setCustomLevelCount(rData.phases.length);
           const firstId = rData.phases[0].id || (rData.phases[0] as any).phase_id || 'phase-1';
           setOpenPhaseId(firstId);
         }
@@ -352,16 +414,91 @@ export default function RoadmapPage() {
     }
   }
 
+  async function handleAcceptSkillRequest(reqItem: RoadmapSkillRequest) {
+    setRequestActionId(reqItem.id);
+    playSound('click', soundEnabled);
+    try {
+      const chosenPhase = selectedPhaseOverrides[reqItem.id] || reqItem.suggested_phase_number;
+      const res = await acceptRoadmapSkillRequest(reqItem.id, chosenPhase);
+      playSound('victory', soundEnabled);
+      setRequestFeedback({
+        id: reqItem.id,
+        msg: res.message || `${reqItem.skill_name} added to Level ${chosenPhase} successfully!`,
+        type: 'success'
+      });
+      setSkillRequests((prev) => prev.filter((r) => r.id !== reqItem.id));
+      await loadRoadmapData();
+      setTimeout(() => setRequestFeedback(null), 6000);
+    } catch (err: any) {
+      console.error('Failed to accept skill request:', err);
+      setRequestFeedback({
+        id: reqItem.id,
+        msg: err?.message || 'Failed to add skill to roadmap',
+        type: 'info'
+      });
+      setTimeout(() => setRequestFeedback(null), 5000);
+    } finally {
+      setRequestActionId(null);
+    }
+  }
+
+  async function handleRejectSkillRequest(reqItem: RoadmapSkillRequest) {
+    setRequestActionId(reqItem.id);
+    playSound('click', soundEnabled);
+    try {
+      await rejectRoadmapSkillRequest(reqItem.id);
+      setSkillRequests((prev) => prev.filter((r) => r.id !== reqItem.id));
+      setRequestFeedback({
+        id: reqItem.id,
+        msg: `Request for ${reqItem.skill_name} dismissed.`,
+        type: 'info'
+      });
+      setTimeout(() => setRequestFeedback(null), 4000);
+    } catch (err: any) {
+      console.error('Failed to reject skill request:', err);
+    } finally {
+      setRequestActionId(null);
+    }
+  }
+
   async function handleGenerateRoadmap(e?: React.FormEvent) {
     if (e) e.preventDefault();
     setActionLoading(true);
     playSound('click', soundEnabled);
     try {
+      const activeDomain = selectedDomain === 'Other / Custom Domain'
+        ? (customDomainInput.trim() || 'Software Developer')
+        : (customDomainInput.trim() || selectedDomain.trim() || roadmap?.target_role || 'Software Developer');
+
+      let targetPhasesCount: number | undefined = undefined;
+      let pace: string = trackPace;
+
+      if (levelMode === 'custom') {
+        targetPhasesCount = customLevelCount;
+      } else if (levelMode === 'express') {
+        targetPhasesCount = 3;
+        pace = 'Express';
+      } else if (levelMode === 'standard') {
+        targetPhasesCount = 5;
+        pace = 'Standard';
+      } else if (levelMode === 'comprehensive') {
+        targetPhasesCount = 6;
+        pace = 'Comprehensive';
+      } else {
+        // AI Recommended / Dynamic
+        targetPhasesCount = undefined;
+        pace = 'Standard';
+      }
+
       const newRoadmap = await generateRoadmap({
         user_level: userLevel,
         hours_per_day: hoursPerDay,
         days_per_week: daysPerWeek,
-        preferred_learning_style: learningStyle
+        preferred_learning_style: learningStyle,
+        target_role: activeDomain,
+        track_pace: pace,
+        target_phases_count: targetPhasesCount,
+        domain_requirement: domainRequirement.trim() || undefined
       });
       setRoadmap(newRoadmap);
       const tData = await getTodayTasks();
@@ -396,12 +533,39 @@ export default function RoadmapPage() {
     setActionLoading(true);
     playSound('click', soundEnabled);
     try {
+      const activeDomain = selectedDomain === 'Other / Custom Domain'
+        ? (customDomainInput.trim() || 'Software Developer')
+        : (customDomainInput.trim() || selectedDomain.trim() || roadmap?.target_role || 'Software Developer');
+
+      let targetPhasesCount: number | undefined = undefined;
+      let pace: string = trackPace;
+
+      if (levelMode === 'custom') {
+        targetPhasesCount = customLevelCount;
+      } else if (levelMode === 'express') {
+        targetPhasesCount = 3;
+        pace = 'Express';
+      } else if (levelMode === 'standard') {
+        targetPhasesCount = 5;
+        pace = 'Standard';
+      } else if (levelMode === 'comprehensive') {
+        targetPhasesCount = 6;
+        pace = 'Comprehensive';
+      } else {
+        // AI Recommended / Dynamic
+        targetPhasesCount = undefined;
+        pace = 'Standard';
+      }
+
       const updated = await updateRoadmapPreferences({
         hours_per_day: hoursPerDay,
         days_per_week: daysPerWeek,
         preferred_learning_style: learningStyle,
         user_level: userLevel,
-        track_pace: trackPace
+        target_role: activeDomain,
+        track_pace: pace,
+        target_phases_count: targetPhasesCount,
+        domain_requirement: domainRequirement.trim() || undefined
       });
       setRoadmap(updated);
       const tData = await getTodayTasks().catch(() => null);
@@ -485,6 +649,509 @@ export default function RoadmapPage() {
       console.error('Failed to toggle task completion:', err);
     }
   }
+
+  const toggleTaskExpand = (taskId: string) => {
+    playSound('select', soundEnabled);
+    setExpandedTaskIds((prev) => ({
+      ...prev,
+      [taskId]: !prev[taskId],
+    }));
+  };
+
+  const toggleSubtopic = (taskId: string, sIdx: number) => {
+    playSound('select', soundEnabled);
+    setCompletedSubtopics((prev) => {
+      const taskSubs = { ...(prev[taskId] || {}) };
+      taskSubs[sIdx] = !taskSubs[sIdx];
+      return { ...prev, [taskId]: taskSubs };
+    });
+  };
+
+  async function handleSendAssistantMessage(customMessage?: string) {
+    const text = (customMessage || assistantInput).trim();
+    if (!text || assistantLoading) return;
+
+    playSound('select', soundEnabled);
+    const userMsg = {
+      role: 'user' as const,
+      content: text,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+    setAssistantMessages((prev) => [...prev, userMsg]);
+    if (!customMessage) setAssistantInput('');
+    setAssistantLoading(true);
+
+    try {
+      const historyPayload = assistantMessages.slice(-6).map((m) => ({ role: m.role, content: m.content }));
+      const res = await askRoadmapAssistant({
+        message: text,
+        history: historyPayload,
+        current_phase_id: selectedPhase?.id || selectedPhase?.phase_id,
+        current_task_id: undefined
+      });
+
+      setAssistantMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: res.response,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        }
+      ]);
+      playSound('victory', soundEnabled);
+    } catch (err: any) {
+      setAssistantMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: "Maaf kijiye, abhi response generate karne me dikkat aayi. Kripya apna Groq API key check karein ya thodi der baad dobara poochhein.",
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        }
+      ]);
+      playSound('fail', soundEnabled);
+    } finally {
+      setAssistantLoading(false);
+    }
+  }
+
+  const renderAssistantSidebarContent = (isInsideModal: boolean) => (
+    <div className="flex flex-col h-full overflow-hidden">
+      {/* Header */}
+      <div className="p-3.5 sm:p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-100/70 dark:bg-slate-900/80 shrink-0">
+        <div className="flex items-center space-x-2.5">
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-xs">
+            <Bot className="w-4 h-4 text-amber-300" />
+          </div>
+          <div>
+            <div className="flex items-center space-x-1.5">
+              <h4 className="font-extrabold text-xs text-slate-900 dark:text-white">AI Roadmap Coach</h4>
+              <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30 uppercase">
+                Groq
+              </span>
+            </div>
+            <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate max-w-[200px]">
+              {selectedPhase ? `Focus: Level ${selectedPhase.phase_number || 1}` : (roadmap?.target_role || 'Career Guide')}
+            </p>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setShowRoadmapAssistant(false)}
+          className="p-1 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition"
+          title="Close Sidebar"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* Scope banner */}
+      <div className="px-3.5 py-1.5 bg-blue-50/70 dark:bg-blue-950/30 border-b border-blue-200/50 dark:border-blue-900/30 text-[10px] text-blue-700 dark:text-blue-300 flex items-center space-x-1 shrink-0">
+        <Sparkles className="w-3 h-3 text-blue-500 shrink-0" />
+        <span className="truncate">Roadmap exclusive: answers topics, tasks & study plans.</span>
+      </div>
+
+      {/* Quick Prompts */}
+      <div className="p-2 border-b border-slate-100 dark:border-slate-800/80 overflow-x-auto flex space-x-1 scrollbar-none shrink-0 bg-white/50 dark:bg-slate-950/20">
+        <button
+          type="button"
+          onClick={() => handleSendAssistantMessage("What should I learn next on my roadmap today?")}
+          className="shrink-0 px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-950/50 text-[10px] font-medium text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition"
+        >
+          🎯 What to learn today?
+        </button>
+        <button
+          type="button"
+          onClick={() => handleSendAssistantMessage("Can you explain how to study this level step-by-step without getting overwhelmed?")}
+          className="shrink-0 px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-950/50 text-[10px] font-medium text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition"
+        >
+          💡 Study plan
+        </button>
+        <button
+          type="button"
+          onClick={() => handleSendAssistantMessage("How should I practice the roadmap coding exercises effectively?")}
+          className="shrink-0 px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-950/50 text-[10px] font-medium text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition"
+        >
+          🛠️ Practice tips
+        </button>
+      </div>
+
+      {/* Chat Messages */}
+      <div className="flex-1 p-3.5 overflow-y-auto space-y-3">
+        {assistantMessages.map((msg, idx) => (
+          <div
+            key={idx}
+            className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}
+          >
+            <div
+              className={`max-w-[92%] p-3 rounded-2xl text-xs leading-relaxed whitespace-pre-wrap ${
+                msg.role === 'user'
+                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-tr-xs shadow-xs'
+                  : 'bg-white dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 rounded-tl-xs shadow-xs'
+              }`}
+            >
+              {msg.content}
+            </div>
+            <span className="text-[9px] text-slate-400 mt-0.5 px-1">
+              {msg.time}
+            </span>
+          </div>
+        ))}
+        {assistantLoading && (
+          <div className="flex items-center space-x-2 text-xs text-slate-400 p-2">
+            <div className="w-3.5 h-3.5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+            <span>Groq AI Coach is typing...</span>
+          </div>
+        )}
+        <div ref={chatMessagesEndRef} />
+      </div>
+
+      {/* Input */}
+      <div className="p-3 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-[#172235] shrink-0">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleSendAssistantMessage();
+          }}
+          className="flex items-center space-x-1.5"
+        >
+          <input
+            type="text"
+            value={assistantInput}
+            onChange={(e) => setAssistantInput(e.target.value)}
+            placeholder="Ask about roadmap, topics, schedule..."
+            disabled={assistantLoading}
+            className="flex-1 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <button
+            type="submit"
+            disabled={!assistantInput.trim() || assistantLoading}
+            className="p-2 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white transition shadow-xs cursor-pointer shrink-0"
+          >
+            <Send className="w-3.5 h-3.5" />
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+
+  const renderTaskCard = (task: any) => {
+    const taskId = task.id;
+    const isCompleted = !!(task.is_completed || task.completed);
+    const isOpen = !!expandedTaskIds[taskId];
+    const subtopics: string[] = task.topics_to_learn || [];
+    const taskSubsDone = completedSubtopics[taskId] || {};
+
+    return (
+      <div
+        key={taskId}
+        className={`rounded-2xl border transition-all duration-200 overflow-hidden ${
+          isCompleted
+            ? 'bg-emerald-500/5 dark:bg-emerald-950/20 border-emerald-500/40 shadow-xs'
+            : isOpen
+            ? 'bg-white dark:bg-slate-900 border-blue-500 shadow-md ring-2 ring-blue-500/10'
+            : 'bg-white dark:bg-slate-900/60 border-slate-200 dark:border-slate-800 hover:border-blue-400 dark:hover:border-blue-600 shadow-xs'
+        }`}
+      >
+        {/* Clickable Button Header */}
+        <div
+          onClick={() => toggleTaskExpand(taskId)}
+          className="p-3.5 flex items-center justify-between cursor-pointer select-none group"
+        >
+          <div className="flex items-center space-x-3 min-w-0 flex-1 pr-2">
+            {/* Checkbox Button */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleToggleTask(taskId, isCompleted);
+              }}
+              className="p-1 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800 transition shrink-0"
+              title={isCompleted ? "Mark as unlearned" : "Click to mark as learned"}
+            >
+              {isCompleted ? (
+                <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+              ) : (
+                <Square className="w-5 h-5 text-slate-400 group-hover:text-blue-500 transition" />
+              )}
+            </button>
+
+            {/* Title & Metadata */}
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center space-x-2">
+                <h5 className={`text-sm font-semibold truncate ${
+                  isCompleted
+                    ? 'line-through text-slate-400 dark:text-slate-500'
+                    : 'text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition'
+                }`}>
+                  {task.title}
+                </h5>
+                {task.difficulty_level && (
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 shrink-0">
+                    {task.difficulty_level}
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center space-x-2 text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">
+                <span>⏱️ {task.estimated_minutes || 30}m</span>
+                {subtopics.length > 0 && (
+                  <>
+                    <span>•</span>
+                    <span>{subtopics.length} learning concepts</span>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Right Action / Status */}
+          <div className="flex items-center space-x-2 shrink-0">
+            {isCompleted ? (
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                ✓ Learned
+              </span>
+            ) : (
+              <span className="text-[11px] font-medium text-blue-600 dark:text-blue-400 opacity-80 group-hover:opacity-100 hidden sm:inline">
+                {isOpen ? 'Close' : 'View Content'}
+              </span>
+            )}
+            <div className={`p-1 rounded-md text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-200 transition ${isOpen ? 'rotate-180 text-blue-500' : ''}`}>
+              <ChevronDown className="w-4 h-4 transition-transform duration-200" />
+            </div>
+          </div>
+        </div>
+
+        {/* Expanded Learning Content */}
+        {isOpen && (
+          <div className="px-4 pb-4 pt-2 border-t border-slate-100 dark:border-slate-800/80 space-y-3.5 bg-slate-50/50 dark:bg-slate-950/40 animate-in fade-in slide-in-from-top-1 duration-150">
+            {/* Description */}
+            {task.description && (
+              <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed pt-1">
+                {task.description}
+              </p>
+            )}
+
+            {/* Prerequisites */}
+            {task.prerequisites && task.prerequisites.length > 0 && (
+              <div className="flex items-center space-x-1.5 text-[11px] text-slate-500 dark:text-slate-400 flex-wrap gap-1">
+                <span className="font-bold text-slate-700 dark:text-slate-300 text-[10px] uppercase tracking-wider">
+                  Prerequisites:
+                </span>
+                {task.prerequisites.map((req: string, rIdx: number) => (
+                  <span key={rIdx} className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-[10px]">
+                    {req}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* Teacher Concept Explanation / Mental Model */}
+            {task.concept_explanation && (
+              <div className="p-3 rounded-xl bg-purple-50/70 dark:bg-purple-950/30 border border-purple-200/70 dark:border-purple-900/40 text-xs text-purple-950 dark:text-purple-200 flex items-start space-x-2">
+                <Sparkles className="w-4 h-4 text-purple-500 shrink-0 mt-0.5" />
+                <div className="space-y-0.5">
+                  <span className="font-bold text-[10px] uppercase tracking-wider block text-purple-600 dark:text-purple-400">
+                    Teacher Mental Model & Example:
+                  </span>
+                  <p className="leading-relaxed whitespace-pre-line">{task.concept_explanation}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Why It Matters */}
+            {task.why_it_matters && (
+              <div className="p-2.5 rounded-xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200/70 dark:border-blue-900/40 text-xs text-blue-950 dark:text-blue-200 flex items-start space-x-2">
+                <Target className="w-3.5 h-3.5 text-blue-500 shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-bold text-[10px] uppercase tracking-wider block text-blue-600 dark:text-blue-400">Why You Need This:</span>
+                  <p className="mt-0.5 leading-relaxed">{task.why_it_matters}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Step-by-Step Learning Instructions */}
+            {task.learning_focus && (
+              <div className="p-2.5 rounded-xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/70 dark:border-amber-900/40 text-xs text-amber-950 dark:text-amber-200 flex items-start space-x-2">
+                <Lightbulb className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-bold text-[10px] uppercase tracking-wider block text-amber-600 dark:text-amber-400">How to Learn & Focus:</span>
+                  <p className="mt-0.5 leading-relaxed">{task.learning_focus}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Numbered Learning Concepts 1., 2., 3., 4. */}
+            {subtopics.length > 0 && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider flex items-center space-x-1">
+                    <BookOpen className="w-3.5 h-3.5" />
+                    <span>Learning Content ({subtopics.length} Concepts):</span>
+                  </span>
+                  <span className="text-[10px] text-slate-400">
+                    Click checkmark as you study
+                  </span>
+                </div>
+
+                <div className="space-y-1.5">
+                  {subtopics.map((sub: string, sIdx: number) => {
+                    const isSubDone = isCompleted || !!taskSubsDone[sIdx];
+                    return (
+                      <div
+                        key={sIdx}
+                        onClick={() => toggleSubtopic(taskId, sIdx)}
+                        className={`p-2.5 rounded-xl border transition flex items-start space-x-2.5 cursor-pointer ${
+                          isSubDone
+                            ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-900 dark:text-emerald-100'
+                            : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-blue-400/50'
+                        }`}
+                      >
+                        {/* Number Badge (1, 2, 3, 4...) */}
+                        <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5 ${
+                          isSubDone
+                            ? 'bg-emerald-500 text-white'
+                            : 'bg-blue-600/10 text-blue-600 dark:text-blue-400 border border-blue-500/30'
+                        }`}>
+                          {sIdx + 1}
+                        </div>
+
+                        <p className={`text-xs flex-1 leading-relaxed ${
+                          isSubDone
+                            ? 'line-through text-slate-400 dark:text-slate-500'
+                            : 'text-slate-800 dark:text-slate-200'
+                        }`}>
+                          {sub}
+                        </p>
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleSubtopic(taskId, sIdx);
+                          }}
+                          className="shrink-0 mt-0.5 text-slate-400 hover:text-emerald-500 transition"
+                        >
+                          {isSubDone ? (
+                            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                          ) : (
+                            <Square className="w-4 h-4 text-slate-400" />
+                          )}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Expected Outcome & Verification Criteria */}
+            {(task.expected_outcome || task.verification_method) && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] pt-1">
+                {task.expected_outcome && (
+                  <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                    <span className="font-bold block text-[10px] uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                      📦 What You'll Be Able to Do:
+                    </span>
+                    <p className="text-slate-600 dark:text-slate-300 mt-1 leading-snug">{task.expected_outcome}</p>
+                  </div>
+                )}
+                {task.verification_method && (
+                  <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                    <span className="font-bold block text-[10px] uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+                      🔍 How to Verify Mastery:
+                    </span>
+                    <p className="text-slate-600 dark:text-slate-300 mt-1 leading-snug">{task.verification_method}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Recommended Resources */}
+            {task.recommended_resources && task.recommended_resources.length > 0 && (
+              <div className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center flex-wrap gap-1.5 pt-1">
+                <span className="font-semibold text-slate-700 dark:text-slate-300 text-[10px] uppercase tracking-wider">
+                  Official Resources:
+                </span>
+                {task.recommended_resources.map((res: string, rIdx: number) => (
+                  <span
+                    key={rIdx}
+                    className="px-2 py-0.5 rounded-md bg-slate-200/70 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-300/60 dark:border-slate-700 text-[10px] font-medium"
+                  >
+                    📚 {res}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* Practice Sandbox Action */}
+            <div className="p-3 rounded-xl bg-slate-100/80 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 flex items-center justify-between">
+              <div className="text-xs space-y-0.5 pr-2">
+                <span className="font-bold text-slate-700 dark:text-slate-300 flex items-center space-x-1">
+                  <Code className="w-3.5 h-3.5 text-blue-500" />
+                  <span>Practice This Concept</span>
+                </span>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  {task.practice_goal || 'Write code and solve interactive exercises for this topic.'}
+                </p>
+              </div>
+              <a
+                href={`/practice?topic=${encodeURIComponent(task.title)}`}
+                className="shrink-0 px-2.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold flex items-center space-x-1 transition shadow-xs"
+              >
+                <span>Practice</span>
+                <ArrowRight className="w-3 h-3" />
+              </a>
+            </div>
+
+            {/* Clear Next Step */}
+            {task.next_step && (
+              <div className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 text-[11px] text-slate-700 dark:text-slate-300 flex items-center space-x-2">
+                <ArrowRight className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                <span><strong className="text-slate-900 dark:text-white">Next Step:</strong> {task.next_step}</span>
+              </div>
+            )}
+
+            {/* Bottom Mark as Learned Button / Checkbox Bar */}
+            <div className="pt-2 flex items-center justify-between border-t border-slate-200 dark:border-slate-800">
+              <span className="text-xs text-slate-500 dark:text-slate-400 flex items-center space-x-1.5">
+                {isCompleted ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-emerald-500" />
+                    <span className="text-emerald-600 dark:text-emerald-400 font-semibold">You have learned this topic</span>
+                  </>
+                ) : (
+                  <span>Finished studying this topic?</span>
+                )}
+              </span>
+
+              <button
+                type="button"
+                onClick={() => handleToggleTask(taskId, isCompleted)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-xs ${
+                  isCompleted
+                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                }`}
+              >
+                {isCompleted ? (
+                  <>
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Learned (Mark Incomplete)</span>
+                  </>
+                ) : (
+                  <>
+                    <Square className="w-3.5 h-3.5" />
+                    <span>Mark as Learned</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   // Handle clicking on a level node in the World Map
   function handleNodeClick(phase: RoadmapPhase, idx: number) {
@@ -650,22 +1317,201 @@ export default function RoadmapPage() {
         </div>
 
         <div className="p-6 sm:p-8 rounded-2xl bg-white dark:bg-[#172235] border border-[#E2E8F0] dark:border-[#334155] shadow-sm space-y-6">
+          {/* Domain Selection */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
+                Apna Target Domain / Role Select Karein
+              </label>
+              <span className="text-[10px] font-extrabold text-[#2563EB] dark:text-[#38BDF8]">
+                Groq AI Powered
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {POPULAR_DOMAINS.map((dom) => {
+                const isSel = selectedDomain === dom;
+                return (
+                  <button
+                    key={dom}
+                    type="button"
+                    onClick={() => {
+                      setSelectedDomain(dom);
+                      if (dom !== 'Other / Custom Domain') {
+                        setCustomDomainInput(dom);
+                      } else {
+                        setCustomDomainInput('');
+                      }
+                      playSound('select', soundEnabled);
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition ${
+                      isSel
+                        ? 'bg-[#2563EB] border-[#2563EB] text-white shadow-xs'
+                        : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300'
+                    }`}
+                  >
+                    {dom}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="mt-2">
+              <input
+                type="text"
+                value={customDomainInput}
+                onChange={(e) => {
+                  setCustomDomainInput(e.target.value);
+                  if (selectedDomain !== 'Other / Custom Domain' && !POPULAR_DOMAINS.includes(e.target.value)) {
+                    setSelectedDomain('Other / Custom Domain');
+                  }
+                }}
+                placeholder="e.g. DevOps Engineer, Machine Learning Specialist, Flutter Developer..."
+                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-hidden focus:border-[#2563EB]"
+              />
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                Aapke is domain ke specific technologies aur modern syllabus ke hisaab se customized roadmap design hoga.
+              </p>
+            </div>
+          </div>
+
+          {/* Flexible Level Count Selector */}
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
+                Roadmap Levels (Flexible Count)
+              </label>
+              <span className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold">
+                5 hi level ho zaroori nahi • Fully Flexible
+              </span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {[
+                { id: 'ai_recommended' as const, label: 'AI Recommended', sub: 'Flexible (3-7 Levels)', badge: 'Groq AI' },
+                { id: 'express' as const, label: 'Express Track', sub: '3 Focused Levels', badge: 'Fast Track' },
+                { id: 'standard' as const, label: 'Standard Track', sub: '4-5 Balanced Levels', badge: 'Balanced' },
+                { id: 'comprehensive' as const, label: 'Comprehensive', sub: '6-8 Deep Levels', badge: 'In-Depth' }
+              ].map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => {
+                    setLevelMode(opt.id);
+                    playSound('select', soundEnabled);
+                  }}
+                  className={`p-2.5 rounded-xl border text-left transition flex flex-col justify-between ${
+                    levelMode === opt.id
+                      ? 'bg-[#2563EB]/15 border-[#2563EB] text-[#2563EB] dark:text-blue-300 ring-1 ring-[#2563EB]'
+                      : 'bg-slate-50 dark:bg-slate-900/60 hover:bg-slate-100 dark:hover:bg-slate-800 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300'
+                  }`}
+                >
+                  <div>
+                    <span className="text-[9px] font-black uppercase text-[#2563EB] dark:text-blue-400 block">{opt.badge}</span>
+                    <span className="text-xs font-bold block">{opt.label}</span>
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 block mt-0.5">{opt.sub}</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            {/* Custom level count exact buttons */}
+            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <span className="text-xs font-bold text-slate-800 dark:text-white block">Ya Exact Level Count Set Karein:</span>
+                <span className="text-[10px] text-slate-500 dark:text-slate-400">Apni requirement ke anusaar 2 se 8 tak levels choose karein.</span>
+              </div>
+              <div className="flex items-center space-x-1.5">
+                {[2, 3, 4, 5, 6, 7, 8].map((num) => (
+                  <button
+                    key={num}
+                    type="button"
+                    onClick={() => {
+                      setLevelMode('custom');
+                      setCustomLevelCount(num);
+                      playSound('select', soundEnabled);
+                    }}
+                    className={`w-7 h-7 rounded-lg text-xs font-bold transition ${
+                      levelMode === 'custom' && customLevelCount === num
+                        ? 'bg-[#2563EB] text-white shadow-xs'
+                        : 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-300'
+                    }`}
+                  >
+                    {num}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Experience Level & Study Commitment */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-800 dark:text-slate-200 block">Experience Level</label>
+              <div className="grid grid-cols-3 gap-2">
+                {['Beginner', 'Intermediate', 'Advanced'].map((lvl) => (
+                  <button
+                    key={lvl}
+                    type="button"
+                    onClick={() => setUserLevel(lvl)}
+                    className={`py-2 px-2.5 rounded-xl text-xs font-bold border transition ${
+                      userLevel === lvl
+                        ? 'bg-[#2563EB] border-[#2563EB] text-white'
+                        : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300'
+                    }`}
+                  >
+                    {lvl}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
+                Study Time: <strong className="text-[#2563EB]">{hoursPerDay}h/day</strong> ({daysPerWeek} days/week)
+              </label>
+              <input
+                type="range"
+                min={1}
+                max={6}
+                value={hoursPerDay}
+                onChange={(e) => setHoursPerDay(parseInt(e.target.value))}
+                className="w-full accent-[#2563EB]"
+              />
+              <div className="flex justify-between text-[10px] text-slate-400">
+                <span>1h (Casual)</span>
+                <span>6h (Intensive)</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Specific Requirement (Optional) */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
+              Specific Requirement ya Focus Area (Optional)
+            </label>
+            <input
+              type="text"
+              value={domainRequirement}
+              onChange={(e) => setDomainRequirement(e.target.value)}
+              placeholder="e.g. Focus heavily on Docker, Kubernetes & AWS for startups..."
+              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-hidden focus:border-[#2563EB]"
+            />
+          </div>
+
           <button
             type="button"
             onClick={() => handleGenerateRoadmap()}
             disabled={actionLoading}
-            className="w-full py-4 rounded-xl bg-[#17324D] hover:bg-[#102A43] text-white font-bold text-sm shadow-sm transition-all flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-50"
+            className="w-full py-4 rounded-xl bg-[#17324D] hover:bg-[#102A43] text-white font-bold text-sm shadow-md transition-all flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-50"
           >
             {actionLoading ? (
               <>
                 <RefreshCw className="w-5 h-5 animate-spin text-white" />
-                <span>Generating Your World Map...</span>
+                <span>Groq AI Designing Your Domain Roadmap...</span>
               </>
             ) : (
               <>
-                <Sparkles className="w-4 h-4 text-[#2563EB]" />
-                <span>Initialize Career World Map (Recommended)</span>
-                <ArrowRight className="w-4 h-4 text-[#2563EB]" />
+                <Sparkles className="w-4 h-4 text-amber-300" />
+                <span>Generate Domain Roadmap with Groq AI</span>
+                <ArrowRight className="w-4 h-4 text-white" />
               </>
             )}
           </button>
@@ -682,16 +1528,37 @@ export default function RoadmapPage() {
       {/* Top Banner & Gamification Controls */}
       <div className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-[#172235] border border-[#E2E8F0] dark:border-[#334155] shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center space-x-2.5 mb-1">
+          <div className="flex items-center space-x-2.5 mb-1 flex-wrap gap-y-1.5">
             <h1 className="text-2xl font-extrabold text-[#0F172A] dark:text-[#F1F5F9] tracking-tight flex items-center space-x-2">
               <span>🗺️ Career World Map</span>
             </h1>
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#2563EB]/15 text-[#17324D] dark:text-[#38BDF8] border border-[#2563EB]/30">
-              {roadmap.target_role}
+            <button
+              onClick={() => {
+                setShowPreferences(true);
+                playSound('select', soundEnabled);
+              }}
+              title="Click to customize domain or flexible levels"
+              className="px-2.5 py-1 rounded-full text-xs font-bold bg-[#2563EB]/15 hover:bg-[#2563EB]/25 text-[#17324D] dark:text-[#38BDF8] border border-[#2563EB]/30 flex items-center space-x-1.5 transition cursor-pointer"
+            >
+              <span>Domain: {roadmap.target_role}</span>
+              <Settings2 className="w-3 h-3 text-[#2563EB]" />
+            </button>
+            <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30">
+              ⚡ {mappedPhases.length} Flexible Levels
             </span>
+            {roadmap.career_goal && (
+              <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30">
+                🎯 {roadmap.career_goal}
+              </span>
+            )}
           </div>
           <p className="text-xs text-[#64748B] dark:text-[#A8B3C2]">
-            Step-by-step career quest • Pass AI tests to advance levels • Est. Duration: <strong className="text-[#0F172A] dark:text-[#F1F5F9]">{roadmap.total_estimated_weeks} weeks</strong>
+            Domain-specific career path designed with Groq AI • Pass level tests to advance • Est. Duration: <strong className="text-[#0F172A] dark:text-[#F1F5F9]">{roadmap.total_estimated_weeks} weeks</strong>
+            {roadmap.schedule_notes && (
+              <span className="block mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                ℹ️ {roadmap.schedule_notes}
+              </span>
+            )}
           </p>
         </div>
 
@@ -741,6 +1608,21 @@ export default function RoadmapPage() {
             </button>
           </div>
 
+          {/* AI Roadmap Coach Button */}
+          <button
+            onClick={() => {
+              setShowRoadmapAssistant(true);
+              playSound('select', soundEnabled);
+            }}
+            className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-700 hover:to-indigo-800 text-white font-bold text-xs shadow-md transition flex items-center space-x-1.5 border border-blue-400/30"
+          >
+            <Bot className="w-4 h-4 text-amber-300" />
+            <span>AI Roadmap Coach</span>
+            <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded-full font-black uppercase">
+              Groq
+            </span>
+          </button>
+
           {/* Minimal Design vs Labels Toggle */}
           {viewMode === 'map' && (
             <button
@@ -789,6 +1671,251 @@ export default function RoadmapPage() {
           </button>
         </div>
       </div>
+
+      {/* ============================================================== */}
+      {/* 2. "WHAT SHOULD I DO TODAY?" - NEXT RECOMMENDED ACTION HERO    */}
+      {/* ============================================================== */}
+      {todayData && (
+        <div className="p-5 sm:p-6 rounded-2xl bg-gradient-to-r from-blue-900/40 via-indigo-950/50 to-slate-900 border border-blue-500/30 shadow-md relative overflow-hidden">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="space-y-2 flex-1">
+              <div className="flex items-center space-x-2 flex-wrap gap-y-1">
+                <span className="px-2.5 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-blue-500/20 text-blue-300 border border-blue-400/30 flex items-center space-x-1">
+                  <Zap className="w-3 h-3 text-amber-300" />
+                  <span>What Should I Do Today?</span>
+                </span>
+                {todayData.current_phase_title && (
+                  <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-800 text-slate-300 border border-slate-700">
+                    📍 {todayData.current_phase_title}
+                  </span>
+                )}
+                {todayData.learner_level && (
+                  <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                    🎯 Level: {todayData.learner_level}
+                  </span>
+                )}
+                {todayData.career_goal && (
+                  <span className="px-2.5 py-1 rounded-full text-[11px] font-medium bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                    🏆 Goal: {todayData.career_goal}
+                  </span>
+                )}
+                <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold text-slate-400 bg-black/30 border border-white/5">
+                  ⏱️ ~{todayData.recommended_minutes || 45} mins today
+                </span>
+              </div>
+
+              <div>
+                <h2 className="text-lg sm:text-xl font-black text-white tracking-tight flex items-center space-x-2">
+                  <span>{todayData.today_focus_title}</span>
+                </h2>
+                {todayData.starting_point_note && (
+                  <p className="text-[11px] text-slate-300/90 italic flex items-center space-x-1.5 pt-0.5">
+                    <span>🧭</span>
+                    <span>{todayData.starting_point_note}</span>
+                  </p>
+                )}
+                {todayData.why_it_matters && (
+                  <p className="text-xs text-blue-200/90 mt-1 leading-relaxed max-w-3xl">
+                    <strong className="text-blue-300 font-bold">Why it matters:</strong> {todayData.why_it_matters}
+                  </p>
+                )}
+              </div>
+
+              {todayData.next_step && (
+                <div className="flex items-center space-x-1.5 text-xs text-slate-300 pt-1">
+                  <ArrowRight className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                  <span><strong>Next action:</strong> {todayData.next_step}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Quick Action Button */}
+            <div className="shrink-0 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+              {todayData.is_level_test_recommended ? (
+                <button
+                  onClick={() => {
+                    const targetPh = mappedPhases.find((p) => p.id === todayData.current_phase_id) || mappedPhases[0];
+                    if (targetPh) handleStartLevelTest(targetPh);
+                  }}
+                  className="px-5 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-black text-xs shadow-lg transition flex items-center justify-center space-x-2 cursor-pointer"
+                >
+                  <Trophy className="w-4 h-4 text-slate-950" />
+                  <span>Take Level Test Now (&gt;=70% to Unlock Next)</span>
+                </button>
+              ) : (todayData.today_tasks && todayData.today_tasks.length > 0) ? (
+                <button
+                  onClick={() => {
+                    const firstT = todayData.today_tasks![0];
+                    const ph = mappedPhases.find((p) => (p.tasks || []).some((t: any) => t.id === firstT.id)) || mappedPhases[0];
+                    if (ph) {
+                      setSelectedPhase(ph);
+                      setActiveTab('learn');
+                      setExpandedTaskIds((prev) => ({ ...prev, [firstT.id]: true }));
+                    }
+                  }}
+                  className="px-5 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-lg transition flex items-center justify-center space-x-2 cursor-pointer"
+                >
+                  <Play className="w-4 h-4 fill-white" />
+                  <span>Start Today's Lesson</span>
+                </button>
+              ) : todayData.completion_status === 'all_completed' ? (
+                <a
+                  href="/interview"
+                  className="px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg transition flex items-center justify-center space-x-2 cursor-pointer"
+                >
+                  <Award className="w-4 h-4" />
+                  <span>Go to Interview Arena</span>
+                </a>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Roadmap Skill Addition Requests Panel */}
+      {(skillRequests.length > 0 || requestFeedback) && (
+        <div id="pending-requests" className="p-5 sm:p-6 rounded-2xl bg-gradient-to-r from-indigo-950/80 via-slate-900 to-indigo-950/70 border border-indigo-500/30 shadow-lg space-y-4 relative overflow-hidden">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-indigo-500/20 pb-4">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 rounded-xl bg-indigo-500/20 border border-indigo-500/40 flex items-center justify-center text-indigo-400">
+                <Inbox className="w-5 h-5 animate-pulse" />
+              </div>
+              <div>
+                <div className="flex items-center space-x-2">
+                  <h3 className="text-base font-bold text-white tracking-tight">
+                    Roadmap Skill Addition Requests
+                  </h3>
+                  {skillRequests.length > 0 && (
+                    <span className="px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-indigo-500/30 text-indigo-300 border border-indigo-400/30">
+                      {skillRequests.length} Pending
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-300 mt-0.5">
+                  Skills requested from Skill Matrix or Job Engine. Review AI placement recommendation and accept to integrate directly into the best roadmap phase.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {requestFeedback && (
+            <div className={`p-3 rounded-xl text-xs font-semibold flex items-center space-x-2 transition-all ${
+              requestFeedback.type === 'success'
+                ? 'bg-emerald-950/80 border border-emerald-500/50 text-emerald-300'
+                : 'bg-indigo-950/80 border border-indigo-500/40 text-indigo-300'
+            }`}>
+              <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>{requestFeedback.msg}</span>
+            </div>
+          )}
+
+          {skillRequests.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+              {skillRequests.map((reqItem) => {
+                const currentPhaseTarget = selectedPhaseOverrides[reqItem.id] || reqItem.suggested_phase_number;
+                const isActing = requestActionId === reqItem.id;
+
+                return (
+                  <div
+                    key={reqItem.id}
+                    className="p-4 rounded-xl bg-slate-950/90 border border-slate-800 hover:border-indigo-500/40 transition-all flex flex-col justify-between space-y-4 shadow-sm"
+                  >
+                    <div className="space-y-3">
+                      {/* Skill Header */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          <span className="text-sm font-bold text-white">{reqItem.skill_name}</span>
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-indigo-500/20 text-indigo-300 border border-indigo-500/40">
+                            {reqItem.source}
+                          </span>
+                        </div>
+                        <span className="text-[11px] font-semibold text-slate-400">
+                          ⏱️ {reqItem.estimated_minutes}m
+                        </span>
+                      </div>
+
+                      {/* AI Placement Recommendation Box */}
+                      <div className="p-3 rounded-lg bg-indigo-950/50 border border-indigo-500/30 text-xs space-y-1.5">
+                        <div className="flex items-center space-x-1.5 text-indigo-300 font-semibold">
+                          <Sparkles className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                          <span>Suitable Placement: {reqItem.suggested_phase_title || `Level ${reqItem.suggested_phase_number}`}</span>
+                        </div>
+                        <p className="text-[11px] text-slate-300 leading-relaxed">
+                          {reqItem.placement_reason}
+                        </p>
+                      </div>
+
+                      {/* Key Topics Preview */}
+                      {reqItem.topics_to_learn && reqItem.topics_to_learn.length > 0 && (
+                        <div className="space-y-1">
+                          <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                            Curriculum Topics to be Added:
+                          </span>
+                          <ul className="text-xs text-slate-300 space-y-0.5">
+                            {reqItem.topics_to_learn.slice(0, 3).map((topic, tIdx) => (
+                              <li key={tIdx} className="flex items-start space-x-1.5">
+                                <span className="text-indigo-400 font-bold">•</span>
+                                <span className="text-slate-300 truncate">{topic}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Level Selector & Action Buttons */}
+                    <div className="space-y-2 pt-2 border-t border-slate-800/80">
+                      <div className="flex items-center justify-between text-xs">
+                        <label className="text-slate-400 font-medium">Add to Level:</label>
+                        <select
+                          value={currentPhaseTarget}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value);
+                            setSelectedPhaseOverrides((prev) => ({ ...prev, [reqItem.id]: val }));
+                          }}
+                          className="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
+                        >
+                          {mappedPhases.map((ph: any) => (
+                            <option key={ph.phase_number} value={ph.phase_number}>
+                              Level {ph.phase_number}: {ph.level_name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="flex items-center space-x-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => handleAcceptSkillRequest(reqItem)}
+                          disabled={isActing}
+                          className="flex-1 py-2 px-3 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition flex items-center justify-center space-x-1.5 shadow-sm disabled:opacity-50 cursor-pointer"
+                        >
+                          {isActing ? (
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Check className="w-3.5 h-3.5" />
+                          )}
+                          <span>Accept & Add to Level {currentPhaseTarget}</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleRejectSkillRequest(reqItem)}
+                          disabled={isActing}
+                          title="Dismiss Request"
+                          className="py-2 px-3 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-800 text-xs font-semibold transition cursor-pointer"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Gamified Player Stats Bar */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1228,47 +2355,35 @@ export default function RoadmapPage() {
 
                     {/* Detailed Syllabus & Tasks */}
                     <div className="space-y-3">
-                      <h4 className="text-xs font-bold text-[#64748B] dark:text-[#A8B3C2] uppercase tracking-wider">
-                        Learning Tasks & Syllabus ({phaseTasks.length})
-                      </h4>
-                      <div className="space-y-2">
-                        {phaseTasks.map((task: any) => (
-                          <div
-                            key={task.id}
-                            className="p-4 rounded-xl bg-white dark:bg-[#172235] border border-[#E2E8F0] dark:border-[#334155] flex items-start justify-between space-x-3"
-                          >
-                            <div className="flex items-start space-x-3">
-                              <button
-                                onClick={() => handleToggleTask(task.id, task.is_completed || task.completed)}
-                                className="mt-0.5 text-[#2563EB]"
-                              >
-                                {task.is_completed || task.completed ? (
-                                  <CheckCircle2 className="w-5 h-5 text-[#2E7D5B]" />
-                                ) : (
-                                  <Square className="w-5 h-5 text-[#64748B]" />
-                                )}
-                              </button>
-                              <div>
-                                <h5 className={`text-sm font-semibold ${(task.is_completed || task.completed) ? 'line-through text-[#64748B]' : 'text-[#0F172A] dark:text-[#F1F5F9]'}`}>
-                                  {task.title}
-                                </h5>
-                                <p className="text-xs text-[#64748B] dark:text-[#A8B3C2] mt-0.5">{task.description}</p>
-                                {task.topics_to_learn && task.topics_to_learn.length > 0 && (
-                                  <div className="flex flex-wrap gap-1 mt-2">
-                                    {task.topics_to_learn.map((sub: string, sIdx: number) => (
-                                      <span key={sIdx} className="text-[10px] px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                                        • {sub}
-                                      </span>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                            <span className="text-[11px] text-[#64748B] dark:text-[#A8B3C2] flex-shrink-0">
-                              {task.estimated_minutes} min
-                            </span>
-                          </div>
-                        ))}
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-xs font-bold text-[#64748B] dark:text-[#A8B3C2] uppercase tracking-wider flex items-center space-x-1.5">
+                          <ListChecks className="w-3.5 h-3.5 text-[#2563EB]" />
+                          <span>Learning Tasks & Syllabus ({phaseTasks.length})</span>
+                        </h4>
+                        <div className="flex items-center space-x-3">
+                          <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                            {phaseTasks.filter((t: any) => t.is_completed || t.completed).length} / {phaseTasks.length} Learned
+                          </span>
+                          {phaseTasks.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const allOpen = phaseTasks.every((t: any) => expandedTaskIds[t.id]);
+                                const nextState: Record<string, boolean> = {};
+                                phaseTasks.forEach((t: any) => {
+                                  nextState[t.id] = !allOpen;
+                                });
+                                setExpandedTaskIds((prev) => ({ ...prev, ...nextState }));
+                              }}
+                              className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline font-semibold"
+                            >
+                              {phaseTasks.every((t: any) => expandedTaskIds[t.id]) ? 'Collapse All' : 'Expand All'}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      <div className="space-y-2.5">
+                        {phaseTasks.map((task: any) => renderTaskCard(task))}
                       </div>
                     </div>
                   </div>
@@ -1283,8 +2398,8 @@ export default function RoadmapPage() {
       {/* 3. LEVEL DETAILS MODAL (3-Step Loop: Learn -> Practice -> Test) */}
       {/* ============================================================== */}
       {selectedPhase && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-[#172235] border border-slate-200 dark:border-slate-700 rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl p-6 sm:p-8 space-y-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 md:p-8 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#172235] border border-slate-200 dark:border-slate-700 rounded-3xl max-w-6xl xl:max-w-7xl w-full max-h-[92vh] overflow-y-auto shadow-2xl p-6 sm:p-8 md:p-10 space-y-6">
             {/* Modal Header */}
             <div className="flex items-start justify-between border-b border-slate-200 dark:border-slate-800 pb-4">
               <div>
@@ -1309,16 +2424,41 @@ export default function RoadmapPage() {
                   {selectedPhase.description || selectedPhase.level_theme}
                 </p>
               </div>
-              <button
-                onClick={() => setSelectedPhase(null)}
-                className="p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <div className="flex items-center space-x-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const nextState = !showRoadmapAssistant;
+                    setShowRoadmapAssistant(nextState);
+                    if (nextState && assistantMessages.length <= 1) {
+                      handleSendAssistantMessage(`I am on Level ${selectedPhase.phase_number || 1}: "${selectedPhase.title || selectedPhase.name}". Can you give me an easy step-by-step guide to learn and complete this level easily?`);
+                    }
+                  }}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-xs ${
+                    showRoadmapAssistant
+                      ? 'bg-blue-600 text-white shadow-blue-500/20'
+                      : 'bg-blue-50 dark:bg-slate-800 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-slate-700 border border-blue-200 dark:border-blue-900/50'
+                  }`}
+                  title="Toggle AI Coach Sidebar"
+                >
+                  <Bot className="w-3.5 h-3.5 text-amber-400" />
+                  <span className="hidden sm:inline">{showRoadmapAssistant ? 'Hide Assistant' : 'AI Coach Sidebar'}</span>
+                  <span className="sm:hidden">{showRoadmapAssistant ? 'Hide' : 'AI Coach'}</span>
+                </button>
+                <button
+                  onClick={() => setSelectedPhase(null)}
+                  className="p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
-            {/* 3-Step Action Tabs: Learn, Practice, Test */}
-            <div className="grid grid-cols-3 gap-2 p-1.5 rounded-2xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-bold">
+            {/* Modal Body: Left Content + Right Assistant Sidebar */}
+            <div className="flex flex-col lg:flex-row gap-6 items-start">
+              <div className={`space-y-6 w-full ${showRoadmapAssistant ? 'lg:flex-1 min-w-0' : 'w-full'}`}>
+                {/* 3-Step Action Tabs: Learn, Practice, Test */}
+                <div className="grid grid-cols-3 gap-2 p-1.5 rounded-2xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-bold">
               <button
                 onClick={() => setActiveTab('learn')}
                 className={`py-2 px-3 rounded-xl transition flex items-center justify-center space-x-1.5 ${
@@ -1376,49 +2516,36 @@ export default function RoadmapPage() {
                 )}
 
                 {/* Topics & Concepts Checklist */}
-                <div className="space-y-2">
-                  <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center space-x-1.5">
-                    <ListChecks className="w-3.5 h-3.5 text-[#2563EB]" />
-                    <span>Concepts to Master (Syllabus)</span>
-                  </h4>
-                  <div className="space-y-2">
-                    {(selectedPhase.tasks || []).map((task: any) => (
-                      <div
-                        key={task.id}
-                        className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 flex items-start justify-between"
-                      >
-                        <div className="flex items-start space-x-3">
-                          <button
-                            onClick={() => handleToggleTask(task.id, task.is_completed || task.completed)}
-                            className="mt-0.5 text-[#2563EB]"
-                          >
-                            {task.is_completed || task.completed ? (
-                              <CheckCircle2 className="w-5 h-5 text-[#2E7D5B]" />
-                            ) : (
-                              <Square className="w-5 h-5 text-[#64748B]" />
-                            )}
-                          </button>
-                          <div>
-                            <h5 className={`text-sm font-semibold ${(task.is_completed || task.completed) ? 'line-through text-slate-400' : 'text-slate-900 dark:text-white'}`}>
-                              {task.title}
-                            </h5>
-                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{task.description}</p>
-                            {task.topics_to_learn && task.topics_to_learn.length > 0 && (
-                              <div className="flex flex-wrap gap-1 mt-2">
-                                {task.topics_to_learn.map((sub: string, sIdx: number) => (
-                                  <span key={sIdx} className="text-[10px] px-2 py-0.5 rounded bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                                    • {sub}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        <span className="text-[11px] text-slate-400 flex-shrink-0">
-                          {task.estimated_minutes}m
-                        </span>
-                      </div>
-                    ))}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center space-x-1.5">
+                      <ListChecks className="w-3.5 h-3.5 text-[#2563EB]" />
+                      <span>Concepts to Master (Syllabus)</span>
+                    </h4>
+                    <div className="flex items-center space-x-3">
+                      <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                        {(selectedPhase.tasks || []).filter((t: any) => t.is_completed || t.completed).length} / {(selectedPhase.tasks || []).length} Learned
+                      </span>
+                      {(selectedPhase.tasks || []).length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const allOpen = (selectedPhase.tasks || []).every((t: any) => expandedTaskIds[t.id]);
+                            const nextState: Record<string, boolean> = {};
+                            (selectedPhase.tasks || []).forEach((t: any) => {
+                              nextState[t.id] = !allOpen;
+                            });
+                            setExpandedTaskIds((prev) => ({ ...prev, ...nextState }));
+                          }}
+                          className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline font-semibold"
+                        >
+                          {(selectedPhase.tasks || []).every((t: any) => expandedTaskIds[t.id]) ? 'Collapse All' : 'Expand All'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <div className="space-y-2.5">
+                    {(selectedPhase.tasks || []).map((task: any) => renderTaskCard(task))}
                   </div>
                 </div>
               </div>
@@ -1456,9 +2583,24 @@ export default function RoadmapPage() {
                           <ArrowRight className="w-3 h-3" />
                         </a>
                       </div>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">
-                        {task.practice_goal || task.practice_exercise || 'Build a working sample demonstrating this concept.'}
-                      </p>
+                      <div className="space-y-1.5 pt-1 text-xs">
+                        <p className="text-slate-600 dark:text-slate-300">
+                          <span className="font-semibold text-slate-700 dark:text-slate-200">Practice Goal: </span>
+                          {task.practice_goal || task.practice_exercise || 'Build a working sample demonstrating this concept.'}
+                        </p>
+                        {task.expected_outcome && (
+                          <p className="text-emerald-700 dark:text-emerald-400">
+                            <span className="font-semibold">Expected Outcome: </span>
+                            {task.expected_outcome}
+                          </p>
+                        )}
+                        {task.verification_method && (
+                          <p className="text-slate-500 dark:text-slate-400 text-[11px]">
+                            <span className="font-semibold text-slate-600 dark:text-slate-300">Verification: </span>
+                            {task.verification_method}
+                          </p>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -1505,6 +2647,15 @@ export default function RoadmapPage() {
                 </div>
               </div>
             )}
+              </div>
+
+              {/* AI Roadmap Assistant Sidebar (Side-by-side with syllabus) */}
+              {showRoadmapAssistant && (
+                <div className="w-full lg:w-[380px] xl:w-[420px] shrink-0 border border-slate-200 dark:border-slate-800 rounded-2xl bg-slate-50/90 dark:bg-slate-900/95 shadow-md flex flex-col h-[75vh] max-h-[750px] overflow-hidden lg:sticky lg:top-0 animate-in slide-in-from-right-2 duration-200">
+                  {renderAssistantSidebarContent(true)}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -1565,8 +2716,8 @@ export default function RoadmapPage() {
       {/* 5. TOP-NOTCH AI LEVEL TEST RUNNER (Timer, Code Box, Flags)     */}
       {/* ============================================================== */}
       {testActivePhase && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="bg-[#172235] border border-slate-700 rounded-3xl max-w-2xl w-full p-6 sm:p-8 space-y-6 shadow-2xl max-h-[92vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 md:p-8 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="bg-[#172235] border border-slate-700 rounded-3xl max-w-6xl xl:max-w-7xl w-full p-6 sm:p-8 md:p-10 space-y-6 shadow-2xl max-h-[92vh] overflow-y-auto">
             {/* Loading State */}
             {testLoading && (
               <div className="py-16 text-center space-y-4">
@@ -1838,6 +2989,45 @@ export default function RoadmapPage() {
                   </div>
                 )}
 
+                {/* Adaptive Recovery & Revision Path when test was not passed */}
+                {!testResult.passed && (
+                  <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-left space-y-3">
+                    <div className="flex items-center space-x-2 text-amber-400 font-bold text-xs uppercase tracking-wider">
+                      <GraduationCap className="w-4 h-4" />
+                      <span>Targeted Recovery & Revision Path</span>
+                    </div>
+
+                    {testResult.recovery_recommendations && testResult.recovery_recommendations.length > 0 ? (
+                      <div className="space-y-1.5">
+                        <span className="text-[11px] font-bold text-slate-300 block">Revision Focus Areas:</span>
+                        <ul className="space-y-1 text-xs text-slate-300 list-disc list-inside">
+                          {testResult.recovery_recommendations.map((rec, rIdx) => (
+                            <li key={rIdx} className="leading-snug">{rec}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : testResult.missed_topics && testResult.missed_topics.length > 0 ? (
+                      <div className="space-y-1.5">
+                        <span className="text-[11px] font-bold text-slate-300 block">Missed Concepts to Review:</span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {testResult.missed_topics.map((top, tIdx) => (
+                            <span key={tIdx} className="px-2 py-0.5 rounded-md bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[10px] font-semibold">
+                              ⚠️ {top}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {testResult.guided_practice_exercise && (
+                      <div className="p-3 rounded-xl bg-black/40 border border-amber-500/20 text-xs text-amber-200 space-y-1">
+                        <span className="font-bold block text-amber-400 text-[11px] uppercase tracking-wider">🛠️ Guided Practice Drill Before Retrying:</span>
+                        <p className="leading-relaxed text-[11px] text-slate-200">{testResult.guided_practice_exercise}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Question Review Accordion */}
                 <div className="text-left space-y-3 pt-2">
                   <button
@@ -2034,63 +3224,143 @@ export default function RoadmapPage() {
             </div>
 
             <form onSubmit={handleSavePreferences} className="space-y-5">
-              {/* Pace & Level Count Selector */}
-              <div className="space-y-2.5">
-                <label className="text-xs font-bold text-slate-200 block">
-                  Learning Track Pace & Level Depth
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {[
-                    {
-                      id: 'Express' as const,
-                      title: 'Express Track',
-                      levels: '2-3 Levels',
-                      desc: 'Fast-track core concepts for upcoming interviews & quick placement prep'
-                    },
-                    {
-                      id: 'Standard' as const,
-                      title: 'Standard Track',
-                      levels: '4-5 Levels',
-                      desc: 'Balanced path covering foundation, architecture & production projects'
-                    },
-                    {
-                      id: 'Comprehensive' as const,
-                      title: 'Comprehensive',
-                      levels: '6-7+ Levels',
-                      desc: 'Complete zero-to-hero mastery from basics to enterprise scale'
-                    }
-                  ].map((pace) => {
-                    const isSelected = trackPace === pace.id;
+              {/* Target Domain Selector */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-200 block">
+                    Target Domain / Career Track
+                  </label>
+                  <span className="text-[10px] text-[#ff4d4f] font-semibold flex items-center space-x-1">
+                    <Sparkles className="w-3 h-3 text-[#ff4d4f]" />
+                    <span>Groq AI Powered</span>
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {POPULAR_DOMAINS.map((dom) => {
+                    const isSel = selectedDomain === dom;
                     return (
                       <button
-                        key={pace.id}
+                        key={dom}
                         type="button"
                         onClick={() => {
-                          setTrackPace(pace.id);
+                          setSelectedDomain(dom);
+                          if (dom !== 'Other / Custom Domain') {
+                            setCustomDomainInput(dom);
+                          } else {
+                            setCustomDomainInput('');
+                          }
                           playSound('select', soundEnabled);
                         }}
-                        className={`p-3.5 rounded-2xl text-left border transition relative flex flex-col justify-between ${
-                          isSelected
-                            ? 'bg-[#ff4d4f]/10 border-[#ff4d4f] text-white shadow-[0_0_15px_rgba(255,77,79,0.2)] ring-1 ring-[#ff4d4f]'
-                            : 'bg-[#27272a]/40 hover:bg-[#27272a]/70 border-slate-700/60 text-slate-300'
+                        className={`px-2.5 py-1 rounded-xl text-xs font-semibold border transition ${
+                          isSel
+                            ? 'bg-[#ff4d4f] border-[#ff4d4f] text-white shadow-xs'
+                            : 'bg-[#27272a]/70 hover:bg-[#27272a] border-slate-700/60 text-slate-300'
                         }`}
                       >
-                        <div>
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="text-xs font-extrabold">{pace.title}</span>
-                            {isSelected && <span className="w-2 h-2 rounded-full bg-[#ff4d4f] shadow-[0_0_6px_#ff4d4f]" />}
-                          </div>
-                          <span className={`text-[10px] font-bold block mb-1.5 ${isSelected ? 'text-[#ff4d4f]' : 'text-slate-400'}`}>
-                            {pace.levels}
-                          </span>
-                          <p className="text-[10px] text-slate-400 leading-tight">
-                            {pace.desc}
-                          </p>
-                        </div>
+                        {dom}
                       </button>
                     );
                   })}
                 </div>
+                <div className="mt-2">
+                  <input
+                    type="text"
+                    value={customDomainInput}
+                    onChange={(e) => {
+                      setCustomDomainInput(e.target.value);
+                      if (selectedDomain !== 'Other / Custom Domain' && !POPULAR_DOMAINS.includes(e.target.value)) {
+                        setSelectedDomain('Other / Custom Domain');
+                      }
+                    }}
+                    placeholder="e.g. DevOps Engineer, Data Scientist, Cybersecurity Analyst..."
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#27272a]/80 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-hidden focus:border-[#ff4d4f]"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    User ke chune hue domain ke according Groq AI syllabus, core skills aur milestone levels tailor karega.
+                  </p>
+                </div>
+              </div>
+
+              {/* Flexible Level Architecture (5 hi level ho zaroori nahi) */}
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-200 block">
+                    Roadmap Level Architecture (Flexible Levels)
+                  </label>
+                  <span className="text-[10px] text-amber-400 font-semibold">
+                    5 hi level ho zaroori nahi • Fully Flexible
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {[
+                    { id: 'ai_recommended' as const, label: 'AI Recommended', sub: 'Flexible (3-7 Levels)', badge: 'Groq AI' },
+                    { id: 'express' as const, label: 'Express Track', sub: '3 Focused Levels', badge: 'Fast Track' },
+                    { id: 'standard' as const, label: 'Standard Track', sub: '4-5 Balanced Levels', badge: 'Balanced' },
+                    { id: 'comprehensive' as const, label: 'Comprehensive', sub: '6-8 Deep Levels', badge: 'In-Depth' }
+                  ].map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => {
+                        setLevelMode(opt.id);
+                        playSound('select', soundEnabled);
+                      }}
+                      className={`p-2.5 rounded-xl border text-left transition flex flex-col justify-between ${
+                        levelMode === opt.id
+                          ? 'bg-[#ff4d4f]/15 border-[#ff4d4f] text-white ring-1 ring-[#ff4d4f]'
+                          : 'bg-[#27272a]/40 hover:bg-[#27272a]/70 border-slate-700/60 text-slate-300'
+                      }`}
+                    >
+                      <div>
+                        <span className="text-[9px] font-black uppercase text-[#ff4d4f] block">{opt.badge}</span>
+                        <span className="text-xs font-bold block">{opt.label}</span>
+                        <span className="text-[10px] text-slate-400 block mt-0.5">{opt.sub}</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Custom level count exact buttons */}
+                <div className="p-3 rounded-xl bg-[#27272a]/40 border border-slate-700/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <span className="text-xs font-bold text-white block">Ya Exact Level Count Set Karein:</span>
+                    <span className="text-[10px] text-slate-400">Apne requirement ke mutabiq 2 se 8 tak jitne levels chahiye select karein.</span>
+                  </div>
+                  <div className="flex items-center space-x-1.5">
+                    {[2, 3, 4, 5, 6, 7, 8].map((num) => (
+                      <button
+                        key={num}
+                        type="button"
+                        onClick={() => {
+                          setLevelMode('custom');
+                          setCustomLevelCount(num);
+                          playSound('select', soundEnabled);
+                        }}
+                        className={`w-7 h-7 rounded-lg text-xs font-bold transition ${
+                          levelMode === 'custom' && customLevelCount === num
+                            ? 'bg-[#ff4d4f] text-white shadow-xs'
+                            : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700'
+                        }`}
+                      >
+                        {num}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Specific Domain Requirement / Focus Area */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-200 block">
+                  Specific Requirement ya Focus Request (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={domainRequirement}
+                  onChange={(e) => setDomainRequirement(e.target.value)}
+                  placeholder="e.g. Focus on Next.js 14, or Docker & Kubernetes, or PyTorch LLMs..."
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#27272a]/80 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-hidden focus:border-[#ff4d4f]"
+                />
               </div>
 
               {/* Experience Level */}
@@ -2327,6 +3597,32 @@ export default function RoadmapPage() {
               </div>
             </form>
           </div>
+        </div>
+      )}
+
+      {/* Floating AI Roadmap Assistant Action Button */}
+      <button
+        type="button"
+        onClick={() => {
+          setShowRoadmapAssistant(true);
+          playSound('select', soundEnabled);
+        }}
+        className="fixed bottom-6 right-6 z-40 px-4 py-3 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-700 hover:to-indigo-800 text-white shadow-xl shadow-blue-500/25 flex items-center space-x-2.5 transition-transform hover:scale-105 active:scale-95 border border-blue-400/30"
+        title="Ask AI Roadmap Coach (Groq)"
+      >
+        <Bot className="w-5 h-5 text-amber-300" />
+        <span className="text-xs font-bold">AI Roadmap Coach</span>
+        <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded-full font-black uppercase">
+          Groq
+        </span>
+      </button>
+
+      {/* ============================================================== */}
+      {/* 6. DEDICATED AI ROADMAP ASSISTANT SIDEBAR (Docked on Right)    */}
+      {/* ============================================================== */}
+      {showRoadmapAssistant && !selectedPhase && (
+        <div className="fixed right-0 top-0 bottom-0 z-50 w-full sm:w-[420px] border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-[#172235] shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
+          {renderAssistantSidebarContent(false)}
         </div>
       )}
     </div>

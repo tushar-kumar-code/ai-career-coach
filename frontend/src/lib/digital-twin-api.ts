@@ -5,9 +5,8 @@
  * Follows existing api-client.ts pattern (request helper + base URL).
  */
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
-
-import { getSavedAuthToken } from './api-client';
+import { getSavedAuthToken, BASE_URL } from './api-client';
+const API_BASE = BASE_URL;
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const token = getSavedAuthToken();

@@ -16,4 +16,4 @@ class SkillEvidence(Base, TimestampMixin):
     description = Column(Text, nullable=False)
     confidence_weight = Column(Integer, default=50, nullable=False)  # 0 to 100
 
-    skill = relationship("Skill", backref="evidence_records")
+    skill = relationship("Skill", back_populates="evidences")

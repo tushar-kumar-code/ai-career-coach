@@ -1,6 +1,7 @@
 import uuid
 from datetime import datetime
 from sqlalchemy import Column, String, Integer, JSON, Boolean, ForeignKey, DateTime
+from sqlalchemy.orm import relationship
 from app.core.database import Base
 from app.models.base import TimestampMixin
 
@@ -32,4 +33,6 @@ class Skill(Base, TimestampMixin):
 
     evidence_sources = Column(JSON, default=list, nullable=False)
     last_evaluated_at = Column(DateTime, default=datetime.utcnow, nullable=True)
+
+    evidences = relationship("SkillEvidence", back_populates="skill", cascade="all, delete-orphan", passive_deletes=True)
 

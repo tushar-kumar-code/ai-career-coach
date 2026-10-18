@@ -14,6 +14,7 @@ import {
   SkillGap,
   SkillDetailData,
   RoadmapData,
+  RoadmapSkillRequest,
   FocusSkillResultData,
   DailyTasksData,
   RoadmapProgressData,
@@ -39,14 +40,38 @@ import {
   UserAuthData,
   AuthResponseData,
   AssessmentStatusData,
-  SuggestedDomainsData
+  SuggestedDomainsData,
+  PracticeContextData,
+  InteractiveDrillQuestion,
+  DrillEvaluationData
 } from './types';
 import { terminalLogger } from './terminal-logger';
 
-const RAW_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api/v1';
-const BASE_URL = RAW_URL.endsWith('/api/v1') 
-  ? RAW_URL.replace(/\/+$/, '') 
-  : `${RAW_URL.replace(/\/+$/, '')}/api/v1`;
+export function resolveApiBaseUrl(): string {
+  let raw = (process.env.NEXT_PUBLIC_API_URL || '').trim();
+
+  // If missing, or literally configured with placeholder like <backend-render-url>
+  const isInvalidOrPlaceholder = !raw || raw.includes('<') || raw.includes('>') || raw.includes('backend-render-url');
+  
+  if (isInvalidOrPlaceholder) {
+    if (typeof window !== 'undefined' && window.location.hostname.includes('onrender.com')) {
+      raw = 'https://ai-career-coach-backend-qkha.onrender.com/api/v1';
+    } else {
+      raw = 'http://127.0.0.1:8000/api/v1';
+    }
+  }
+
+  // Prepend https:// if protocol is missing (e.g. from Render property: host)
+  if (!raw.startsWith('http://') && !raw.startsWith('https://')) {
+    raw = `https://${raw}`;
+  }
+
+  return raw.endsWith('/api/v1') 
+    ? raw.replace(/\/+$/, '') 
+    : `${raw.replace(/\/+$/, '')}/api/v1`;
+}
+
+export const BASE_URL = resolveApiBaseUrl();
 
 export function getSavedAuthToken(): string | null {
   if (typeof window === 'undefined') return null;
@@ -437,6 +462,11 @@ export async function generateRoadmap(params?: {
   days_per_week?: number;
   preferred_learning_style?: string;
   target_career_id?: string;
+  target_role?: string;
+  career_goal?: string;
+  track_pace?: string;
+  target_phases_count?: number;
+  domain_requirement?: string;
 }): Promise<RoadmapData> {
   return request<RoadmapData>('/roadmap/generate', {
     method: 'POST',
@@ -469,8 +499,11 @@ export async function updateRoadmapPreferences(prefs: {
   days_per_week: number;
   preferred_learning_style: string;
   user_level: string;
+  target_role?: string;
+  career_goal?: string;
   track_pace?: string;
   target_phases_count?: number;
+  domain_requirement?: string;
 }): Promise<RoadmapData> {
   return request<RoadmapData>('/roadmap/preferences', {
     method: 'PUT',
@@ -644,6 +677,51 @@ export async function focusSkillOnRoadmap(skillName: string): Promise<FocusSkill
   });
 }
 
+// Roadmap Skill Request & Ingestion APIs
+export async function createRoadmapSkillRequest(
+  skillName: string,
+  source: string = 'Skill Matrix',
+  priority: string = 'Medium'
+): Promise<RoadmapSkillRequest> {
+  return request<RoadmapSkillRequest>('/roadmap/requests', {
+    method: 'POST',
+    body: JSON.stringify({
+      skill_name: skillName,
+      source,
+      priority,
+    }),
+  });
+}
+
+export async function getRoadmapSkillRequests(status: string = 'pending'): Promise<RoadmapSkillRequest[]> {
+  try {
+    return await request<RoadmapSkillRequest[]>(`/roadmap/requests?status=${status}`, { cache: 'no-store' });
+  } catch (err) {
+    console.warn('Failed to fetch roadmap skill requests:', err);
+    return [];
+  }
+}
+
+export async function acceptRoadmapSkillRequest(
+  requestId: string,
+  targetPhaseNumber?: number
+): Promise<{ request_id: string; status: string; phase_number: number; phase_title: string; task_id: string; task_title: string; message?: string }> {
+  return request(`/roadmap/requests/${requestId}/accept`, {
+    method: 'POST',
+    body: JSON.stringify({
+      target_phase_number: targetPhaseNumber,
+    }),
+  });
+}
+
+export async function rejectRoadmapSkillRequest(
+  requestId: string
+): Promise<{ request_id: string; status: string }> {
+  return request(`/roadmap/requests/${requestId}/reject`, {
+    method: 'POST',
+  });
+}
+
 // Phase 3 — Micro Practice & Learning Resource APIs
 export async function getPracticeSuggestions(): Promise<PracticeSuggestion[]> {
   try {
@@ -655,6 +733,57 @@ export async function getPracticeSuggestions(): Promise<PracticeSuggestion[]> {
 
 export async function getTaskLearningContent(taskId: string): Promise<RoadmapTaskLearningContent> {
   return request<RoadmapTaskLearningContent>(`/roadmap/tasks/${taskId}/learn`, { cache: 'no-store' });
+}
+
+export interface RoadmapAssistantRequest {
+  message: string;
+  history?: { role: string; content: string }[];
+  current_phase_id?: string;
+  current_task_id?: string;
+}
+
+export interface RoadmapAssistantResponse {
+  response: string;
+  provider: string;
+  suggested_actions?: string[];
+}
+
+export async function askRoadmapAssistant(
+  payload: RoadmapAssistantRequest
+): Promise<RoadmapAssistantResponse> {
+  return request<RoadmapAssistantResponse>('/roadmap/assistant', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getPracticeContext(): Promise<PracticeContextData> {
+  return request<PracticeContextData>('/practice/context', { cache: 'no-store' });
+}
+
+export async function generatePracticeDrill(
+  topic: string,
+  difficulty = 'Intermediate',
+  questionCount = 3
+): Promise<InteractiveDrillQuestion[]> {
+  return request<InteractiveDrillQuestion[]>('/practice/drill/generate', {
+    method: 'POST',
+    body: JSON.stringify({ topic, difficulty, question_count: questionCount }),
+  });
+}
+
+export async function evaluatePracticeDrillQuestion(payload: {
+  question_id: string;
+  question_text: string;
+  options: string[];
+  correct_answer: string;
+  explanation: string;
+  user_answer: string;
+}): Promise<DrillEvaluationData> {
+  return request<DrillEvaluationData>('/practice/drill/evaluate', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
 }
 
 export async function startMicroPractice(topic: string, targetRole?: string): Promise<InterviewSessionData> {

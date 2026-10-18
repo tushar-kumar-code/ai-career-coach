@@ -46,7 +46,4 @@ services:
       - key: NODE_VERSION
         value: 20
       - key: NEXT_PUBLIC_API_URL
-        fromService:
-          type: web
-          name: ai-career-coach-backend
-          property: host
+        value: https://ai-career-coach-backend-qkha.onrender.com/api/v1

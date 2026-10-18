@@ -73,11 +73,33 @@ SKILL_ALIASES: Dict[str, str] = {
     "rest api": "REST APIs",
     "rest apis": "REST APIs",
     "restful apis": "REST APIs",
+    "c/c++": "C++",
+    "c and c++": "C++",
+    "c & c++": "C++",
+    "git/github": "GitHub",
+    "git & github": "GitHub",
+    "git and github": "GitHub",
     "ci/cd": "CI/CD Pipelines",
     "ci/cd pipelines": "CI/CD Pipelines",
+    "c": "C",
+    "c++": "C++",
+    "cpp": "C++",
+    "c plus plus": "C++",
+    "java": "Java",
     "oop": "OOP",
+    "oops": "OOP",
+    "object oriented programming": "OOP",
+    "object-oriented programming": "OOP",
+    "oop (object-oriented programming)": "OOP",
     "data structures": "Data Structures",
+    "dsa": "Data Structures",
+    "data structures and algorithms": "Data Structures",
+    "data structures & algorithms": "Data Structures",
+    "data structures and algorithms (dsa)": "Data Structures",
     "problem solving": "Problem Solving",
+    "problem-solving": "Problem Solving",
+    "strengthen problem-solving skills": "Problem Solving",
+    "analytical problem solving": "Problem Solving",
     "analytical thinking": "Analytical Thinking",
     "logical reasoning": "Logical Reasoning",
     "systems thinking": "Systems Thinking",
@@ -99,6 +121,12 @@ class SkillNormalizer:
         if not name:
             return ""
         clean_name = name.strip().lower()
+        
+        # Remove proficiency level indicators if surrounded by space or boundaries
+        subbed = re.sub(r'\s*\b(basic|intermediate|advanced|proficient|beginner)\b', '', clean_name, flags=re.IGNORECASE).strip()
+        if subbed:
+            clean_name = subbed
+
         clean_name = re.sub(r'[\s_]+', ' ', clean_name)
         
         # Direct lookup in alias dictionary
@@ -106,5 +134,5 @@ class SkillNormalizer:
             return SKILL_ALIASES[clean_name]
         
         # Capitalize words as fallback
-        words = name.strip().split()
+        words = clean_name.strip().split()
         return " ".join(w.capitalize() for w in words)

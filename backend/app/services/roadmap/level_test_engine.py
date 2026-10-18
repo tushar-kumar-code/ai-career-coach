@@ -381,10 +381,23 @@ REQUIREMENTS:
                 f"Congratulations! 🏆 You scored {score_percent}% ({mastery_level}) on Level {phase_number}: '{level_name}'! "
                 f"+{xp_earned} XP earned. You have demonstrated thorough mastery of all core learning objectives."
             )
-        else:
+        recovery_recommendations: List[str] = []
+        guided_practice_exercise: Optional[str] = None
+
+        if not passed:
+            for top in missed_topics:
+                recovery_recommendations.append(
+                    f"Review core fundamentals of '{top}': study syntax patterns, edge cases, and practical usage before retaking."
+                )
+            if missed_topics:
+                primary_missed = missed_topics[0]
+                guided_practice_exercise = (
+                    f"Targeted Recovery Practice: Write a standalone practice script/module implementing '{primary_missed}'. "
+                    f"Test it locally with both normal inputs and boundary edge cases to ensure deep conceptual understanding."
+                )
             feedback = (
                 f"Score: {score_percent}% ({correct_count}/{total_questions} correct). You need at least 70% to unlock the next level. "
-                f"+{xp_earned} encouragement XP added. Review the missed topics in your syllabus, then retake the AI test!"
+                f"+{xp_earned} encouragement XP added. Follow the recovery recommendations below, complete the guided practice drill, then retry!"
             )
 
         return LevelTestSubmitResponse(
@@ -404,5 +417,8 @@ REQUIREMENTS:
             unlocked_level_name=unlocked_level_name,
             feedback=feedback,
             missed_topics=missed_topics,
-            results_detail=results_detail
+            results_detail=results_detail,
+            recovery_recommendations=recovery_recommendations,
+            guided_practice_exercise=guided_practice_exercise,
+            can_retry=True
         )

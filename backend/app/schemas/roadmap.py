@@ -1,5 +1,6 @@
 from typing import List, Dict, Any, Optional
-from pydantic import BaseModel, Field
+from datetime import datetime
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class RoadmapGenerateRequest(BaseModel):
@@ -7,8 +8,11 @@ class RoadmapGenerateRequest(BaseModel):
     hours_per_day: int = Field(default=1, ge=1, le=8, description="Available study hours per day")
     days_per_week: int = Field(default=5, ge=1, le=7, description="Available study days per week")
     preferred_learning_style: str = Field(default="Hands-on", description="Hands-on, Visual, or Reading")
+    career_goal: Optional[str] = Field(default="Entry-level Job", description="Internship, Entry-level Job, Career Transition, Certification, or Skill Mastery")
+    target_role: Optional[str] = Field(default=None, description="Explicit target role or domain override")
     track_pace: Optional[str] = Field(default="Standard", description="Express (3 Levels), Standard (4-5 Levels), or Comprehensive (6-7 Levels)")
     target_phases_count: Optional[int] = Field(default=None, ge=2, le=9, description="Custom number of levels")
+    domain_requirement: Optional[str] = Field(default=None, description="Custom domain focus or special requirement")
 
 
 class RoadmapPreferencesRequest(BaseModel):
@@ -16,8 +20,11 @@ class RoadmapPreferencesRequest(BaseModel):
     hours_per_day: int = Field(..., ge=1, le=8)
     days_per_week: int = Field(..., ge=1, le=7)
     preferred_learning_style: str = Field(...)
-    track_pace: Optional[str] = Field(default="Standard")
-    target_phases_count: Optional[int] = Field(default=None, ge=2, le=9)
+    career_goal: Optional[str] = Field(default="Entry-level Job", description="Internship, Entry-level Job, Career Transition, Certification, or Skill Mastery")
+    target_role: Optional[str] = Field(default=None, description="Target career domain (e.g. DevOps, Data Science, Full Stack)")
+    track_pace: Optional[str] = Field(default="Standard", description="Express, Standard, Comprehensive, or Dynamic")
+    target_phases_count: Optional[int] = Field(default=None, ge=2, le=9, description="Custom flexible number of levels")
+    domain_requirement: Optional[str] = Field(default=None, description="Custom focus or specific domain requirements")
 
 
 class CustomPhaseRequest(BaseModel):
@@ -52,6 +59,11 @@ class RoadmapTaskSchema(BaseModel):
     # Priority flag from Interview feedback loop
     is_priority: Optional[bool] = False
     priority_reason: Optional[str] = None
+    skill: Optional[str] = None
+    # Actionable outcome & verification fields
+    expected_outcome: Optional[str] = Field(default=None, description="Concrete deliverable or output produced")
+    verification_method: Optional[str] = Field(default=None, description="How understanding or completion is verified")
+    next_step: Optional[str] = Field(default=None, description="Clear next step after completing this task")
 
 
 class RoadmapProjectSchema(BaseModel):
@@ -114,6 +126,9 @@ class RoadmapResponse(BaseModel):
     current_unlocked_level: Optional[int] = 1
     total_xp: Optional[int] = 0
     adventurer_level: Optional[int] = 1
+    career_goal: Optional[str] = "Entry-level Job"
+    schedule_notes: Optional[str] = None
+    total_estimated_minutes: Optional[int] = None
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
 
@@ -126,6 +141,12 @@ class TodayFocusResponse(BaseModel):
     today_tasks: List[RoadmapTaskSchema]
     recommended_minutes: int
     why_it_matters: Optional[str] = None
+    is_level_test_recommended: bool = False
+    next_step: Optional[str] = None
+    completion_status: Optional[str] = "in_progress"
+    learner_level: Optional[str] = "Beginner"
+    starting_point_note: Optional[str] = None
+    career_goal: Optional[str] = None
 
 
 class RoadmapProgressResponse(BaseModel):
@@ -231,4 +252,51 @@ class LevelTestSubmitResponse(BaseModel):
     feedback: str
     missed_topics: List[str] = Field(default_factory=list)
     results_detail: List[QuestionResultDetail] = Field(default_factory=list)
+    recovery_recommendations: List[str] = Field(default_factory=list, description="Targeted recovery and revision instructions for missed topics")
+    guided_practice_exercise: Optional[str] = Field(default=None, description="Guided practice drill to reinforce weak concepts before retrying")
+    can_retry: bool = True
+
+
+class CreateRoadmapSkillRequestSchema(BaseModel):
+    skill_name: str
+    source: Optional[str] = "Skill Matrix"
+    priority: Optional[str] = "Medium"
+
+
+class AcceptRoadmapSkillRequestSchema(BaseModel):
+    target_phase_number: Optional[int] = None
+
+
+class RoadmapSkillRequestResponse(BaseModel):
+    id: str
+    user_id: str
+    roadmap_id: Optional[str] = None
+    skill_name: str
+    source: str
+    status: str
+    priority: str
+    suggested_phase_number: int
+    suggested_phase_title: Optional[str] = None
+    suggested_task_title: Optional[str] = None
+    placement_reason: Optional[str] = None
+    difficulty_level: str
+    estimated_minutes: int
+    topics_to_learn: List[str] = Field(default_factory=list)
+    practice_goal: Optional[str] = None
+    created_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class RoadmapAssistantRequest(BaseModel):
+    message: str = Field(..., min_length=1, description="User question or query about roadmap")
+    history: Optional[List[Dict[str, str]]] = Field(default_factory=list, description="Prior conversation messages")
+    current_phase_id: Optional[str] = Field(default=None, description="Active level/phase ID")
+    current_task_id: Optional[str] = Field(default=None, description="Active task/topic ID")
+
+
+class RoadmapAssistantResponse(BaseModel):
+    response: str
+    provider: str = "Groq AI"
+    suggested_actions: Optional[List[str]] = Field(default_factory=list)
 

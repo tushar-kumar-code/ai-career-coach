@@ -344,9 +344,12 @@ export interface RoadmapTask {
   topics_to_learn?: string[];
   learning_focus?: string;
   practice_goal?: string;
+  expected_outcome?: string;
+  verification_method?: string;
   recommended_resources?: string[];
   difficulty_level?: string;
   prerequisites?: string[];
+  next_step?: string;
   // Legacy learning resources
   concept_explanation?: string;
   practice_exercise?: string;
@@ -417,6 +420,9 @@ export interface RoadmapData {
   user_id: string;
   target_career_id?: string;
   target_role: string;
+  career_goal?: string;
+  schedule_notes?: string;
+  total_estimated_minutes?: number;
   user_level: string;
   overall_progress_percent: number;
   is_active: boolean;
@@ -433,6 +439,25 @@ export interface RoadmapData {
   current_unlocked_level?: number;
   total_xp?: number;
   adventurer_level?: number;
+}
+
+export interface RoadmapSkillRequest {
+  id: string;
+  user_id: string;
+  roadmap_id?: string;
+  skill_name: string;
+  source: string;
+  status: 'pending' | 'accepted' | 'rejected';
+  priority: string;
+  suggested_phase_number: number;
+  suggested_phase_title?: string;
+  suggested_task_title?: string;
+  placement_reason?: string;
+  difficulty_level: string;
+  estimated_minutes: number;
+  topics_to_learn: string[];
+  practice_goal?: string;
+  created_at?: string;
 }
 
 // ----------------------------------------------------
@@ -491,16 +516,30 @@ export interface LevelTestSubmitResponse {
   feedback: string;
   missed_topics: string[];
   results_detail: QuestionResultDetail[];
+  recovery_recommendations?: string[];
+  guided_practice_exercise?: string;
+  can_retry?: boolean;
 }
 
 export interface DailyTasksData {
-  roadmap_id: string;
-  target_role: string;
-  current_phase_name: string;
-  hours_budget: number;
+  roadmap_id?: string;
+  target_role?: string;
+  target_career?: string;
+  current_phase_name?: string;
+  current_phase_id?: string;
+  current_phase_title?: string;
+  hours_budget?: number;
+  recommended_minutes?: number;
   today_focus_title: string;
-  why_it_matters: string;
-  tasks: RoadmapTask[];
+  why_it_matters?: string;
+  today_tasks?: RoadmapTask[];
+  tasks?: RoadmapTask[];
+  is_level_test_recommended?: boolean;
+  next_step?: string;
+  completion_status?: 'in_progress' | 'ready_for_test' | 'all_completed';
+  learner_level?: string;
+  starting_point_note?: string;
+  career_goal?: string;
 }
 
 export interface RoadmapProgressData {
@@ -1017,5 +1056,65 @@ export interface AuthResponseData {
   access_token: string;
   token_type: string;
   user: UserAuthData;
+}
+
+// ----------------------------------------------------
+// Skill Practice Engine & Interactive Drills
+// ----------------------------------------------------
+export interface PracticeContextLevelSummary {
+  phase_id: string;
+  phase_number: number;
+  level_name: string;
+  level_theme: string;
+  level_icon: string;
+  is_unlocked: boolean;
+  test_passed: boolean;
+  test_score?: number | null;
+  stars: number;
+  xp_reward: number;
+}
+
+export interface PracticeContextData {
+  target_role: string;
+  profile_skills: string[];
+  missing_skills: string[];
+  current_level_number: number;
+  current_level_name: string;
+  current_level_theme: string;
+  current_phase_id: string;
+  current_level_unlocked: boolean;
+  current_test_passed: boolean;
+  current_test_score?: number | null;
+  next_level_name?: string | null;
+  all_levels: PracticeContextLevelSummary[];
+  recommended_topics: Array<{
+    topic: string;
+    reason: string;
+    type: string;
+    priority: string;
+  }>;
+}
+
+export interface InteractiveDrillQuestion {
+  id: string;
+  topic: string;
+  question: string;
+  code_snippet?: string | null;
+  difficulty: string;
+  question_type: string;
+  options: string[];
+  correct_answer: string;
+  explanation: string;
+}
+
+export interface DrillEvaluationData {
+  question_id: string;
+  is_correct: boolean;
+  score: number;
+  user_answer: string;
+  correct_answer: string;
+  explanation: string;
+  feedback: string;
+  key_takeaway: string;
 }
 

@@ -30,12 +30,12 @@ class UserSkillSchema(BaseModel):
 
 class SkillGapSchema(BaseModel):
     skill_name: str
-    category: str
-    current_proficiency: str
-    required_proficiency: str
-    gap_status: str
-    priority: str
-    priority_reason: str
+    category: str = "Technical"
+    current_proficiency: str = "None"
+    required_proficiency: str = "Intermediate"
+    gap_status: str = "Missing"
+    priority: str = "High"
+    priority_reason: str = "Target career requirement"
 
 
 class SkillProfileResponse(BaseModel):
